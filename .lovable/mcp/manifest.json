@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "sdk_version": "0.20.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "partnerhub-mcp",
+      "version": "0.1.0",
+      "title": "PartnerHub MCP"
+    },
+    "tools": [
+      {
+        "name": "list_partners",
+        "title": "List partners",
+        "description": "List partners in the PartnerHub portal. Supports optional tier and type filters.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "tier": {
+              "description": "Filter by tier.",
+              "type": "string",
+              "enum": [
+                "Bronze",
+                "Silver",
+                "Gold",
+                "Platinum"
+              ]
+            },
+            "type": {
+              "description": "Filter by partner type.",
+              "type": "string",
+              "enum": [
+                "Reseller",
+                "Referral"
+              ]
+            },
+            "limit": {
+              "description": "Maximum number of partners to return.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_deals",
+        "title": "List deals",
+        "description": "List deals in the pipeline. Supports optional stage and partner filters.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "stage": {
+              "type": "string",
+              "enum": [
+                "Qualified",
+                "Proposal",
+                "Negotiation",
+                "Won",
+                "Lost"
+              ]
+            },
+            "partner": {
+              "description": "Partner name substring to filter by.",
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_dashboard_summary",
+        "title": "Get dashboard summary",
+        "description": "Return an aggregated snapshot of the PartnerHub admin dashboard: KPIs, pipeline stages, and top-tier distribution.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

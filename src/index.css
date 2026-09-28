@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 218 79% 46%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 216 34% 94%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 214 32% 95%;
+    --muted-foreground: 215 20% 38%;
+
+    --accent: 214 42% 92%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 158 64% 29%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 42 96% 54%;
+    --warning-foreground: 222 47% 11%;
+
+    --info: 217 91% 60%;
+    --info-foreground: 222 47% 11%;
+
+    --border: 214 24% 87%;
+    --input: 214 24% 87%;
+    --ring: 218 79% 46%;
+
+    --radius: 0.625rem;
+
+    --sidebar-background: var(--background);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-primary: 205 92% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 252 100% 97%;
+    --sidebar-accent-foreground: var(--foreground);
+    --sidebar-border: var(--border);
+    --sidebar-ring: 205 92% 58%;
+    --sidebar-muted: 215 20% 38%;
+  }
+
+  .dark {
+    --background: 224 34% 11%;
+    --foreground: 220 28% 92%;
+    --card: 224 30% 14%;
+    --card-foreground: 220 28% 92%;
+    --popover: 224 30% 14%;
+    --popover-foreground: 220 28% 92%;
+    --primary: 217 91% 62%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 222 24% 20%;
+    --secondary-foreground: 220 28% 92%;
+    --muted: 222 24% 20%;
+    --muted-foreground: 220 16% 70%;
+    --accent: 223 26% 24%;
+    --accent-foreground: 220 28% 92%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 158 62% 32%;
+    --success-foreground: 0 0% 100%;
+    --warning: 42 96% 58%;
+    --warning-foreground: 222 47% 11%;
+    --info: 217 91% 66%;
+    --info-foreground: 222 47% 11%;
+    --border: 223 19% 26%;
+    --input: 223 19% 26%;
+    --ring: 217 91% 62%;
+    --sidebar-background: var(--background);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-primary: 217 91% 62%;
+    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-accent: 223 26% 24%;
+    --sidebar-accent-foreground: var(--foreground);
+    --sidebar-border: var(--border);
+    --sidebar-ring: 217 91% 62%;
+    --sidebar-muted: 220 16% 70%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply text-foreground font-sans;
+    background-color: hsl(var(--background));
+    background-image: none;
+  }
+}
