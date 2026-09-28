@@ -1,5 +1,3 @@
-import { mockUsers } from "@/lib/mock-data";
-
 export type AppRole = "admin" | "partner";
 
 export interface AuthUser {
@@ -10,31 +8,36 @@ export interface AuthUser {
   status?: "ACTIVE" | "INACTIVE";
 }
 
-// ── Mock auth (no backend in sandbox) ─────────────────────────────
-// Accepts ANY password for any seeded user email. Keeps the same API surface
-// the rest of the app expects (token + AuthUser shape).
+// ── Placeholder auth (template) ───────────────────────────────────
+// Two demo accounts, any password signs in. Swap for a real backend
+// (e.g. Lovable Cloud auth) when wiring up the app.
 
-const TOKEN_PREFIX = "mock-token::";
+const TOKEN_PREFIX = "template-token::";
+
+const demoUsers = [
+  { id: "u_admin", email: "admin@demo.dev", role: "admin" as const },
+  { id: "u_partner", email: "partner@demo.dev", role: "partner" as const },
+];
 
 function findUserByEmail(email: string) {
   const normalized = email.trim().toLowerCase();
-  return mockUsers.find((u) => u.email.toLowerCase() === normalized);
+  return demoUsers.find((u) => u.email.toLowerCase() === normalized);
 }
 
-function toAuthUser(u: (typeof mockUsers)[number]): AuthUser {
+function toAuthUser(u: (typeof demoUsers)[number]): AuthUser {
   return {
     id: u.id,
     email: u.email,
     role: u.role === "admin" ? "ADMIN" : "PARTNER_USER",
-    partnerId: u.partnerId ?? null,
-    status: u.status === "active" ? "ACTIVE" : "INACTIVE",
+    partnerId: null,
+    status: "ACTIVE",
   };
 }
 
 function userFromToken(token: string) {
   if (!token.startsWith(TOKEN_PREFIX)) return null;
   const id = token.slice(TOKEN_PREFIX.length);
-  return mockUsers.find((u) => u.id === id) ?? null;
+  return demoUsers.find((u) => u.id === id) ?? null;
 }
 
 export async function loginApi(email: string, _password: string) {
@@ -60,7 +63,7 @@ export async function logoutApi(_token: string) {
 }
 
 export async function forgotPasswordApi(_email: string) {
-  return { sent: true, resetToken: "mock-reset-token" };
+  return { sent: true, resetToken: "template-reset-token" };
 }
 
 export async function resetPasswordApi(_token: string, _newPassword: string) {
@@ -70,4 +73,3 @@ export async function resetPasswordApi(_token: string, _newPassword: string) {
 export function toAppRole(role: AuthUser["role"]): AppRole {
   return role === "ADMIN" ? "admin" : "partner";
 }
-
