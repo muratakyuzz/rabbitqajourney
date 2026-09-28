@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 218 79% 46%;
+    --primary: 246 86% 53%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 216 34% 94%;
@@ -41,18 +41,20 @@
 
     --border: 214 24% 87%;
     --input: 214 24% 87%;
-    --ring: 218 79% 46%;
+    --ring: 246 86% 53%;
 
     --radius: 0.625rem;
 
     --sidebar-background: var(--background);
     --sidebar-foreground: var(--foreground);
-    --sidebar-primary: 205 92% 58%;
+    --sidebar-primary: 245 100% 56%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 252 100% 97%;
-    --sidebar-accent-foreground: var(--foreground);
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 223 48% 11%;
+    --sidebar-selected-background: 227 100% 93%;
+    --sidebar-selected-foreground: 245 100% 56%;
     --sidebar-border: var(--border);
-    --sidebar-ring: 205 92% 58%;
+    --sidebar-ring: 246 86% 53%;
     --sidebar-muted: 215 20% 38%;
   }
 
@@ -63,8 +65,8 @@
     --card-foreground: 220 28% 92%;
     --popover: 224 30% 14%;
     --popover-foreground: 220 28% 92%;
-    --primary: 217 91% 62%;
-    --primary-foreground: 222 47% 11%;
+    --primary: 246 86% 68%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 222 24% 20%;
     --secondary-foreground: 220 28% 92%;
     --muted: 222 24% 20%;
@@ -81,15 +83,17 @@
     --info-foreground: 222 47% 11%;
     --border: 223 19% 26%;
     --input: 223 19% 26%;
-    --ring: 217 91% 62%;
+    --ring: 246 86% 68%;
     --sidebar-background: var(--background);
     --sidebar-foreground: var(--foreground);
-    --sidebar-primary: 217 91% 62%;
-    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-primary: 245 100% 70%;
+    --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 223 26% 24%;
     --sidebar-accent-foreground: var(--foreground);
+    --sidebar-selected-background: 245 45% 24%;
+    --sidebar-selected-foreground: 245 100% 78%;
     --sidebar-border: var(--border);
-    --sidebar-ring: 217 91% 62%;
+    --sidebar-ring: 246 86% 68%;
     --sidebar-muted: 220 16% 70%;
   }
 }
@@ -104,4 +108,12 @@
     background-color: hsl(var(--background));
     background-image: none;
   }
+}
+
+/* Move sonner's toast close (×) button from its default top-left corner to
+   top-right, matching the requested placement. */
+[data-sonner-toaster] {
+  --toast-close-button-start: unset;
+  --toast-close-button-end: 0;
+  --toast-close-button-transform: translate(35%, -35%);
 }
