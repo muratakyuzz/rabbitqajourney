@@ -5,10 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
  * Empty page skeleton used across the template. Replace the body with
  * real content as you build each page out.
  */
-export function PageSkeleton({ title, description }: { title: string; description?: string }) {
+export function PageSkeleton({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="space-y-6">
-      <PageHeader title={title} description={description ?? `${title} placeholder`} />
+      <PageHeader title={title} subtitle={subtitle ?? `${title} placeholder`} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[1, 2, 3].map((i) => (
