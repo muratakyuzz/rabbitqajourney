@@ -58,7 +58,7 @@ const App = () => (
             {/* Admin routes */}
             <Route path="/app/admin" element={<ProtectedRoute allowedRole="admin" />}>
               <Route element={<AppShell />}>
-                <Route path="dashboard" element={<PageSkeleton title="Dashboard" description="Admin overview placeholder" />} />
+                <Route path="dashboard" element={<PageSkeleton title="Dashboard" subtitle="Admin overview placeholder" />} />
                 <Route path="partners" element={<PageSkeleton title="Partners" />} />
                 <Route path="leads" element={<PageSkeleton title="Leads" />} />
                 <Route path="deals" element={<PageSkeleton title="Deals" />} />
@@ -72,7 +72,7 @@ const App = () => (
             {/* Partner routes */}
             <Route path="/app/partner" element={<ProtectedRoute allowedRole="partner" />}>
               <Route element={<AppShell />}>
-                <Route path="dashboard" element={<PageSkeleton title="Dashboard" description="Partner portal overview placeholder" />} />
+                <Route path="dashboard" element={<PageSkeleton title="Dashboard" subtitle="Partner portal overview placeholder" />} />
                 <Route path="leads" element={<PageSkeleton title="Leads" />} />
                 <Route path="deals" element={<PageSkeleton title="Deals" />} />
                 <Route path="finance" element={<PageSkeleton title="Finance" />} />
