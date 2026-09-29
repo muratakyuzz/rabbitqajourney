@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { getMe, loginApi, logoutApi, toAppRole, type AppRole, type AuthUser } from "@/lib/auth-api";
+import { getMe, loginApi, logoutApi, type AppRole, type AuthUser } from "@/lib/auth-api";
 
 // auth: mock-only (no backend in sandbox)
-const TOKEN_KEY = "partner-ecosystem-token";
+const TOKEN_KEY = "rabbitqa-token";
 
 interface AuthContextType {
   user: AuthUser | null;
-  role: AppRole;
+  role: AppRole | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextType>(
     () => ({
       user,
-      role: user ? toAppRole(user.role) : "admin",
+      role: user ? user.role : null,
       token,
       isAuthenticated: !!user,
       isLoading,
