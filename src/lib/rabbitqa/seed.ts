@@ -156,6 +156,15 @@ export function createSeed(): RqState {
       q_notes: "Dedicated test ekipleri henüz yok.",
       q_kpi: "Tüm senaryoları yüklemek ve koşumları gerçekleştirmek.",
     },
+    teamInfo: {
+      "Herkese Borsa": { contact: "Sevcan Vural", users: null },
+      "Trade Master": { contact: "Ezel Sarıtepe", users: null },
+    },
+    installType: "onprem",
+    llmChoice: "rabbitqa",
+    presentationShared: true,
+    reqDocShared: true,
+    reqDocSharedAt: "2026-08-28",
     createdAt: "2026-08-21T09:00:00.000Z",
   };
   const { phases, steps } = buildFromTemplate(project, users, {
@@ -198,8 +207,14 @@ export function createSeed(): RqState {
     { id: "cm_1", projectId: project.id, text: "Mobil kanal için MobileHub demosu yapılacak", targetPhaseCode: "04", status: "open" as const, note: "" },
   ];
 
+  const pid = project.id;
+  const trainingSteps: Step[] = ["2026-09-08", "2026-09-10"].map((d, i) => ({
+    id: uid("st"), projectId: pid, phaseId: phases.find((p) => p.code === "04")!.id, title: `Katılımcı girişi — ${d.split("-").reverse().join(".")} session'ı`,
+    required: false, ownerId: "u_deniz", ball: "csm", ballSince: project.createdAt, due: d, status: "done", order: 10 + i,
+  }));
+  steps.push(...trainingSteps);
   return {
-    version: 1,
+    version: 2,
     users,
     salespeople: SEED_SALESPEOPLE,
     modules: SEED_MODULES,
@@ -211,6 +226,24 @@ export function createSeed(): RqState {
     meetings,
     contacts,
     commitments,
+    kpis: [
+      { id: "k_1", projectId: pid, name: "Yüklenen regresyon senaryosu oranı", unit: "%", baseline: 0, target: 100, targetDate: "2026-10-02", measurements: [{ date: "2026-09-18", value: 25 }, { date: "2026-09-25", value: 40 }] },
+    ],
+    trainings: [
+      { id: "t_1", projectId: pid, date: "2026-09-08", trainerId: "u_deniz", attendees: "Herkese Borsa ekibi (İş analistleri, PO'lar)", modules: ["TestPilot", "CaseWriter"], recordingUrl: "", notes: "", status: "done" },
+      { id: "t_2", projectId: pid, date: "2026-09-10", trainerId: "u_deniz", attendees: "Trade Master ekibi", modules: ["TestPilot", "CaseWriter", "AutoRunner", "DataCrate"], recordingUrl: "", notes: "", status: "done" },
+    ],
+    adaptations: [
+      { id: "ad_1", projectId: pid, team: "Herkese Borsa", date: "2026-09-15", participants: "Sevcan Vural", notes: "" },
+      { id: "ad_2", projectId: pid, team: "Trade Master", date: "2026-09-17", participants: "Ezel Sarıtepe", notes: "" },
+    ],
+    credentials: [
+      { id: "cr_1", projectId: pid, type: "VPN", provider: "FortiClient", username: "virgosol.rabbitqa", password: "Demo-Sifre-123", validUntil: "2026-10-06", note: "Örnek kayıt" },
+    ],
+    documents: [
+      { id: "d_1", projectId: pid, type: "offer", name: "IsYatirim_Teklif.pdf", linkType: "project", linkId: null, addedAt: "2026-08-22T10:00:00.000Z" },
+      { id: "d_2", projectId: pid, type: "contract", name: "IsYatirim_Sozlesme.pdf", linkType: "project", linkId: null, addedAt: "2026-08-25T10:00:00.000Z" },
+    ],
     audit: [
       { id: "au_seed", projectId: project.id, at: project.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: project.id, label: "Proje oluşturuldu" },
     ],
