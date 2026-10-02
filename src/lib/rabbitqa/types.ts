@@ -19,6 +19,10 @@ export type MeetingType =
   | "go_no_go"
   | "other";
 
+export type InstallType = "saas" | "onprem";
+export type LlmChoice = "rabbitqa" | "own" | "gpu";
+export type DocType = "offer" | "contract" | "req_doc" | "presentation" | "other";
+
 export interface User {
   id: string;
   name: string;
@@ -53,6 +57,12 @@ export interface Project {
   healthReason: string;
   teams: string[];
   discoveryAnswers: Record<string, string>;
+  teamInfo: Record<string, { contact: string; users: number | null }>;
+  installType: InstallType | null;
+  llmChoice: LlmChoice | null;
+  presentationShared: boolean;
+  reqDocShared: boolean;
+  reqDocSharedAt: string | null;
   createdAt: string;
 }
 
@@ -84,6 +94,7 @@ export interface Step {
   due: string | null;
   status: StepStatus;
   order: number;
+  key?: string;
 }
 
 export interface Action {
@@ -98,6 +109,7 @@ export interface Action {
   source: ActionSource;
   meetingId: string | null;
   createdAt: string;
+  ruleKey?: string;
 }
 
 export interface Meeting {
@@ -135,7 +147,7 @@ export interface AuditEntry {
   projectId: string;
   at: string;
   userId: string;
-  kind: "create" | "update" | "delete";
+  kind: "create" | "update" | "delete" | "view";
   entity: string;
   entityId: string;
   label: string;
@@ -143,6 +155,59 @@ export interface AuditEntry {
   oldValue?: string;
   newValue?: string;
   reason?: string;
+}
+
+export interface Kpi {
+  id: string;
+  projectId: string;
+  name: string;
+  unit: string;
+  baseline: number | null;
+  target: number | null;
+  targetDate: string | null;
+  measurements: { date: string; value: number }[];
+}
+
+export interface TrainingSession {
+  id: string;
+  projectId: string;
+  date: string;
+  trainerId: string | null;
+  attendees: string;
+  modules: string[];
+  recordingUrl: string;
+  notes: string;
+  status: "planned" | "done";
+}
+
+export interface AdaptationSession {
+  id: string;
+  projectId: string;
+  team: string;
+  date: string | null;
+  participants: string;
+  notes: string;
+}
+
+export interface Credential {
+  id: string;
+  projectId: string;
+  type: string;
+  provider: string;
+  username: string;
+  password: string;
+  validUntil: string | null;
+  note: string;
+}
+
+export interface DocumentRec {
+  id: string;
+  projectId: string;
+  type: DocType;
+  name: string;
+  linkType: "project" | "meeting" | "step";
+  linkId: string | null;
+  addedAt: string;
 }
 
 export interface RqState {
@@ -158,5 +223,10 @@ export interface RqState {
   meetings: Meeting[];
   contacts: Contact[];
   commitments: Commitment[];
+  kpis: Kpi[];
+  trainings: TrainingSession[];
+  adaptations: AdaptationSession[];
+  credentials: Credential[];
+  documents: DocumentRec[];
   audit: AuditEntry[];
 }

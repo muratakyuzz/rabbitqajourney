@@ -22,3 +22,8 @@ export function visibleProjects(state: RqState, u: AuthUser | null) {
   ]);
   return state.projects.filter((p) => ids.has(p.id));
 }
+
+export function canSeeCredentials(u: AuthUser | null, p: Project) {
+  if (!u) return false;
+  return u.role === "devops" || (u.role === "csm" && p.csmId === u.id);
+}

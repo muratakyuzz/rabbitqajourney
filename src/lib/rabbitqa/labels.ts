@@ -42,6 +42,7 @@ export const MEETING_TYPE_LABEL: Record<MeetingType, string> = {
 };
 export const ENTITY_LABEL: Record<string, string> = {
   project: "Proje", phase: "Aşama", step: "Adım", action: "Aksiyon", meeting: "Toplantı", contact: "Kişi", commitment: "Taahhüt",
+  kpi: "KPI", training: "Eğitim", adaptation: "Uyarlama", credential: "Erişim bilgisi", document: "Doküman",
 };
 
 export function fmtDate(d: string | null | undefined) {
@@ -57,3 +58,13 @@ export function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+
+export const INSTALL_LABEL = { saas: "SaaS", onprem: "On-prem" } as const;
+export const LLM_LABEL = {
+  rabbitqa: "RabbitQA'nın sağladığı LLM",
+  own: "Müşterinin kendi LLM'i",
+  gpu: "Müşteri GPU'lu sunucu verir, model kurulumunu Virgosol yapar",
+} as const;
+export const DOC_TYPE_LABEL = {
+  offer: "Teklif", contract: "Sözleşme", req_doc: "Kurulum gereksinim dokümanı", presentation: "Onboarding sunumu", other: "Diğer",
+} as const;

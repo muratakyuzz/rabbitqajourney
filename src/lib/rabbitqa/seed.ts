@@ -28,7 +28,7 @@ export const SEED_QUESTIONS: DiscoveryQuestion[] = [
   { id: "q_kpi", group: "Diğer", text: "KPI", required: false },
 ];
 
-interface StepTpl { title: string; ball: Ball; required: boolean; ownerRole?: "manager" }
+interface StepTpl { title: string; ball: Ball; required: boolean; ownerRole?: "manager"; key?: string }
 interface PhaseTpl { code: string; name: string; steps: StepTpl[] }
 
 export const PHASE_TEMPLATE: PhaseTpl[] = [
@@ -38,15 +38,15 @@ export const PHASE_TEMPLATE: PhaseTpl[] = [
     { title: "Satın alınan modüllerin girilmesi", ball: "csm", required: true },
     { title: "Taahhütlerin girilmesi", ball: "csm", required: true },
     { title: "Internal brif toplantısı", ball: "csm", required: true },
-    { title: "Teklif dokümanının yüklenmesi", ball: "csm", required: true },
-    { title: "Müşteri sözleşmesinin yüklenmesi", ball: "csm", required: true },
+    { key: "offer", title: "Teklif dokümanının yüklenmesi", ball: "csm", required: true },
+    { key: "contract", title: "Müşteri sözleşmesinin yüklenmesi", ball: "csm", required: true },
   ]},
   { code: "01", name: "Kick-off", steps: [
     { title: "Kick-off toplantısı", ball: "csm", required: true },
-    { title: "Onboarding sunumunun paylaşılması", ball: "csm", required: false },
-    { title: "Kurulum tipi seçimi", ball: "csm", required: true },
-    { title: "Kurulum gereksinim dokümanının paylaşılması", ball: "csm", required: true },
-    { title: "LLM tercihinin girilmesi", ball: "csm", required: true },
+    { key: "presentation", title: "Onboarding sunumunun paylaşılması", ball: "csm", required: false },
+    { key: "install_type", title: "Kurulum tipi seçimi", ball: "csm", required: true },
+    { key: "reqdoc", title: "Kurulum gereksinim dokümanının paylaşılması", ball: "csm", required: true },
+    { key: "llm", title: "LLM tercihinin girilmesi", ball: "csm", required: true },
   ]},
   { code: "02", name: "Keşif", steps: [
     { title: "Keşif toplantısı", ball: "csm", required: true },
@@ -55,12 +55,12 @@ export const PHASE_TEMPLATE: PhaseTpl[] = [
     { title: "KPI tanımı", ball: "csm", required: false },
   ]},
   { code: "03", name: "Kurulum", steps: [
-    { title: "VPN erişiminin talep edilmesi", ball: "customer", required: true },
-    { title: "VPN bilgilerinin alınması ve kaydedilmesi", ball: "csm", required: true },
-    { title: "Sunucuların oluşturulup teslim edilmesi", ball: "customer", required: true },
-    { title: "Müşterinin DevOps ekibine devir toplantısı", ball: "customer", required: true },
+    { key: "vpn_req", title: "VPN erişiminin talep edilmesi", ball: "customer", required: true },
+    { key: "vpn_info", title: "VPN bilgilerinin alınması ve kaydedilmesi", ball: "csm", required: true },
+    { key: "servers", title: "Sunucuların oluşturulup teslim edilmesi", ball: "customer", required: true },
+    { key: "devops_handover", title: "Müşterinin DevOps ekibine devir toplantısı", ball: "customer", required: true },
     { title: "Ürün kurulumu", ball: "devops", required: true },
-    { title: "Model kurulumu", ball: "devops", required: false },
+    { key: "model_install", title: "Model kurulumu", ball: "devops", required: false },
     { title: "İlk platform testleri", ball: "care", required: true },
     { title: "Örnek proje ile platforma veri doldurulması", ball: "care", required: true },
     { title: "Müşteri hesaplarının açılması ve paylaşılması", ball: "care", required: true },
@@ -124,7 +124,7 @@ export function buildFromTemplate(project: Project, users: User[], planEnds: Rec
       steps.push({
         id: uid("st"), projectId: project.id, phaseId: phase.id, title: st.title, required: st.required,
         ownerId: ownerFor(st.ball, project.csmId, users, (st as StepTpl).ownerRole), ball: st.ball,
-        ballSince: project.createdAt, due: end, status: "pending", order: j,
+        ballSince: project.createdAt, due: end, status: "pending", order: j, key: (st as StepTpl).key,
       });
     });
   });
@@ -156,6 +156,15 @@ export function createSeed(): RqState {
       q_notes: "Dedicated test ekipleri henüz yok.",
       q_kpi: "Tüm senaryoları yüklemek ve koşumları gerçekleştirmek.",
     },
+    teamInfo: {
+      "Herkese Borsa": { contact: "Sevcan Vural", users: null },
+      "Trade Master": { contact: "Ezel Sarıtepe", users: null },
+    },
+    installType: "onprem",
+    llmChoice: "rabbitqa",
+    presentationShared: true,
+    reqDocShared: true,
+    reqDocSharedAt: "2026-08-28",
     createdAt: "2026-08-21T09:00:00.000Z",
   };
   const { phases, steps } = buildFromTemplate(project, users, {
@@ -198,8 +207,14 @@ export function createSeed(): RqState {
     { id: "cm_1", projectId: project.id, text: "Mobil kanal için MobileHub demosu yapılacak", targetPhaseCode: "04", status: "open" as const, note: "" },
   ];
 
+  const pid = project.id;
+  const trainingSteps: Step[] = ["2026-09-08", "2026-09-10"].map((d, i) => ({
+    id: uid("st"), projectId: pid, phaseId: phases.find((p) => p.code === "04")!.id, title: `Katılımcı girişi — ${d.split("-").reverse().join(".")} session'ı`,
+    required: false, ownerId: "u_deniz", ball: "csm", ballSince: project.createdAt, due: d, status: "done", order: 10 + i,
+  }));
+  steps.push(...trainingSteps);
   return {
-    version: 1,
+    version: 2,
     users,
     salespeople: SEED_SALESPEOPLE,
     modules: SEED_MODULES,
@@ -211,6 +226,24 @@ export function createSeed(): RqState {
     meetings,
     contacts,
     commitments,
+    kpis: [
+      { id: "k_1", projectId: pid, name: "Yüklenen regresyon senaryosu oranı", unit: "%", baseline: 0, target: 100, targetDate: "2026-10-02", measurements: [{ date: "2026-09-18", value: 25 }, { date: "2026-09-25", value: 40 }] },
+    ],
+    trainings: [
+      { id: "t_1", projectId: pid, date: "2026-09-08", trainerId: "u_deniz", attendees: "Herkese Borsa ekibi (İş analistleri, PO'lar)", modules: ["TestPilot", "CaseWriter"], recordingUrl: "", notes: "", status: "done" },
+      { id: "t_2", projectId: pid, date: "2026-09-10", trainerId: "u_deniz", attendees: "Trade Master ekibi", modules: ["TestPilot", "CaseWriter", "AutoRunner", "DataCrate"], recordingUrl: "", notes: "", status: "done" },
+    ],
+    adaptations: [
+      { id: "ad_1", projectId: pid, team: "Herkese Borsa", date: "2026-09-15", participants: "Sevcan Vural", notes: "" },
+      { id: "ad_2", projectId: pid, team: "Trade Master", date: "2026-09-17", participants: "Ezel Sarıtepe", notes: "" },
+    ],
+    credentials: [
+      { id: "cr_1", projectId: pid, type: "VPN", provider: "FortiClient", username: "virgosol.rabbitqa", password: "Demo-Sifre-123", validUntil: "2026-10-06", note: "Örnek kayıt" },
+    ],
+    documents: [
+      { id: "d_1", projectId: pid, type: "offer", name: "IsYatirim_Teklif.pdf", linkType: "project", linkId: null, addedAt: "2026-08-22T10:00:00.000Z" },
+      { id: "d_2", projectId: pid, type: "contract", name: "IsYatirim_Sozlesme.pdf", linkType: "project", linkId: null, addedAt: "2026-08-25T10:00:00.000Z" },
+    ],
     audit: [
       { id: "au_seed", projectId: project.id, at: project.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: project.id, label: "Proje oluşturuldu" },
     ],
