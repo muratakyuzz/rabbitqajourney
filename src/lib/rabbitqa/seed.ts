@@ -28,7 +28,7 @@ export const SEED_QUESTIONS: DiscoveryQuestion[] = [
   { id: "q_kpi", group: "Diğer", text: "KPI", required: false },
 ];
 
-interface StepTpl { title: string; ball: Ball; required: boolean; ownerRole?: "manager" }
+interface StepTpl { title: string; ball: Ball; required: boolean; ownerRole?: "manager"; key?: string }
 interface PhaseTpl { code: string; name: string; steps: StepTpl[] }
 
 export const PHASE_TEMPLATE: PhaseTpl[] = [
@@ -38,15 +38,15 @@ export const PHASE_TEMPLATE: PhaseTpl[] = [
     { title: "Satın alınan modüllerin girilmesi", ball: "csm", required: true },
     { title: "Taahhütlerin girilmesi", ball: "csm", required: true },
     { title: "Internal brif toplantısı", ball: "csm", required: true },
-    { title: "Teklif dokümanının yüklenmesi", ball: "csm", required: true },
-    { title: "Müşteri sözleşmesinin yüklenmesi", ball: "csm", required: true },
+    { key: "offer", title: "Teklif dokümanının yüklenmesi", ball: "csm", required: true },
+    { key: "contract", title: "Müşteri sözleşmesinin yüklenmesi", ball: "csm", required: true },
   ]},
   { code: "01", name: "Kick-off", steps: [
     { title: "Kick-off toplantısı", ball: "csm", required: true },
-    { title: "Onboarding sunumunun paylaşılması", ball: "csm", required: false },
-    { title: "Kurulum tipi seçimi", ball: "csm", required: true },
-    { title: "Kurulum gereksinim dokümanının paylaşılması", ball: "csm", required: true },
-    { title: "LLM tercihinin girilmesi", ball: "csm", required: true },
+    { key: "presentation", title: "Onboarding sunumunun paylaşılması", ball: "csm", required: false },
+    { key: "install_type", title: "Kurulum tipi seçimi", ball: "csm", required: true },
+    { key: "reqdoc", title: "Kurulum gereksinim dokümanının paylaşılması", ball: "csm", required: true },
+    { key: "llm", title: "LLM tercihinin girilmesi", ball: "csm", required: true },
   ]},
   { code: "02", name: "Keşif", steps: [
     { title: "Keşif toplantısı", ball: "csm", required: true },
@@ -55,12 +55,12 @@ export const PHASE_TEMPLATE: PhaseTpl[] = [
     { title: "KPI tanımı", ball: "csm", required: false },
   ]},
   { code: "03", name: "Kurulum", steps: [
-    { title: "VPN erişiminin talep edilmesi", ball: "customer", required: true },
-    { title: "VPN bilgilerinin alınması ve kaydedilmesi", ball: "csm", required: true },
-    { title: "Sunucuların oluşturulup teslim edilmesi", ball: "customer", required: true },
-    { title: "Müşterinin DevOps ekibine devir toplantısı", ball: "customer", required: true },
+    { key: "vpn_req", title: "VPN erişiminin talep edilmesi", ball: "customer", required: true },
+    { key: "vpn_info", title: "VPN bilgilerinin alınması ve kaydedilmesi", ball: "csm", required: true },
+    { key: "servers", title: "Sunucuların oluşturulup teslim edilmesi", ball: "customer", required: true },
+    { key: "devops_handover", title: "Müşterinin DevOps ekibine devir toplantısı", ball: "customer", required: true },
     { title: "Ürün kurulumu", ball: "devops", required: true },
-    { title: "Model kurulumu", ball: "devops", required: false },
+    { key: "model_install", title: "Model kurulumu", ball: "devops", required: false },
     { title: "İlk platform testleri", ball: "care", required: true },
     { title: "Örnek proje ile platforma veri doldurulması", ball: "care", required: true },
     { title: "Müşteri hesaplarının açılması ve paylaşılması", ball: "care", required: true },
@@ -124,7 +124,7 @@ export function buildFromTemplate(project: Project, users: User[], planEnds: Rec
       steps.push({
         id: uid("st"), projectId: project.id, phaseId: phase.id, title: st.title, required: st.required,
         ownerId: ownerFor(st.ball, project.csmId, users, (st as StepTpl).ownerRole), ball: st.ball,
-        ballSince: project.createdAt, due: end, status: "pending", order: j,
+        ballSince: project.createdAt, due: end, status: "pending", order: j, key: (st as StepTpl).key,
       });
     });
   });
