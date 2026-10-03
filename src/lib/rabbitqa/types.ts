@@ -34,6 +34,7 @@ export interface User {
 export interface Salesperson {
   id: string;
   name: string;
+  active: boolean;
 }
 
 export interface DiscoveryQuestion {
@@ -295,6 +296,28 @@ export interface RqState {
   chatChannels: ChatChannel[];
   insights: AiInsight[];
   unmatchedEmails: UnmatchedEmail[];
+  holidays: Holiday[];
+  alertThresholds: AlertThresholds;
+  alertStates: AlertState[];
+  reportsSent: { projectId: string; weekStart: string }[];
+}
+
+export interface Holiday { date: string; name: string; halfDay: boolean }
+export interface AlertThresholds {
+  phaseRiskDays: number; dueSoonDays: number; customerWaitDays: number; customerWaitRedDays: number;
+  reqDocDays: number; goLiveCommitDays: number; credentialDays: number; silentDays: number;
+}
+export type AlertType =
+  | "phase_late" | "phase_at_risk" | "item_late" | "action_due_soon" | "waiting_customer" | "reqdoc_not_shared" | "handover_missing"
+  | "open_commitment" | "discovery_missing" | "kpi_unmeasurable" | "license_mismatch" | "credential_expiring" | "report_not_sent" | "silent_project"
+  | "manual";
+export type AlertLevel = "yellow" | "red";
+export type AlertStateStatus = "open" | "snoozed" | "closed";
+export interface AlertState { key: string; status: AlertStateStatus; snoozedUntil: string | null; reason: string; by: string; at: string }
+export interface ComputedAlert {
+  key: string; type: AlertType; level: AlertLevel; projectId: string;
+  entity: "phase" | "step" | "action" | "project" | "commitment" | "kpi" | "credential";
+  entityId: string; ownerId: string | null; title: string; detail: string;
 }
 
 export type ChatProvider = "teams" | "slack";
