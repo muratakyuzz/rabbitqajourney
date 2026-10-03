@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/EmptyState";
+import { AccessTab, AdaptationTab, DocumentsTab, KickoffTab, KpiSection, TeamRow, TrainingTab } from "./project/Phase2Tabs";
 import {
   ActionStatusBadge, HealthBadge, PhaseStatusBadge, Pill, PriorityBadge, StepStatusBadge, isOverdue,
 } from "@/components/rq/Badges";
@@ -23,7 +24,7 @@ import { personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
 import { canEditItem, canManageProject, isAllSeeing } from "@/lib/rabbitqa/perm";
 import {
   ACTION_STATUS_LABEL, BALL_LABEL, COMMIT_STATUS_LABEL, CONTACT_ROLE_LABEL, ENTITY_LABEL, HEALTH_LABEL, MEETING_TYPE_LABEL,
-  PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, fmtDate, fmtDateTime, todayISO,
+  PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, fmtDate, fmtDateTime, todayISO,
 } from "@/lib/rabbitqa/labels";
 import type {
   Action, ActionStatus, Ball, Commitment, CommitmentStatus, ContactRole, Health, MeetingType, Phase, PhaseStatus, Priority, Project, Step, StepStatus,
@@ -100,7 +101,12 @@ export default function ProjectDetail() {
           <TabsTrigger value="actions">Aksiyonlar</TabsTrigger>
           <TabsTrigger value="meetings">Toplantılar</TabsTrigger>
           <TabsTrigger value="handover">Satış devri</TabsTrigger>
+          <TabsTrigger value="kickoff">Kick-off</TabsTrigger>
           <TabsTrigger value="discovery">Keşif ve takımlar</TabsTrigger>
+          <TabsTrigger value="access">Kurulum ve erişim</TabsTrigger>
+          <TabsTrigger value="training">Eğitim</TabsTrigger>
+          <TabsTrigger value="adaptation">Uyarlama</TabsTrigger>
+          <TabsTrigger value="documents">Dokümanlar</TabsTrigger>
           <TabsTrigger value="contacts">Müşteri kişileri</TabsTrigger>
           <TabsTrigger value="history">Müşteri geçmişi</TabsTrigger>
         </TabsList>
@@ -108,7 +114,12 @@ export default function ProjectDetail() {
         <TabsContent value="actions"><ActionsTab project={project} /></TabsContent>
         <TabsContent value="meetings"><MeetingsTab project={project} /></TabsContent>
         <TabsContent value="handover"><HandoverTab project={project} /></TabsContent>
+        <TabsContent value="kickoff"><KickoffTab project={project} /></TabsContent>
         <TabsContent value="discovery"><DiscoveryTab project={project} /></TabsContent>
+        <TabsContent value="access"><AccessTab project={project} /></TabsContent>
+        <TabsContent value="training"><TrainingTab project={project} /></TabsContent>
+        <TabsContent value="adaptation"><AdaptationTab project={project} /></TabsContent>
+        <TabsContent value="documents"><DocumentsTab project={project} /></TabsContent>
         <TabsContent value="contacts"><ContactsTab project={project} /></TabsContent>
         <TabsContent value="history"><HistoryTab project={project} /></TabsContent>
       </Tabs>
@@ -693,7 +704,7 @@ function DiscoveryTab({ project }: { project: Project }) {
         <CardHeader><CardTitle className="text-base">Takımlar</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {project.teams.length === 0 && <p className="text-sm text-muted-foreground">Takım tanımlanmadı.</p>}
-          {project.teams.map((t) => <div key={t} className="rounded-lg border px-3 py-2 text-sm font-medium">{t}</div>)}
+          {project.teams.map((t) => <TeamRow key={t} project={project} team={t} />)}
           {manage && (
             <div className="flex gap-2 pt-2">
               <Input placeholder="Takım adı" value={team} onChange={(e) => setTeam(e.target.value)} />
@@ -707,6 +718,7 @@ function DiscoveryTab({ project }: { project: Project }) {
           )}
         </CardContent>
       </Card>
+      <KpiSection project={project} />
     </div>
   );
 }
@@ -758,6 +770,8 @@ const FIELD_LABEL: Record<string, string> = {
   csmId: "CSM", salespersonId: "Satışçı", licenseModel: "Lisans modeli", purchasedModules: "Satın alınan modüller",
   desiredModules: "İstenen modüller", discoveryAnswers: "Keşif cevapları", priority: "Öncelik", title: "Başlık", note: "Not",
   approvedBy: "Onaylayan", approvedAt: "Onay tarihi", ballSince: "Top el değiştirme", baselineEnd: "Baseline",
+  installType: "Kurulum tipi", llmChoice: "LLM tercihi", presentationShared: "Sunum paylaşıldı", reqDocShared: "Gereksinim dokümanı paylaşıldı",
+  reqDocSharedAt: "Paylaşım tarihi", teamInfo: "Takım bilgisi", measurements: "KPI ölçümleri", participants: "Katılımcılar", date: "Tarih", notes: "Notlar", required: "Zorunlu",
 };
 
 function HistoryTab({ project }: { project: Project }) {
@@ -775,7 +789,11 @@ function HistoryTab({ project }: { project: Project }) {
     if (field === "status") return (STEP_STATUS_LABEL as Record<string, string>)[v] ?? (PHASE_STATUS_LABEL as Record<string, string>)[v] ?? (ACTION_STATUS_LABEL as Record<string, string>)[v] ?? (COMMIT_STATUS_LABEL as Record<string, string>)[v] ?? v;
     if (field === "health") return HEALTH_LABEL[v as Health] ?? v;
     if (field === "priority") return PRIORITY_LABEL[v as Priority] ?? v;
-    if (field === "discoveryAnswers") return "(güncellendi)";
+    if (field === "discoveryAnswers" || field === "teamInfo" || field === "measurements") return "(güncellendi)";
+    if (field === "installType") return (INSTALL_LABEL as Record<string, string>)[v] ?? v;
+    if (field === "llmChoice") return (LLM_LABEL as Record<string, string>)[v] ?? v;
+    if (v === "true") return "Evet";
+    if (v === "false") return "Hayır";
     if (/^\d{4}-\d{2}-\d{2}/.test(v)) return fmtDate(v);
     return v.length > 80 ? v.slice(0, 80) + "…" : v;
   };
@@ -815,7 +833,7 @@ function HistoryTab({ project }: { project: Project }) {
                 <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border-2 border-background bg-primary" />
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span>{e.m ? fmtDate(e.m.date) : fmtDateTime(e.at)}</span>
-                  <Pill tone={e.m ? "info" : "muted"}>{ENTITY_LABEL[e.type] ?? e.type}</Pill>
+                  <Pill tone={e.m ? "info" : e.a?.kind === "view" ? "warning" : "muted"}>{ENTITY_LABEL[e.type] ?? e.type}</Pill>
                   {e.a && <span>{personName(state, e.a.userId)}</span>}
                 </div>
                 {e.m ? (
@@ -828,7 +846,7 @@ function HistoryTab({ project }: { project: Project }) {
                     {e.a.field && (
                       <span className="text-muted-foreground"> · {FIELD_LABEL[e.a.field] ?? e.a.field}: {valueText(e.a.field, e.a.oldValue)} → <span className="text-foreground">{valueText(e.a.field, e.a.newValue)}</span></span>
                     )}
-                    {e.a.kind === "create" && e.a.entity !== "project" && <span className="text-muted-foreground"> · oluşturuldu</span>}
+                    {e.a.kind === "create" && !["project", "training", "credential", "document", "adaptation"].includes(e.a.entity) && <span className="text-muted-foreground"> · oluşturuldu</span>}
                     {e.a.reason && <p className="text-xs text-muted-foreground italic">Gerekçe: {e.a.reason}</p>}
                   </div>
                 )}
