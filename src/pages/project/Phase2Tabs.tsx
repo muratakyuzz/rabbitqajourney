@@ -17,7 +17,10 @@ import { EmptyState } from "@/components/EmptyState";
 import { Pill, StepStatusBadge } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { personName, useRq } from "@/lib/rabbitqa/store";
-import { canManageProject, canSeeCredentials } from "@/lib/rabbitqa/perm";
+import { canManageProject, canSeeCredentials, selectableUsers } from "@/lib/rabbitqa/perm";
+import { Link } from "react-router-dom";
+import { KpiChart } from "@/components/rq/KpiChart";
+import { VisibleIcon } from "@/components/rq/VisibleIcon";
 import { DOC_TYPE_LABEL, INSTALL_LABEL, LLM_LABEL, MEETING_TYPE_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
 import type { DocType, InstallType, LlmChoice, Project } from "@/lib/rabbitqa/types";
 
@@ -41,13 +44,16 @@ export function KickoffTab({ project }: { project: Project }) {
 
   const save = () => {
     if (choiceChanged && !reason.trim()) return toast.error("Kurulum tipi veya LLM değişikliğinde gerekçe zorunlu");
-    setKickoff(project.id, {
+    const summary = setKickoff(project.id, {
       presentationShared: presentation, installType, llmChoice: llm,
       reqDocShared: installType === "onprem" ? reqDoc : false,
       reqDocSharedAt: installType === "onprem" && reqDoc ? reqDocAt || todayISO() : null,
     }, reason.trim() || undefined);
     setReason("");
-    toast.success("Kick-off bilgileri kaydedildi");
+    toast.success("Kick-off bilgileri kaydedildi", {
+      description: summary ? <span>{summary}. <Link className="underline" to={`/app/projects/${project.id}?tab=history`}>Müşteri geçmişinde gör</Link></span> : undefined,
+      duration: summary ? 8000 : undefined,
+    });
   };
 
   return (
@@ -123,12 +129,12 @@ export function KickoffTab({ project }: { project: Project }) {
 
 /* ── KPI ────────────────────────────────────────────────── */
 export function KpiSection({ project }: { project: Project }) {
-  const { state, addKpi, addMeasurement } = useRq();
+  const { state, addKpi, addMeasurement, updateKpi } = useRq();
   const { user } = useAuth();
   const manage = canManageProject(user, project);
   const kpis = state.kpis.filter((k) => k.projectId === project.id);
   const [open, setOpen] = useState(false);
-  const [f, setF] = useState({ name: "", unit: "", baseline: "", target: "", targetDate: "" });
+  const [f, setF] = useState({ name: "", unit: "", baseline: "", target: "", targetDate: "", visible: true });
   const [measure, setMeasure] = useState<Record<string, string>>({});
 
   return (
@@ -147,7 +153,7 @@ export function KpiSection({ project }: { project: Project }) {
           return (
             <div key={k.id} className="rounded-lg border p-3 space-y-2">
               <div className="flex items-start justify-between gap-2">
-                <p className="font-medium text-sm">{k.name}</p>
+                <p className="font-medium text-sm">{k.name}<VisibleIcon visible={k.isCustomerVisible} /></p>
                 {missing && <Pill tone="warning">Ölçülemez</Pill>}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -157,9 +163,8 @@ export function KpiSection({ project }: { project: Project }) {
                 <Progress value={pct ?? 0} className="h-2" />
                 <span className="text-xs w-24 text-right">Mevcut: {current ?? "—"} {k.unit}</span>
               </div>
-              {k.measurements.length > 0 && (
-                <p className="text-xs text-muted-foreground">Ölçümler: {k.measurements.map((m) => `${fmtDate(m.date)}: ${m.value}`).join(" · ")}</p>
-              )}
+              {k.measurements.length > 0 ? <KpiChart kpi={k} /> : <p className="text-xs text-muted-foreground">Henüz ölçüm yok.</p>}
+              {manage && <label className="flex items-center gap-2 text-xs"><Switch checked={k.isCustomerVisible} onCheckedChange={(c) => updateKpi(k.id, { isCustomerVisible: c })} />Müşteriye görünür</label>}
               {manage && (
                 <div className="flex gap-2">
                   <Input type="number" placeholder="Yeni ölçüm" className="h-8" value={measure[k.id] ?? ""} onChange={(e) => setMeasure({ ...measure, [k.id]: e.target.value })} />
@@ -186,12 +191,13 @@ export function KpiSection({ project }: { project: Project }) {
               <div className="grid gap-2"><Label>Başlangıç değeri</Label><Input type="number" value={f.baseline} onChange={(e) => setF({ ...f, baseline: e.target.value })} /></div>
               <div className="grid gap-2"><Label>Hedef değer</Label><Input type="number" value={f.target} onChange={(e) => setF({ ...f, target: e.target.value })} /></div>
             </div>
+            <label className="flex items-center gap-3 text-sm"><Switch checked={f.visible} onCheckedChange={(c) => setF({ ...f, visible: c })} />Müşteriye görünür</label>
           </div>
           <DialogFooter>
             <Button onClick={() => {
               if (!f.name.trim()) return toast.error("Ad zorunlu");
-              addKpi({ projectId: project.id, name: f.name.trim(), unit: f.unit, baseline: f.baseline === "" ? null : Number(f.baseline), target: f.target === "" ? null : Number(f.target), targetDate: f.targetDate || null });
-              setF({ name: "", unit: "", baseline: "", target: "", targetDate: "" });
+              addKpi({ projectId: project.id, name: f.name.trim(), unit: f.unit, baseline: f.baseline === "" ? null : Number(f.baseline), target: f.target === "" ? null : Number(f.target), targetDate: f.targetDate || null, isCustomerVisible: f.visible });
+              setF({ name: "", unit: "", baseline: "", target: "", targetDate: "", visible: true });
               setOpen(false);
             }}>Kaydet</Button>
           </DialogFooter>
@@ -267,7 +273,7 @@ export function TrainingTab({ project }: { project: Project }) {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NONE}>Seçilmedi</SelectItem>
-                    {state.users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                    {selectableUsers(state).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

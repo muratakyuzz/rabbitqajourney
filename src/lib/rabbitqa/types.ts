@@ -29,6 +29,7 @@ export interface User {
   name: string;
   email: string;
   role: Role;
+  active: boolean;
 }
 
 export interface Salesperson {
@@ -42,6 +43,8 @@ export interface DiscoveryQuestion {
   group: string;
   text: string;
   required: boolean;
+  type: "text" | "modules";
+  order: number;
 }
 
 export interface Project {
@@ -67,6 +70,7 @@ export interface Project {
   reqDocSharedAt: string | null;
   createdAt: string;
   integrations: ProjectIntegrations;
+  goLiveApproval?: GoLiveApproval | null;
 }
 
 export interface Phase {
@@ -119,6 +123,7 @@ export interface Action {
   createdAt: string;
   ruleKey?: string;
   insightId?: string;
+  isCustomerVisible: boolean;
 }
 
 export interface Meeting {
@@ -130,6 +135,7 @@ export interface Meeting {
   contactIds: string[];
   notes: string;
   decisions: string;
+  isCustomerVisible: boolean;
 }
 
 export interface Contact {
@@ -175,6 +181,7 @@ export interface Kpi {
   target: number | null;
   targetDate: string | null;
   measurements: { date: string; value: number }[];
+  isCustomerVisible: boolean;
 }
 
 export interface TrainingSession {
@@ -248,7 +255,13 @@ export interface SupportTicket {
   ownerId: string | null;
   openedAt: string;
   resolvedAt: string | null;
+  type: TicketType;
+  resolution: string;
+  boardDecision: BoardDecision | null;
+  customerNotifiedAt: string | null;
 }
+export type TicketType = "technical" | "usage" | "feature_request";
+export type BoardDecision = "pending" | "accepted" | "rejected" | "planned";
 
 export type RiskKind = "risk" | "decision";
 export type RiskStatus = "open" | "mitigated" | "accepted" | "realized";
@@ -264,7 +277,19 @@ export interface RiskDecision {
   ownerId: string | null;
   due: string | null;
   createdAt: string;
+  probability: Priority;
+  mitigation: string;
+  meetingId: string | null;
+  decidedAt: string | null;
+  isCustomerVisible: boolean;
 }
+
+export interface CustomerReport {
+  id: string; projectId: string; weekStart: string; createdBy: string; createdAt: string;
+  status: "draft" | "sent"; sentAt: string | null; sentBy: string | null;
+  summary: string; nextWeek: string; snapshot: Record<string, unknown>;
+}
+export interface GoLiveApproval { contactId: string; approvedAt: string; recordedBy: string; recordedAt: string }
 
 export interface StepTpl { title: string; ball: Ball; required: boolean; ownerRole?: "manager"; key?: string; dependency: Dependency; durationDays: number }
 export interface PhaseTpl { code: string; name: string; dependency: Dependency; steps: StepTpl[] }
@@ -300,6 +325,7 @@ export interface RqState {
   alertThresholds: AlertThresholds;
   alertStates: AlertState[];
   reportsSent: { projectId: string; weekStart: string }[];
+  customerReports: CustomerReport[];
 }
 
 export interface Holiday { date: string; name: string; halfDay: boolean }

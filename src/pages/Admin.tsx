@@ -15,9 +15,10 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useAuth } from "@/lib/auth-context";
 import { useRq } from "@/lib/rabbitqa/store";
 import { uid } from "@/lib/rabbitqa/seed";
-import { BALL_LABEL, ROLE_LABEL, fmtDateTime } from "@/lib/rabbitqa/labels";
+import { BALL_LABEL, QUESTION_TYPE_LABEL, fmtDateTime } from "@/lib/rabbitqa/labels";
 import { IntegrationsAdmin } from "./admin/IntegrationsAdmin";
 import { AlertsAdmin, SalespeopleAdmin } from "./admin/AlertsAdmin";
+import { UsersAdmin } from "./admin/UsersAdmin";
 import { canAccessAdmin } from "@/lib/rabbitqa/perm";
 import type { Ball, Dependency, PhaseTpl } from "@/lib/rabbitqa/types";
 
@@ -48,17 +49,7 @@ export default function Admin() {
         <TabsContent value="modules"><ModulesEditor /></TabsContent>
         <TabsContent value="integrations"><IntegrationsAdmin /></TabsContent>
         <TabsContent value="questions"><QuestionsEditor /></TabsContent>
-        <TabsContent value="users">
-          <Card className="p-4">
-            <Table>
-              <TableHeader><TableRow><TableHead>Ad</TableHead><TableHead>E-posta</TableHead><TableHead>Rol</TableHead></TableRow></TableHeader>
-              <TableBody>{state.users.map((u) => (
-                <TableRow key={u.id}><TableCell>{u.name}</TableCell><TableCell>{u.email}</TableCell><TableCell>{ROLE_LABEL[u.role]}</TableCell></TableRow>
-              ))}</TableBody>
-            </Table>
-            <p className="text-xs text-muted-foreground mt-3">Demo sürümde kullanıcılar sabittir; gerçek kullanıcı yönetimi canlı sürümde eklenir.</p>
-          </Card>
-        </TabsContent>
+        <TabsContent value="users"><UsersAdmin /></TabsContent>
         <TabsContent value="salespeople"><SalespeopleAdmin /></TabsContent>
         <TabsContent value="alerts"><AlertsAdmin /></TabsContent>
         <TabsContent value="log">
@@ -176,21 +167,29 @@ function ModulesEditor() {
 
 function QuestionsEditor() {
   const { state, setConfig } = useRq();
-  const [qs, setQs] = useState(() => structuredClone(state.questions));
+  const [qs, setQs] = useState(() => structuredClone(state.questions).sort((a, b) => a.order - b.order));
   const set = (i: number, patch: Partial<(typeof qs)[number]>) => setQs((q) => q.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const move = (i: number, d: -1 | 1) => setQs((q) => { const j = i + d; if (j < 0 || j >= q.length) return q; const n = [...q]; [n[i], n[j]] = [n[j], n[i]]; return n; });
   return (
     <Card className="p-4 space-y-3">
+      {qs.length === 0 && <p className="text-sm text-muted-foreground">Keşif sorusu yok.</p>}
       {qs.map((q, i) => (
-        <div key={q.id} className="flex items-center gap-2">
-          <Input className="w-56" value={q.group} onChange={(e) => set(i, { group: e.target.value })} aria-label="Grup" />
-          <Input value={q.text} onChange={(e) => set(i, { text: e.target.value })} aria-label="Soru" />
+        <div key={q.id} className="flex flex-wrap items-center gap-2">
+          <Input className="w-48" value={q.group} onChange={(e) => set(i, { group: e.target.value })} aria-label="Grup" />
+          <Input className="flex-1 min-w-48" value={q.text} onChange={(e) => set(i, { text: e.target.value })} aria-label="Soru" />
+          <Select value={q.type ?? "text"} onValueChange={(v) => set(i, { type: v as "text" | "modules" })}>
+            <SelectTrigger className="w-48" aria-label="Tip"><SelectValue /></SelectTrigger>
+            <SelectContent>{Object.entries(QUESTION_TYPE_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+          </Select>
           <label className="flex items-center gap-1 text-xs whitespace-nowrap"><Checkbox checked={q.required} onCheckedChange={(c) => set(i, { required: !!c })} />Zorunlu</label>
-          <Button variant="ghost" size="icon" onClick={() => setQs((x) => x.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" disabled={i === 0} aria-label="Yukarı taşı" onClick={() => move(i, -1)}><ArrowUp className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" disabled={i === qs.length - 1} aria-label="Aşağı taşı" onClick={() => move(i, 1)}><ArrowDown className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" aria-label="Sil" onClick={() => setQs((x) => x.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
         </div>
       ))}
       <div className="flex gap-2">
-        <Button variant="outline" onClick={() => setQs((x) => [...x, { id: uid("q"), group: "Diğer", text: "Yeni soru", required: false }])}><Plus className="h-4 w-4 mr-1" />Soru ekle</Button>
-        <Button onClick={() => { setConfig("questions", qs.filter((q) => q.text.trim()), "Keşif soruları güncellendi"); toast.success("Sorular kaydedildi"); }}>Kaydet</Button>
+        <Button variant="outline" onClick={() => setQs((x) => [...x, { id: uid("q"), group: "Diğer", text: "Yeni soru", required: false, type: "text", order: x.length }])}><Plus className="h-4 w-4 mr-1" />Soru ekle</Button>
+        <Button onClick={() => { setConfig("questions", qs.filter((q) => q.text.trim()).map((q, i) => ({ ...q, order: i })), "Keşif soruları güncellendi"); toast.success("Sorular kaydedildi"); }}>Kaydet</Button>
       </div>
     </Card>
   );

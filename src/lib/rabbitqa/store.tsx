@@ -10,19 +10,21 @@ import { analyzeText, type IncomingMeta } from "./ai-mock";
 import { matchEmail } from "./email-match";
 import type {
   AiInsight, ChatChannel, InsightSource, IntegrationConfig, ProjectIntegrations, UnmatchedEmail,
-  Action, AdaptationSession, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RiskDecision, RqState, Step, SupportTicket, TrainingSession,
+  CustomerReport, User, Action, AdaptationSession, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RiskDecision, RqState, Step, SupportTicket, TrainingSession,
 } from "./types";
 import { todayISO } from "./labels";
+import { buildReportSnapshot, defaultNextWeek } from "./reports";
+import { weekStartOf } from "./alerts";
 import { applyInstallType, applyLlmChoice, setStepByKey } from "./rules";
 
-const KEY = "rabbitqa-demo-state-v7";
+const KEY = "rabbitqa-demo-state-v8";
 
 function load(): RqState {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as RqState;
-      if (s.version === 7) return s;
+      if (s.version === 8) return s;
     }
   } catch { /* ignore */ }
   return createSeed();
@@ -44,17 +46,19 @@ interface Ctx {
   updatePhase: (id: string, patch: Partial<Phase>, reason?: string) => string | null;
   completePhase: (id: string) => string | null;
   updateStep: (id: string, patch: Partial<Step>, reason?: string) => string | null;
-  addAction: (a: Omit<Action, "id" | "createdAt">) => void;
+  addAction: (a: Omit<Action, "id" | "createdAt" | "isCustomerVisible"> & { isCustomerVisible?: boolean }) => void;
   updateAction: (id: string, patch: Partial<Action>, reason?: string) => void;
-  addMeeting: (m: Omit<Meeting, "id">, actions: Omit<Action, "id" | "createdAt" | "meetingId" | "projectId" | "source">[]) => void;
+  addMeeting: (m: Omit<Meeting, "id" | "isCustomerVisible"> & { isCustomerVisible?: boolean }, actions: (Omit<Action, "id" | "createdAt" | "meetingId" | "projectId" | "source" | "isCustomerVisible"> & { isCustomerVisible?: boolean })[]) => string;
   addContact: (c: Omit<Contact, "id">) => void;
   updateContact: (id: string, patch: Partial<Contact>) => void;
   addCommitment: (c: Omit<Commitment, "id">) => void;
   updateCommitment: (id: string, patch: Partial<Commitment>, reason?: string) => void;
   addTeam: (projectId: string, team: string) => void;
   setTeamInfo: (projectId: string, team: string, info: { contact: string; users: number | null }) => void;
-  setKickoff: (projectId: string, patch: Pick<Project, "presentationShared" | "installType" | "llmChoice" | "reqDocShared" | "reqDocSharedAt">, reason?: string) => void;
-  addKpi: (k: Omit<Kpi, "id" | "measurements">) => void;
+  setKickoff: (projectId: string, patch: Pick<Project, "presentationShared" | "installType" | "llmChoice" | "reqDocShared" | "reqDocSharedAt">, reason?: string) => string | null;
+  addKpi: (k: Omit<Kpi, "id" | "measurements" | "isCustomerVisible"> & { isCustomerVisible?: boolean }) => void;
+  updateKpi: (id: string, patch: Partial<Kpi>) => void;
+  updateMeeting: (id: string, patch: Partial<Meeting>) => void;
   addMeasurement: (kpiId: string, m: { date: string; value: number }) => void;
   addTraining: (t: Omit<TrainingSession, "id">) => void;
   updateTraining: (id: string, patch: Partial<TrainingSession>) => void;
@@ -66,12 +70,17 @@ interface Ctx {
   resolveAlert: (id: string) => void;
   snoozeAlert: (key: string, until: string, reason: string) => string | null;
   closeAlert: (key: string, reason: string) => string | null;
-  addTicket: (t: Omit<SupportTicket, "id" | "openedAt" | "resolvedAt">) => void;
-  updateTicket: (id: string, patch: Partial<SupportTicket>, reason?: string) => void;
+  addTicket: (t: Omit<SupportTicket, "id" | "openedAt" | "resolvedAt">) => string | null;
+  updateTicket: (id: string, patch: Partial<SupportTicket>, reason?: string) => string | null;
   addRisk: (r: Omit<RiskDecision, "id" | "createdAt">) => void;
+  createCustomerReport: (projectId: string, weekStart: string) => string | null;
+  updateCustomerReport: (id: string, patch: Pick<CustomerReport, "summary" | "nextWeek">) => string | null;
+  markReportSent: (id: string) => string | null;
+  addUser: (u: Omit<User, "id" | "active">) => string | null;
+  updateUser: (id: string, patch: Partial<Pick<User, "role" | "active" | "name">>) => string | null;
   updateRisk: (id: string, patch: Partial<RiskDecision>, reason?: string) => void;
-  approveGoLive: (projectId: string, reason: string) => string | null;
-  setConfig: <K extends "modules" | "questions" | "template" | "integrations" | "salespeople" | "alertThresholds" | "holidays">(key: K, value: RqState[K], label: string) => void;
+  approveGoLive: (projectId: string, contactId: string, approvedAt: string, reason: string) => string | null;
+  setConfig: <K extends "modules" | "questions" | "template" | "integrations" | "salespeople" | "alertThresholds" | "holidays" | "users">(key: K, value: RqState[K], label: string) => void;
   testConnection: (kind: "teams" | "email", override?: IntegrationConfig) => Promise<{ ok: boolean; message: string; channels?: ChatChannel[] }>;
   disconnect: (kind: "teams" | "email") => void;
   logSecretView: (field: string) => void;
@@ -258,10 +267,10 @@ export function RqProvider({ children }: { children: ReactNode }) {
       patch<Step>("steps", id, changes, reason);
       return null;
     },
-    addAction: (a) => add<Action>("actions", { ...a, id: uid("a"), createdAt: new Date().toISOString() }),
+    addAction: (a) => add<Action>("actions", { ...a, isCustomerVisible: a.isCustomerVisible ?? !(a.ruleKey ?? "").startsWith("phase_approval:"), id: uid("a"), createdAt: new Date().toISOString() }),
     updateAction: (id, p, reason) => patch<Action>("actions", id, p, reason),
     addMeeting: (m, actions) => {
-      const meeting = { ...m, id: uid("m") };
+      const meeting: Meeting = { ...m, isCustomerVisible: m.isCustomerVisible ?? false, id: uid("m") };
       add<Meeting>("meetings", meeting, `Toplantı kaydedildi`);
       if (m.type === "devops_handover") {
         setState((s) => setStepByKey(s, m.projectId, "devops_handover", { status: "done", ball: "devops", ballSince: new Date().toISOString() }, mkAudit, "Otomatik kural: DevOps devir toplantısı kaydedildi, top DevOps'a geçti"));
@@ -270,9 +279,11 @@ export function RqProvider({ children }: { children: ReactNode }) {
         setState((s) => setStepByKey(s, m.projectId, "gonogo", { status: "done" }, mkAudit, "Otomatik kural: Go/No-Go toplantısı kaydedildi"));
       }
       actions.forEach((a) =>
-        add<Action>("actions", { ...a, id: uid("a"), projectId: m.projectId, source: "meeting", meetingId: meeting.id, createdAt: new Date().toISOString() }),
+        add<Action>("actions", { ...a, isCustomerVisible: a.isCustomerVisible ?? true, id: uid("a"), projectId: m.projectId, source: "meeting", meetingId: meeting.id, createdAt: new Date().toISOString() }),
       );
+      return meeting.id;
     },
+    updateMeeting: (id, p) => patch<Meeting>("meetings", id, p),
     addContact: (c) => add<Contact>("contacts", { ...c, id: uid("c") }),
     updateContact: (id, p) => patch<Contact>("contacts", id, p),
     addCommitment: (c) => add<Commitment>("commitments", { ...c, id: uid("cm") }),
@@ -306,6 +317,8 @@ export function RqProvider({ children }: { children: ReactNode }) {
       if (p) patch<Project>("projects", projectId, { teamInfo: { ...p.teamInfo, [team]: info } });
     },
     setKickoff: (projectId, kp, reason) => {
+      const before = state;
+      let summary: string | null = null;
       setState((s) => {
         const old = s.projects.find((p) => p.id === projectId);
         if (!old) return s;
@@ -327,10 +340,14 @@ export function RqProvider({ children }: { children: ReactNode }) {
         }
         if (kp.presentationShared && !old.presentationShared) next = setStepByKey(next, projectId, "presentation", { status: "done" }, mkAudit, "Sunum paylaşıldı");
         if (kp.reqDocShared && !old.reqDocShared) next = setStepByKey(next, projectId, "reqdoc", { status: "done" }, mkAudit, "Gereksinim dokümanı paylaşıldı");
+        summary = kickoffSummary(s, next, projectId);
         return next;
       });
+      void before;
+      return summary;
     },
-    addKpi: (k) => add<Kpi>("kpis", { ...k, id: uid("k"), measurements: [] }),
+    addKpi: (k) => add<Kpi>("kpis", { ...k, isCustomerVisible: k.isCustomerVisible ?? true, id: uid("k"), measurements: [] }),
+    updateKpi: (id, p) => patch<Kpi>("kpis", id, p),
     addMeasurement: (kpiId, m) => {
       const k = state.kpis.find((x) => x.id === kpiId);
       if (k) patch<Kpi>("kpis", kpiId, { measurements: [...k.measurements, m].sort((a, b) => a.date.localeCompare(b.date)) });
@@ -395,6 +412,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
     },
     resolveAlert: (id) => patch<Alert>("alerts", id, { status: "resolved", resolvedAt: new Date().toISOString(), resolvedBy: userId }),
     addTicket: (t) => {
+      if ((t.status === "resolved" || t.status === "closed") && !t.resolution.trim()) return "Çözüm metni zorunlu";
       add<SupportTicket>("tickets", { ...t, id: uid("tk"), openedAt: new Date().toISOString(), resolvedAt: null }, `Destek kaydı açıldı — ${t.title}`);
       setState((s) => setStepByKey(s, t.projectId, "support_track", { status: "in_progress" }, mkAudit, "Otomatik kural: destek kaydı açıldı"));
       if (t.priority === "high") {
@@ -404,16 +422,25 @@ export function RqProvider({ children }: { children: ReactNode }) {
           audit: [...s.audit, mkAudit({ projectId: t.projectId, kind: "create", entity: "alert", entityId: "auto", label: `Yüksek öncelikli destek kaydı uyarısı — ${t.title}`, reason: "Otomatik kural: yüksek öncelikli ticket" })],
         }));
       }
+      return null;
     },
     updateTicket: (id, p, reason) => {
       const old = state.tickets.find((t) => t.id === id);
+      if (!old) return "Kayıt bulunamadı";
+      const nx = { ...old, ...p };
+      if ((nx.status === "resolved" || nx.status === "closed") && !nx.resolution.trim()) return "Çözüm metni olmadan kayıt Çözüldü/Kapatıldı yapılamaz";
       const changes = { ...p };
       if (old && (p.status === "resolved" || p.status === "closed") && !old.resolvedAt) changes.resolvedAt = new Date().toISOString();
       patch<SupportTicket>("tickets", id, changes, reason);
+      return null;
     },
     addRisk: (r) => add<RiskDecision>("risks", { ...r, id: uid("r"), createdAt: new Date().toISOString() }, `${r.kind === "risk" ? "Risk" : "Karar"} eklendi — ${r.title}`),
     updateRisk: (id, p, reason) => patch<RiskDecision>("risks", id, p, reason),
-    approveGoLive: (projectId, reason) => {
+    approveGoLive: (projectId, contactId, approvedAt, reason) => {
+      const contact = state.contacts.find((c) => c.id === contactId && c.projectId === projectId);
+      if (!contact) return "Onaylayan müşteri kişisini seçin";
+      if (!approvedAt) return "Onay tarihi zorunlu";
+      if (!reason.trim()) return "Onay notu zorunlu";
       const gonogo = state.steps.find((s) => s.projectId === projectId && s.key === "gonogo");
       if (!gonogo || gonogo.status !== "done") return "Önce Go/No-Go toplantısını kaydedin";
       const openCommits = state.commitments.filter((c) => c.projectId === projectId && c.status === "open");
@@ -421,6 +448,12 @@ export function RqProvider({ children }: { children: ReactNode }) {
       const phase = state.phases.find((p) => p.projectId === projectId && p.code === "07");
       setState((s) => {
         let next = setStepByKey(s, projectId, "customer_approval", { status: "done" }, mkAudit, reason);
+        const approval = { contactId, approvedAt, recordedBy: userId, recordedAt: new Date().toISOString() };
+        next = {
+          ...next,
+          projects: next.projects.map((p) => (p.id === projectId ? { ...p, goLiveApproval: approval } : p)),
+          audit: [...next.audit, mkAudit({ projectId, kind: "update", entity: "project", entityId: projectId, label: `Go-Live müşteri onayı — ${contact.name}${contact.title ? ` (${contact.title})` : ""}, ${approvedAt.split("-").reverse().join(".")}`, field: "goLiveApproval", newValue: contact.name, reason })],
+        };
         if (phase) {
           const open = next.steps.filter((x) => x.phaseId === phase.id && x.required && x.status !== "done" && x.status !== "out_of_scope");
           if (!open.length) {
@@ -433,6 +466,64 @@ export function RqProvider({ children }: { children: ReactNode }) {
         }
         return next;
       });
+      return null;
+    },
+    createCustomerReport: (projectId, weekStart) => {
+      if (!state.projects.some((p) => p.id === projectId)) return null;
+      const ws = weekStartOf(weekStart);
+      const ex = state.customerReports.find((r) => r.projectId === projectId && r.weekStart === ws);
+      if (ex) return ex.id;
+      const snap = buildReportSnapshot(state, projectId, ws, todayISO());
+      const rep: CustomerReport = { id: uid("rep"), projectId, weekStart: ws, createdBy: userId, createdAt: new Date().toISOString(), status: "draft", sentAt: null, sentBy: null, summary: "", nextWeek: defaultNextWeek(snap), snapshot: snap as unknown as Record<string, unknown> };
+      setState((s) => ({ ...s, customerReports: [...s.customerReports, rep], audit: [...s.audit, mkAudit({ projectId, kind: "create", entity: "report", entityId: rep.id, label: `Haftalık rapor taslağı oluşturuldu — ${ws.split("-").reverse().join(".")} haftası` })] }));
+      return rep.id;
+    },
+    updateCustomerReport: (id, p) => {
+      const r = state.customerReports.find((x) => x.id === id);
+      if (!r) return "Rapor bulunamadı";
+      if (r.status === "sent") return "Gönderilmiş rapor düzenlenemez";
+      const fields = (["summary", "nextWeek"] as const).filter((k) => p[k] !== r[k]);
+      if (!fields.length) return null;
+      setState((s) => ({
+        ...s,
+        customerReports: s.customerReports.map((x) => (x.id === id ? { ...x, ...p } : x)),
+        audit: [...s.audit, ...fields.map((k) => mkAudit({ projectId: r.projectId, kind: "update" as const, entity: "report", entityId: id, label: "Haftalık rapor", field: k, oldValue: r[k], newValue: p[k] }))],
+      }));
+      return null;
+    },
+    markReportSent: (id) => {
+      const r = state.customerReports.find((x) => x.id === id);
+      if (!r) return "Rapor bulunamadı";
+      if (r.status === "sent") return "Rapor zaten gönderildi";
+      const now = new Date().toISOString();
+      setState((s) => ({
+        ...s,
+        customerReports: s.customerReports.map((x) => (x.id === id ? { ...x, status: "sent" as const, sentAt: now, sentBy: userId } : x)),
+        audit: [...s.audit, mkAudit({ projectId: r.projectId, kind: "update", entity: "report", entityId: id, label: `Haftalık rapor gönderildi — ${r.weekStart.split("-").reverse().join(".")} haftası`, field: "status", oldValue: "draft", newValue: "sent" })],
+      }));
+      return null;
+    },
+    addUser: (u) => {
+      const email = u.email.trim().toLowerCase();
+      if (!u.name.trim() || !email.includes("@")) return "Ad ve geçerli e-posta zorunlu";
+      if (state.users.some((x) => x.email.toLowerCase() === email)) return "Bu e-posta zaten kayıtlı";
+      const nu: User = { id: uid("u"), name: u.name.trim(), email, role: u.role, active: true };
+      setState((s) => ({ ...s, users: [...s.users, nu], audit: [...s.audit, mkAudit({ projectId: "system", kind: "create", entity: "config", entityId: "users", label: `Kullanıcı eklendi: ${nu.name} (${nu.email})`, field: "users" })] }));
+      return null;
+    },
+    updateUser: (id, p) => {
+      const u = state.users.find((x) => x.id === id);
+      if (!u) return "Kullanıcı bulunamadı";
+      const activeAdmins = state.users.filter((x) => x.role === "admin" && x.active !== false);
+      const losesAdmin = u.role === "admin" && u.active !== false && ((p.role && p.role !== "admin") || p.active === false);
+      if (losesAdmin && activeAdmins.length <= 1) return "Son aktif admin pasifleştirilemez ve rolü değiştirilemez";
+      const changes = (Object.keys(p) as (keyof typeof p)[]).filter((k) => p[k] !== undefined && p[k] !== u[k]);
+      if (!changes.length) return null;
+      setState((s) => ({
+        ...s,
+        users: s.users.map((x) => (x.id === id ? { ...x, ...p } : x)),
+        audit: [...s.audit, ...changes.map((k) => mkAudit({ projectId: "system", kind: "update" as const, entity: "config", entityId: "users", label: `Kullanıcı güncellendi: ${u.name}`, field: k, oldValue: String(u[k]), newValue: String(p[k]) }))],
+      }));
       return null;
     },
     setConfig: (key, val, label) => setState((s) => {
@@ -516,7 +607,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
           applied = aid;
           setState((s) => ({
             ...s,
-            actions: [...s.actions, { id: aid, projectId: ins.projectId, title: String(v.title ?? "AI aksiyonu"), ownerId: v.ownerId ?? null, ball: v.ball ?? "csm", due: v.due ?? null, priority: v.priority ?? "medium", status: "open", source: ins.source, meetingId: null, createdAt: new Date().toISOString(), insightId: ins.id }],
+            actions: [...s.actions, { id: aid, projectId: ins.projectId, title: String(v.title ?? "AI aksiyonu"), ownerId: v.ownerId ?? null, ball: v.ball ?? "csm", due: v.due ?? null, priority: v.priority ?? "medium", status: "open", source: ins.source, meetingId: null, createdAt: new Date().toISOString(), insightId: ins.id, isCustomerVisible: true }],
             audit: [...s.audit, mkAudit({ projectId: ins.projectId, kind: "create", entity: "action", entityId: aid, label: String(v.title), reason })],
           }));
           break;
@@ -530,7 +621,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
           const kind = ins.kind === "risk_create" ? "risk" as const : "decision" as const;
           setState((s) => ({
             ...s,
-            risks: [...s.risks, { id: rid, projectId: ins.projectId, kind, title: String(v.title), description: String(v.description ?? ""), impact: v.impact ?? "medium", status: kind === "risk" ? "open" : "accepted", ownerId: null, due: null, createdAt: new Date().toISOString() }],
+            risks: [...s.risks, { id: rid, projectId: ins.projectId, kind, title: String(v.title), description: String(v.description ?? ""), impact: v.impact ?? "medium", status: kind === "risk" ? "open" : "accepted", ownerId: null, due: null, createdAt: new Date().toISOString(), probability: "medium", mitigation: "", meetingId: null, decidedAt: kind === "decision" ? todayISO() : null, isCustomerVisible: false }],
             audit: [...s.audit, mkAudit({ projectId: ins.projectId, kind: "create", entity: "risk", entityId: rid, label: `${kind === "risk" ? "Risk" : "Karar"} eklendi — ${v.title}`, reason })],
           }));
           break;
@@ -651,4 +742,19 @@ function flowMessages(prev: RqState, next: RqState): string[] {
     msgs.push(`Sıradaki adım açıldı: ${s.title} — ${name(s.ownerId)}, termin ${fmtDate(s.due)}${opened.length > 1 ? ` (+${opened.length - 1} adım)` : ""}`);
   }
   return msgs;
+}
+
+/** Kick-off kaydının otomatik kurallarla yaptığı değişikliklerin özeti. */
+function kickoffSummary(prev: RqState, next: RqState, projectId: string): string | null {
+  const ps = new Map(prev.steps.map((s) => [s.id, s.status]));
+  const pa = new Map(prev.actions.map((a) => [a.id, a.status]));
+  const steps = next.steps.filter((s) => s.projectId === projectId);
+  const oos = steps.filter((s) => s.status === "out_of_scope" && ps.get(s.id) !== "out_of_scope").length;
+  const opened = steps.filter((s) => (s.status === "pending" || s.status === "in_progress") && ps.get(s.id) !== s.status && (ps.get(s.id) === undefined || ps.get(s.id) === "locked" || ps.get(s.id) === "out_of_scope")).length;
+  const done = steps.filter((s) => s.status === "done" && ps.get(s.id) !== "done").length;
+  const acts = next.actions.filter((a) => a.projectId === projectId);
+  const aOpen = acts.filter((a) => a.status === "open" && pa.get(a.id) !== "open").length;
+  const aCancel = acts.filter((a) => a.status === "cancelled" && pa.get(a.id) !== "cancelled").length;
+  const parts = [oos && `${oos} adım kapsam dışı`, opened && `${opened} adım açıldı`, done && `${done} adım tamamlandı`, aOpen && `${aOpen} aksiyon açıldı`, aCancel && `${aCancel} aksiyon iptal edildi`].filter(Boolean);
+  return parts.length ? parts.join(", ") : null;
 }

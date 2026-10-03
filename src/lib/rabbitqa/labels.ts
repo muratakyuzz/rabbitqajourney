@@ -44,7 +44,7 @@ export const MEETING_TYPE_LABEL: Record<MeetingType, string> = {
 export const ENTITY_LABEL: Record<string, string> = {
   project: "Proje", phase: "Aşama", step: "Adım", action: "Aksiyon", meeting: "Toplantı", contact: "Kişi", commitment: "Taahhüt",
   kpi: "KPI", training: "Eğitim", adaptation: "Uyarlama", credential: "Erişim bilgisi", document: "Doküman",
-  alert: "Uyarı", ticket: "Destek kaydı", risk: "Risk/Karar", insight: "AI Insight", integration: "Entegrasyon",
+  alert: "Uyarı", ticket: "Destek kaydı", risk: "Risk/Karar", insight: "AI Insight", integration: "Entegrasyon", report: "Haftalık rapor", config: "Sistem ayarı",
 };
 export const ALERT_SEVERITY_LABEL = { info: "Sarı", warning: "Sarı", critical: "Kırmızı" } as const;
 export const ALERT_STATUS_LABEL = { open: "Açık", resolved: "Kapatıldı" } as const;
@@ -93,3 +93,9 @@ export const INSIGHT_KIND_LABEL = {
 export const INSIGHT_STATUS_LABEL = { pending: "Bekliyor", approved: "Onaylandı", rejected: "Reddedildi", expired: "Süresi doldu" } as const;
 export const INSIGHT_SOURCE_LABEL = { teams: "Teams", email: "E-posta" } as const;
 export const CONN_STATUS_LABEL = { disconnected: "Bağlı değil", connected: "Bağlı", error: "Hata" } as const;
+
+export const PROBABILITY_LABEL = { low: "Düşük", medium: "Orta", high: "Yüksek" } as const;
+export const TICKET_TYPE_LABEL = { technical: "Teknik destek", usage: "Kullanım desteği", feature_request: "Geliştirme talebi" } as const;
+export const BOARD_DECISION_LABEL = { pending: "Bekliyor", accepted: "Kabul", rejected: "Ret", planned: "Planlandı" } as const;
+export const REPORT_STATUS_LABEL = { draft: "Taslak", sent: "Gönderildi" } as const;
+export const QUESTION_TYPE_LABEL = { text: "Metin", modules: "Modül çoklu seçim" } as const;
