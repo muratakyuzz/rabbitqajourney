@@ -48,7 +48,7 @@ export default function CustomerReport() {
             <h1 className="text-2xl font-bold">{project.customerName}</h1>
             <p className="text-sm text-muted-foreground">{project.name} · {fmtDate(weekAgo)} – {fmtDate(today)}</p>
           </div>
-          <img src="/brand/logo-48.png" alt="RabbitQA" className="h-10 w-10" />
+          <img src="/brand/vector.png" alt="RabbitQA" className="h-12 w-12 object-contain" />
         </header>
 
         <section className="grid grid-cols-4 gap-4 text-sm">
