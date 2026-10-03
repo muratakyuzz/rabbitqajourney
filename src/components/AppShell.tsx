@@ -34,6 +34,7 @@ import {
   Settings,
   Settings2,
   BarChart3,
+  Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +47,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const mainNav = [
+  { title: "Genel bakış", url: "/app/overview", icon: Gauge, roles: null },
   { title: "Müşteri projeleri", url: "/app/projects", icon: Building2, roles: null },
   { title: "Bana atananlar", url: "/app/my-work", icon: ListChecks, roles: null },
   { title: "Yönetim raporu", url: "/app/reports", icon: BarChart3, roles: ["manager", "admin"] },
