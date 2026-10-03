@@ -293,7 +293,7 @@ export function createSeed(): RqState {
         const vpnReq = ps.find((x) => x.key === "vpn_req")!;
         Object.assign(vpnReq, { status: "done", activatedAt: at(start), due: addBusinessDays(start, 3) });
         const vpnInfo = ps.find((x) => x.key === "vpn_info")!;
-        Object.assign(vpnInfo, { status: "pending", activatedAt: new Date().toISOString(), ballSince: new Date().toISOString(), due: addBusinessDays(today, 2) });
+        Object.assign(vpnInfo, { status: "pending", activatedAt: new Date().toISOString(), ballSince: new Date().toISOString(), due: addBusinessDays(today, 1) });
         const servers = ps.find((x) => x.key === "servers")!;
         Object.assign(servers, { dependency: "independent", status: "pending", activatedAt: at(start), ballSince: at(start), due: addBusinessDays(start, 5) });
         const model = ps.find((x) => x.key === "model_install");
