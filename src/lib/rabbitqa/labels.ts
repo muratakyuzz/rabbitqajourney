@@ -16,11 +16,12 @@ export const BALL_LABEL: Record<Ball, string> = {
   customer: "Müşteri", csm: "CSM", devops: "DevOps", care: "Customer Care",
 };
 export const STEP_STATUS_LABEL: Record<StepStatus, string> = {
-  pending: "Bekliyor", in_progress: "Devam ediyor", done: "Tamamlandı", out_of_scope: "Kapsam dışı",
+  pending: "Bekliyor", in_progress: "Devam ediyor", done: "Tamamlandı", out_of_scope: "Kapsam dışı", locked: "Sırası gelmedi",
 };
 export const PHASE_STATUS_LABEL: Record<PhaseStatus, string> = {
-  not_started: "Başlamadı", in_progress: "Devam ediyor", at_risk: "Risk altında", late: "Gecikti", done: "Tamamlandı", out_of_scope: "Kapsam dışı",
+  not_started: "Başlamadı", in_progress: "Devam ediyor", at_risk: "Risk altında", late: "Gecikti", done: "Tamamlandı", out_of_scope: "Kapsam dışı", locked: "Sırası gelmedi",
 };
+export const DEPENDENCY_LABEL = { previous: "Önceki tamamlanınca", independent: "Bağımsız" } as const;
 export const HEALTH_LABEL: Record<Health, string> = { green: "Yeşil", yellow: "Sarı", red: "Kırmızı" };
 export const ACTION_STATUS_LABEL: Record<ActionStatus, string> = {
   open: "Açık", in_progress: "Devam ediyor", done: "Tamamlandı", cancelled: "İptal",

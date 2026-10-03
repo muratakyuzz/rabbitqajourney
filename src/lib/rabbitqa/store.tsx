@@ -1,6 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
+import { advanceAll, projectPlan } from "./flow";
+import { fmtDate } from "./labels";
 import { useAuth } from "@/lib/auth-context";
-import { ADAPTATION_STEPS, DEFAULT_PROJECT_INTEGRATIONS, buildFromTemplate, createSeed, uid } from "./seed";
+import { ADAPTATION_FLOW, ADAPTATION_STEPS, DEFAULT_PROJECT_INTEGRATIONS, buildFromTemplate, createSeed, uid } from "./seed";
 import { analyzeText, type IncomingMeta } from "./ai-mock";
 import { matchEmail } from "./email-match";
 import type {
@@ -10,14 +13,14 @@ import type {
 import { todayISO } from "./labels";
 import { applyInstallType, applyLlmChoice, setStepByKey } from "./rules";
 
-const KEY = "rabbitqa-demo-state-v5";
+const KEY = "rabbitqa-demo-state-v6";
 
 function load(): RqState {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as RqState;
-      if (s.version === 5) return s;
+      if (s.version === 6) return s;
     }
   } catch { /* ignore */ }
   return createSeed();
@@ -36,9 +39,9 @@ interface Ctx {
   userId: string;
   createProject: (p: Pick<Project, "customerName" | "name" | "csmId" | "salespersonId" | "licenseModel" | "purchasedModules" | "startDate" | "goLiveDate">) => string;
   updateProject: (id: string, patch: Partial<Project>, reason?: string) => void;
-  updatePhase: (id: string, patch: Partial<Phase>, reason?: string) => void;
+  updatePhase: (id: string, patch: Partial<Phase>, reason?: string) => string | null;
   completePhase: (id: string) => string | null;
-  updateStep: (id: string, patch: Partial<Step>, reason?: string) => void;
+  updateStep: (id: string, patch: Partial<Step>, reason?: string) => string | null;
   addAction: (a: Omit<Action, "id" | "createdAt">) => void;
   updateAction: (id: string, patch: Partial<Action>, reason?: string) => void;
   addMeeting: (m: Omit<Meeting, "id">, actions: Omit<Action, "id" | "createdAt" | "meetingId" | "projectId" | "source">[]) => void;
@@ -84,7 +87,26 @@ const RqContext = createContext<Ctx | null>(null);
 export function RqProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const userId = user?.id ?? "system";
-  const [state, setState] = useState<RqState>(load);
+  const [state, setRaw] = useState<RqState>(load);
+  const mkRef = useRef<(e: Omit<AuditEntry, "id" | "at" | "userId">) => AuditEntry>(() => { throw new Error("mk"); });
+  const flowMsgs = useRef<string[]>([]);
+
+  /** Her güncellemeden sonra akış motoru çalışır (idempotent); açılan adımlar için bildirim hazırlanır. */
+  const setState = useCallback((u: RqState | ((s: RqState) => RqState)) => {
+    setRaw((s) => {
+      const n = typeof u === "function" ? u(s) : u;
+      if (n === s) return s;
+      const next = advanceAll(n, mkRef.current);
+      flowMsgs.current = flowMessages(s, next);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!flowMsgs.current.length) return;
+    flowMsgs.current.forEach((m) => toast.success(m));
+    flowMsgs.current = [];
+  }, [state]);
 
   useEffect(() => {
     localStorage.setItem(KEY, JSON.stringify(state));
@@ -94,6 +116,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
     (e: Omit<AuditEntry, "id" | "at" | "userId">): AuditEntry => ({ ...e, id: uid("au"), at: new Date().toISOString(), userId }),
     [userId],
   );
+  mkRef.current = mkAudit;
 
   const labelOf = (coll: Coll, item: Record<string, unknown>) =>
     String(item.title ?? item.name ?? item.text ?? item.customerName ?? item.type ?? "");
@@ -170,12 +193,20 @@ export function RqProvider({ children }: { children: ReactNode }) {
       };
       setState((s) => {
         const { phases, steps } = buildFromTemplate(project, s.users, {}, s.template);
+        const plan = projectPlan(phases, steps, project.startDate);
+        phases.forEach((ph) => {
+          const d = plan.phases[ph.id];
+          if (!d) return;
+          ph.planStart = ph.planStart ?? d.start;
+          ph.planEnd = ph.planEnd ?? d.end;
+          ph.baselineEnd = ph.baselineEnd ?? d.end;
+        });
         return {
           ...s,
           projects: [...s.projects, project],
           phases: [...s.phases, ...phases],
           steps: [...s.steps, ...steps],
-          audit: [...s.audit, mkAudit({ projectId: project.id, kind: "create", entity: "project", entityId: project.id, label: `Proje oluşturuldu — aşamalar ve adımlar şablondan kopyalandı` })],
+          audit: [...s.audit, mkAudit({ projectId: project.id, kind: "create", entity: "project", entityId: project.id, label: `Proje oluşturuldu — aşamalar ve adımlar şablondan kopyalandı, akış başlatıldı` })],
         };
       });
       return project.id;
@@ -190,10 +221,20 @@ export function RqProvider({ children }: { children: ReactNode }) {
       }
       return {};
     }),
-    updatePhase: (id, p, reason) => patch<Phase>("phases", id, p, reason),
+    updatePhase: (id, p, reason) => {
+      const ph = state.phases.find((x) => x.id === id);
+      if (!ph) return "Aşama bulunamadı";
+      if (p.status && p.status !== ph.status) {
+        if (ph.status === "locked") return "Aşamanın sırası gelmedi";
+        if (p.status === "locked") return "\"Sırası gelmedi\" elle seçilemez";
+      }
+      patch<Phase>("phases", id, p, reason);
+      return null;
+    },
     completePhase: (id) => {
       const ph = state.phases.find((x) => x.id === id);
       if (!ph) return "Aşama bulunamadı";
+      if (ph.status === "locked") return "Aşamanın sırası gelmedi";
       const open = state.steps.filter((s) => s.phaseId === id && s.required && s.status !== "done" && s.status !== "out_of_scope");
       if (open.length) return `${open.length} zorunlu adım tamamlanmadı`;
       patch<Phase>("phases", id, { status: "done", actualEnd: todayISO(), actualStart: ph.actualStart ?? todayISO(), approvedBy: userId, approvedAt: new Date().toISOString() });
@@ -201,9 +242,15 @@ export function RqProvider({ children }: { children: ReactNode }) {
     },
     updateStep: (id, p, reason) => {
       const old = state.steps.find((s) => s.id === id);
+      if (!old) return "Adım bulunamadı";
+      if (p.status && p.status !== old.status) {
+        if (old.status === "locked") return "Adımın sırası gelmedi; durumu elle değiştirilemez";
+        if (p.status === "locked") return "\"Sırası gelmedi\" elle seçilemez";
+      }
       const changes = { ...p };
-      if (old && p.ball && p.ball !== old.ball) changes.ballSince = new Date().toISOString();
+      if (p.ball && p.ball !== old.ball) changes.ballSince = new Date().toISOString();
       patch<Step>("steps", id, changes, reason);
+      return null;
     },
     addAction: (a) => add<Action>("actions", { ...a, id: uid("a"), createdAt: new Date().toISOString() }),
     updateAction: (id, p, reason) => patch<Action>("actions", id, p, reason),
@@ -238,7 +285,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
         const start = s.steps.filter((x) => x.phaseId === phase.id).length;
         const newSteps: Step[] = ADAPTATION_STEPS.map((t, i) => ({
           id: uid("st"), projectId, phaseId: phase.id, title: `${team} — ${t}`, required: true, ownerId: project.csmId, ball: "csm",
-          ballSince: new Date().toISOString(), due: phase.planEnd, status: "pending", order: start + i,
+          ballSince: new Date().toISOString(), due: null, status: "locked", order: start + i, ...ADAPTATION_FLOW[i], activatedAt: null,
         }));
         return {
           ...s,
@@ -290,7 +337,8 @@ export function RqProvider({ children }: { children: ReactNode }) {
         if (!phase) return s;
         const step: Step = {
           id: uid("st"), projectId: t.projectId, phaseId: phase.id, title: `Katılımcı girişi — ${t.date.split("-").reverse().join(".")} session'ı`, required: false,
-          ownerId: s.projects.find((p) => p.id === t.projectId)?.csmId ?? null, ball: "csm", ballSince: new Date().toISOString(), due: t.date, status: t.attendees ? "done" : "pending", order: 100,
+          ownerId: s.projects.find((p) => p.id === t.projectId)?.csmId ?? null, ball: "csm", ballSince: new Date().toISOString(), due: t.attendees ? t.date : null, status: t.attendees ? "done" : "locked", order: 100,
+          dependency: "independent", durationDays: 2, activatedAt: t.attendees ? new Date().toISOString() : null,
         };
         return { ...s, steps: [...s.steps, step], audit: [...s.audit, mkAudit({ projectId: t.projectId, kind: "create", entity: "step", entityId: step.id, label: `${step.title} — adım açıldı (otomatik kural)` })] };
       });
@@ -444,7 +492,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
           break;
         }
         case "action_update": if (ins.targetId) api.updateAction(ins.targetId, v, reason); break;
-        case "step_update": if (ins.targetId) api.updateStep(ins.targetId, v, reason); break;
+        case "step_update": if (ins.targetId) patch<Step>("steps", ins.targetId, v as Partial<Step>, reason); break;
         case "risk_create":
         case "decision_create": {
           const rid = uid("r");
@@ -536,4 +584,25 @@ export function activePhase(state: RqState, projectId: string) {
 export function personName(state: RqState, id: string | null) {
   if (!id) return "—";
   return state.users.find((u) => u.id === id)?.name ?? state.contacts.find((c) => c.id === id)?.name ?? "—";
+}
+
+/** Önceki ve sonraki state arasında akışın açtığı aşama/adımlar için Türkçe bildirimler. */
+function flowMessages(prev: RqState, next: RqState): string[] {
+  const oldIds = new Set(prev.projects.map((p) => p.id));
+  const prevPh = new Map(prev.phases.map((p) => [p.id, p]));
+  const prevSt = new Map(prev.steps.map((s) => [s.id, s]));
+  const name = (id: string | null) => next.users.find((u) => u.id === id)?.name ?? next.contacts.find((c) => c.id === id)?.name ?? "atanmamış";
+  const msgs: string[] = [];
+  const opened = next.steps.filter((s) => oldIds.has(s.projectId) && prevSt.get(s.id)?.status === "locked" && s.status === "pending");
+  const donePh = next.phases.filter((p) => oldIds.has(p.projectId) && prevPh.get(p.id) && prevPh.get(p.id)!.status !== "done" && p.status === "done");
+  donePh.forEach((ph) => {
+    const started = next.phases.find((p) => p.projectId === ph.projectId && prevPh.get(p.id)?.status === "locked" && p.status !== "locked");
+    const n = started ? opened.filter((s) => s.phaseId === started.id).length : 0;
+    msgs.push(started ? `${ph.name} tamamlandı — ${started.name} başladı, ${n} adım açıldı` : `${ph.name} tamamlandı`);
+  });
+  if (!donePh.length && opened.length) {
+    const s = opened[0];
+    msgs.push(`Sıradaki adım açıldı: ${s.title} — ${name(s.ownerId)}, termin ${fmtDate(s.due)}${opened.length > 1 ? ` (+${opened.length - 1} adım)` : ""}`);
+  }
+  return msgs;
 }

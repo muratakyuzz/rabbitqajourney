@@ -8,6 +8,9 @@ export function canManageProject(u: AuthUser | null, p: Project) {
   return isAllSeeing(u) || (u.role === "csm" && p.csmId === u.id);
 }
 
+/** Proje içindeki adımın bağlılığı ve süresi. */
+export const canEditFlow = (u: AuthUser | null, p: Project) => canManageProject(u, p);
+
 export function canEditItem(u: AuthUser | null, p: Project, ownerId: string | null) {
   return canManageProject(u, p) || (!!u && ownerId === u.id);
 }

@@ -25,13 +25,15 @@ import {
 } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
-import { canEditItem, canManageProject, isAllSeeing } from "@/lib/rabbitqa/perm";
+import { canEditFlow, canEditItem, canManageProject, isAllSeeing } from "@/lib/rabbitqa/perm";
+import { isActivePhase, isOpenStep, previousStep } from "@/lib/rabbitqa/flow";
+import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
 import {
   ACTION_STATUS_LABEL, BALL_LABEL, COMMIT_STATUS_LABEL, CONTACT_ROLE_LABEL, ENTITY_LABEL, HEALTH_LABEL, MEETING_TYPE_LABEL,
   PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, SOURCE_LABEL, fmtDate, fmtDateTime, todayISO,
 } from "@/lib/rabbitqa/labels";
 import type {
-  Action, ActionStatus, Ball, Commitment, CommitmentStatus, ContactRole, Health, MeetingType, Phase, PhaseStatus, Priority, Project, Step, StepStatus,
+  Action, ActionStatus, Ball, Commitment, Dependency, CommitmentStatus, ContactRole, Health, MeetingType, Phase, PhaseStatus, Priority, Project, Step, StepStatus,
 } from "@/lib/rabbitqa/types";
 
 const NONE = "__none";
@@ -201,6 +203,22 @@ function HealthCard({ project, canEdit }: { project: Project; canEdit: boolean }
 }
 
 /* ── Phases & steps ─────────────────────────────────────── */
+const DepIcon = ({ dep }: { dep: Dependency }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+        <span className="font-mono">{dep === "previous" ? "↳" : "∥"}</span>{dep === "previous" ? "Önceki" : "Bağımsız"}
+      </span>
+    </TooltipTrigger>
+    <TooltipContent>{dep === "previous" ? "Önceki adım tamamlanınca açılır (aşamanın ilk adımıysa aşama başlayınca)" : "Aşama başlayınca açılır"}</TooltipContent>
+  </Tooltip>
+);
+
+export function isNewlyActivated(at: string | null | undefined) {
+  if (!at) return false;
+  return businessDaysBetween(at.slice(0, 10), todayISO()) <= 1;
+}
+
 function PhasesTab({ project }: { project: Project }) {
   const { state, completePhase } = useRq();
   const { user } = useAuth();
@@ -208,22 +226,31 @@ function PhasesTab({ project }: { project: Project }) {
   const phases = state.phases.filter((p) => p.projectId === project.id).sort((a, b) => a.order - b.order);
   const [editStep, setEditStep] = useState<Step | null>(null);
   const [editPhase, setEditPhase] = useState<Phase | null>(null);
-  const current = phases.find((p) => p.status !== "done" && p.status !== "out_of_scope");
+  const activeIds = phases.filter(isActivePhase).map((p) => p.id);
+  const today = todayISO();
 
   return (
     <>
-      <Accordion type="multiple" defaultValue={current ? [current.id] : []} className="space-y-2">
-        {phases.map((ph) => {
+      <Accordion type="multiple" defaultValue={activeIds} className="space-y-2">
+        {phases.map((ph, idx) => {
           const steps = state.steps.filter((s) => s.phaseId === ph.id).sort((a, b) => a.order - b.order);
           const counted = steps.filter((s) => s.status !== "out_of_scope");
           const done = counted.filter((s) => s.status === "done").length;
+          const locked = ph.status === "locked";
+          const prevPh = phases[idx - 1];
           return (
-            <AccordionItem key={ph.id} value={ph.id} className="rounded-lg border bg-card px-4">
+            <AccordionItem key={ph.id} value={ph.id} className={`rounded-lg border bg-card px-4 ${locked ? "opacity-80" : ""}`}>
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex flex-1 flex-wrap items-center gap-3 text-left pr-3">
                   <span className="font-mono text-xs text-muted-foreground">{ph.code}</span>
                   <span className="font-semibold">{ph.name}</span>
                   <PhaseStatusBadge status={ph.status} />
+                  {locked && (
+                    <span className="text-xs text-muted-foreground font-normal">
+                      {ph.dependency === "independent" ? "Bağımsız" : prevPh ? `Önceki aşama (${prevPh.code} ${prevPh.name}) tamamlanınca başlar` : ""}
+                    </span>
+                  )}
+                  {!locked && ph.activatedAt && ph.status !== "done" && <span className="text-xs text-muted-foreground font-normal">Başladı: {fmtDate(ph.activatedAt)}</span>}
                   <span className="ml-auto text-xs text-muted-foreground font-normal">
                     {done}/{counted.length} adım · Plan: {fmtDate(ph.planStart)} – {fmtDate(ph.planEnd)}
                   </span>
@@ -237,10 +264,10 @@ function PhasesTab({ project }: { project: Project }) {
                   {manage && (
                     <div className="ml-auto flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => setEditPhase(ph)}><Pencil className="h-3.5 w-3.5 mr-1" />Aşamayı düzenle</Button>
-                      {ph.status !== "done" && (
+                      {ph.status !== "done" && !locked && (
                         <Button size="sm" onClick={() => {
                           const err = completePhase(ph.id);
-                          err ? toast.error(`Aşama tamamlanamaz: ${err}`) : toast.success(`${ph.name} tamamlandı`);
+                          if (err) toast.error(`Aşama tamamlanamaz: ${err}`);
                         }}><CheckCircle2 className="h-3.5 w-3.5 mr-1" />Aşamayı tamamla</Button>
                       )}
                     </div>
@@ -254,22 +281,40 @@ function PhasesTab({ project }: { project: Project }) {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Adım</TableHead><TableHead>Sorumlu</TableHead><TableHead>Top kimde</TableHead>
-                        <TableHead>Termin</TableHead><TableHead>Durum</TableHead><TableHead className="w-10" />
+                        <TableHead>Adım</TableHead><TableHead>Başlangıç</TableHead><TableHead>Süre</TableHead><TableHead>Sorumlu</TableHead><TableHead>Top kimde</TableHead>
+                        <TableHead>Aktifleşti</TableHead><TableHead>Termin</TableHead><TableHead>Durum</TableHead><TableHead className="w-10" />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {steps.map((s) => {
-                        const late = isOverdue(s.due, s.status === "done" || s.status === "out_of_scope");
+                        const sLocked = s.status === "locked";
+                        const late = isOpenStep(s) && !!s.due && s.due < today;
+                        const lateDays = late ? businessDaysBetween(s.due!, today) : 0;
+                        const prev = previousStep(steps, s);
                         return (
-                          <TableRow key={s.id} className={s.status === "out_of_scope" ? "opacity-60" : ""}>
+                          <TableRow key={s.id} className={s.status === "out_of_scope" || sLocked ? "opacity-60" : ""}>
                             <TableCell className="font-medium">
                               {s.title}{s.required && <span className="text-destructive ml-1" title="Zorunlu">*</span>}
+                              {isOpenStep(s) && isNewlyActivated(s.activatedAt) && <Pill tone="info" className="ml-2">Yeni</Pill>}
                             </TableCell>
+                            <TableCell><DepIcon dep={s.dependency} /></TableCell>
+                            <TableCell className="whitespace-nowrap text-xs">{s.durationDays} iş günü</TableCell>
                             <TableCell>{personName(state, s.ownerId)}</TableCell>
                             <TableCell><Pill tone={s.ball === "customer" ? "warning" : "muted"}>{BALL_LABEL[s.ball]}</Pill></TableCell>
-                            <TableCell className={late ? "text-destructive font-medium" : ""}>{fmtDate(s.due)}</TableCell>
-                            <TableCell><StepStatusBadge status={s.status} /></TableCell>
+                            <TableCell className="text-xs">{fmtDate(s.activatedAt)}</TableCell>
+                            <TableCell className={late ? "text-destructive font-medium" : ""}>
+                              {sLocked ? <span>— <span className="text-xs text-muted-foreground">({s.durationDays} iş günü)</span></span> : (
+                                <span className="flex flex-wrap items-center gap-1">{fmtDate(s.due)}{late && <Pill tone="danger">{lateDays} iş günü gecikti</Pill>}</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {sLocked ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild><span><StepStatusBadge status={s.status} /></span></TooltipTrigger>
+                                  <TooltipContent>{s.dependency === "independent" || !prev ? "Aşama başlayınca açılır" : `${prev.title} tamamlanınca açılır`}</TooltipContent>
+                                </Tooltip>
+                              ) : <StepStatusBadge status={s.status} />}
+                            </TableCell>
                             <TableCell>
                               {canEditItem(user, project, s.ownerId) && (
                                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditStep(s)} aria-label="Adımı düzenle"><Pencil className="h-3.5 w-3.5" /></Button>
@@ -294,12 +339,19 @@ function PhasesTab({ project }: { project: Project }) {
 
 function StepDialog({ step, project, onClose }: { step: Step; project: Project; onClose: () => void }) {
   const { updateStep } = useRq();
+  const { user } = useAuth();
+  const flow = canEditFlow(user, project);
+  const locked = step.status === "locked";
   const [ownerId, setOwnerId] = useState(step.ownerId);
   const [ball, setBall] = useState<Ball>(step.ball);
   const [due, setDue] = useState(step.due ?? "");
   const [status, setStatus] = useState<StepStatus>(step.status);
+  const [dependency, setDependency] = useState<Dependency>(step.dependency);
+  const [durationDays, setDurationDays] = useState(step.durationDays);
   const [reason, setReason] = useState("");
   const needsReason = (due || null) !== step.due || status !== step.status;
+  const statusLabels = { ...STEP_STATUS_LABEL } as Partial<Record<StepStatus, string>>;
+  if (!locked) delete statusLabels.locked;
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
@@ -308,16 +360,47 @@ function StepDialog({ step, project, onClose }: { step: Step; project: Project; 
           <div className="grid gap-2"><Label>Sorumlu</Label><PersonSelect value={ownerId} onChange={setOwnerId} projectId={project.id} /></div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2"><Label>Top kimde</Label><EnumSelect value={ball} onChange={setBall} labels={BALL_LABEL} /></div>
-            <div className="grid gap-2"><Label>Durum</Label><EnumSelect value={status} onChange={setStatus} labels={STEP_STATUS_LABEL} /></div>
+            <div className="grid gap-2">
+              <Label>Durum</Label>
+              {locked ? (
+                <>
+                  <Input value="Sırası gelmedi" disabled />
+                  <p className="text-xs text-muted-foreground">Sırası gelince otomatik açılır; durumu elle değiştirilemez.</p>
+                </>
+              ) : <EnumSelect value={status} onChange={setStatus} labels={statusLabels as Record<StepStatus, string>} />}
+            </div>
           </div>
-          <div className="grid gap-2"><Label>Termin</Label><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></div>
+          {!locked && <div className="grid gap-2"><Label>Termin</Label><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></div>}
+          {flow && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Başlangıç</Label>
+                <Select value={dependency} onValueChange={(v) => setDependency(v as Dependency)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="previous">Önceki adım tamamlanınca</SelectItem>
+                    <SelectItem value="independent">Bağımsız</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Süre (iş günü)</Label>
+                <Input type="number" min={1} max={60} value={durationDays} disabled={!locked} onChange={(e) => setDurationDays(Math.max(1, Math.min(60, Number(e.target.value) || 1)))} />
+                {!locked && <p className="text-xs text-muted-foreground">Süre yalnızca adım kilitliyken değişir.</p>}
+              </div>
+            </div>
+          )}
           {needsReason && <div className="grid gap-2"><Label>Gerekçe (tarih/durum değişikliğinde zorunlu)</Label><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></div>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Vazgeç</Button>
           <Button onClick={() => {
             if (needsReason && !reason.trim()) return toast.error("Gerekçe zorunlu");
-            updateStep(step.id, { ownerId, ball, due: due || null, status }, reason.trim() || undefined);
+            const p: Partial<Step> = { ownerId, ball };
+            if (!locked) { p.due = due || null; p.status = status; }
+            if (flow) { p.dependency = dependency; if (locked) p.durationDays = durationDays; }
+            const err = updateStep(step.id, p, reason.trim() || undefined);
+            if (err) return toast.error(err);
             toast.success("Adım güncellendi");
             onClose();
           }}>Kaydet</Button>
@@ -329,6 +412,7 @@ function StepDialog({ step, project, onClose }: { step: Step; project: Project; 
 
 function PhaseDialog({ phase, onClose }: { phase: Phase; onClose: () => void }) {
   const { updatePhase } = useRq();
+  const locked = phase.status === "locked";
   const [status, setStatus] = useState<PhaseStatus>(phase.status);
   const [planStart, setPlanStart] = useState(phase.planStart ?? "");
   const [planEnd, setPlanEnd] = useState(phase.planEnd ?? "");
@@ -336,6 +420,7 @@ function PhaseDialog({ phase, onClose }: { phase: Phase; onClose: () => void }) 
   const [reason, setReason] = useState("");
   const statusOptions = { ...PHASE_STATUS_LABEL } as Partial<Record<PhaseStatus, string>>;
   delete statusOptions.done;
+  delete statusOptions.locked;
   const needsReason = status !== phase.status || (planEnd || null) !== phase.planEnd || (planStart || null) !== phase.planStart;
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -344,8 +429,17 @@ function PhaseDialog({ phase, onClose }: { phase: Phase; onClose: () => void }) 
         <div className="grid gap-3">
           <div className="grid gap-2">
             <Label>Durum</Label>
-            <EnumSelect value={status} onChange={setStatus} labels={(phase.status === "done" ? PHASE_STATUS_LABEL : statusOptions) as Record<PhaseStatus, string>} />
-            <p className="text-xs text-muted-foreground">"Tamamlandı" için "Aşamayı tamamla" butonunu kullanın.</p>
+            {locked ? (
+              <>
+                <Input value="Sırası gelmedi" disabled />
+                <p className="text-xs text-muted-foreground">Aşamanın sırası gelince otomatik başlar; durumu elle değiştirilemez.</p>
+              </>
+            ) : (
+              <>
+                <EnumSelect value={status} onChange={setStatus} labels={(phase.status === "done" ? { ...statusOptions, done: PHASE_STATUS_LABEL.done } : statusOptions) as Record<PhaseStatus, string>} />
+                <p className="text-xs text-muted-foreground">"Tamamlandı" için "Aşamayı tamamla" butonunu kullanın.</p>
+              </>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2"><Label>Plan başlangıç</Label><Input type="date" value={planStart} onChange={(e) => setPlanStart(e.target.value)} /></div>
@@ -359,10 +453,11 @@ function PhaseDialog({ phase, onClose }: { phase: Phase; onClose: () => void }) 
           <Button variant="outline" onClick={onClose}>Vazgeç</Button>
           <Button onClick={() => {
             if (needsReason && !reason.trim()) return toast.error("Gerekçe zorunlu");
-            updatePhase(phase.id, {
+            const err = updatePhase(phase.id, {
               status, planStart: planStart || null, planEnd: planEnd || null, actualStart: actualStart || null,
               baselineEnd: phase.baselineEnd ?? (planEnd || null),
             }, reason.trim() || undefined);
+            if (err) return toast.error(err);
             onClose();
           }}>Kaydet</Button>
         </DialogFooter>

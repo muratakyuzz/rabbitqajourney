@@ -1,3 +1,4 @@
+import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ActionStatus, Health, PhaseStatus, Priority, StepStatus } from "@/lib/rabbitqa/types";
 import { ACTION_STATUS_LABEL, HEALTH_LABEL, PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL } from "@/lib/rabbitqa/labels";
@@ -28,13 +29,13 @@ export const HealthBadge = ({ health }: { health: Health }) => (
 );
 
 const PHASE_TONE: Record<PhaseStatus, Tone> = {
-  not_started: "muted", in_progress: "info", at_risk: "warning", late: "danger", done: "success", out_of_scope: "muted",
+  not_started: "muted", in_progress: "info", at_risk: "warning", late: "danger", done: "success", out_of_scope: "muted", locked: "muted",
 };
-export const PhaseStatusBadge = ({ status }: { status: PhaseStatus }) => <Pill tone={PHASE_TONE[status]}>{PHASE_STATUS_LABEL[status]}</Pill>;
+export const PhaseStatusBadge = ({ status }: { status: PhaseStatus }) => <Pill tone={PHASE_TONE[status]}>{status === "locked" && <Lock className="h-3 w-3" />}{PHASE_STATUS_LABEL[status]}</Pill>;
 
-const STEP_TONE: Record<StepStatus, Tone> = { pending: "muted", in_progress: "info", done: "success", out_of_scope: "muted" };
+const STEP_TONE: Record<StepStatus, Tone> = { pending: "muted", in_progress: "info", done: "success", out_of_scope: "muted", locked: "muted" };
 export const StepStatusBadge = ({ status }: { status: StepStatus }) => (
-  <Pill tone={STEP_TONE[status]} className={status === "out_of_scope" ? "line-through" : ""}>{STEP_STATUS_LABEL[status]}</Pill>
+  <Pill tone={STEP_TONE[status]} className={status === "out_of_scope" ? "line-through" : ""}>{status === "locked" && <Lock className="h-3 w-3" />}{STEP_STATUS_LABEL[status]}</Pill>
 );
 
 const ACTION_TONE: Record<ActionStatus, Tone> = { open: "muted", in_progress: "info", done: "success", cancelled: "muted" };
