@@ -15,7 +15,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { HealthBadge } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { activePhase, activePhaseCount, personName, projectProgress, useAlertViews, useRq } from "@/lib/rabbitqa/store";
-import { visibleProjects, isAllSeeing, canCreateProject, isCsmUser } from "@/lib/rabbitqa/perm";
+import { visibleProjects, isAllSeeing, canCreateProject, isCsmUser, selectableCsms } from "@/lib/rabbitqa/perm";
 import { Pill } from "@/components/rq/Badges";
 import { fmtDate, HEALTH_LABEL, todayISO } from "@/lib/rabbitqa/labels";
 import { toast } from "sonner";
@@ -185,7 +185,7 @@ function NewProjectDialog({
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Atanmadı</SelectItem>
-                  {state.users.filter((u) => u.role === "csm").map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                  {selectableCsms(state).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
