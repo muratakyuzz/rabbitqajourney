@@ -185,7 +185,7 @@ function NewProjectDialog({
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Atanmadı</SelectItem>
-                  {state.users.filter((u) => u.role === "csm").map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                  {selectableCsms(state).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
