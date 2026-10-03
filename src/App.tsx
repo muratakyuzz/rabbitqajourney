@@ -18,6 +18,7 @@ import CustomerReport from "./pages/CustomerReport";
 import ManagementReport from "./pages/ManagementReport";
 import Admin from "./pages/Admin";
 import Overview from "./pages/Overview";
+import Insights from "./pages/Insights";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
                 <Route element={<AppShell />}>
                   <Route index element={<Navigate to="/app/overview" replace />} />
                   <Route path="overview" element={<Overview />} />
+                  <Route path="insights" element={<Insights />} />
                   <Route path="projects" element={<Projects />} />
                   <Route path="projects/:id" element={<ProjectDetail />} />
                   <Route path="my-work" element={<MyWork />} />

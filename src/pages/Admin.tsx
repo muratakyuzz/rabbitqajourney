@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useRq } from "@/lib/rabbitqa/store";
 import { uid } from "@/lib/rabbitqa/seed";
 import { BALL_LABEL, ROLE_LABEL, fmtDateTime } from "@/lib/rabbitqa/labels";
+import { IntegrationsAdmin } from "./admin/IntegrationsAdmin";
 import type { Ball, PhaseTpl } from "@/lib/rabbitqa/types";
 
 export default function Admin() {
@@ -32,12 +33,14 @@ export default function Admin() {
         <TabsList>
           <TabsTrigger value="template">Aşama şablonu</TabsTrigger>
           <TabsTrigger value="modules">Modüller</TabsTrigger>
+          <TabsTrigger value="integrations">Entegrasyonlar</TabsTrigger>
           <TabsTrigger value="questions">Keşif soruları</TabsTrigger>
           <TabsTrigger value="users">Kullanıcılar</TabsTrigger>
           <TabsTrigger value="log">Değişiklikler</TabsTrigger>
         </TabsList>
         <TabsContent value="template"><TemplateEditor /></TabsContent>
         <TabsContent value="modules"><ModulesEditor /></TabsContent>
+        <TabsContent value="integrations"><IntegrationsAdmin /></TabsContent>
         <TabsContent value="questions"><QuestionsEditor /></TabsContent>
         <TabsContent value="users">
           <Card className="p-4">

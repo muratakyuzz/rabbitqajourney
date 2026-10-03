@@ -1,6 +1,11 @@
 import { Link } from "react-router-dom";
 import { AlertTriangle, BarChart3, Building2, CalendarDays, LifeBuoy, ListChecks, Rocket, Activity } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { useState } from "react";
+import { Sparkles } from "lucide-react";
+import { DEFAULT_FILTER, InsightCard, InsightFilters, applyFilter } from "@/components/rq/InsightCard";
+import { visibleInsights } from "@/lib/rabbitqa/perm";
+import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { HealthBadge, Pill } from "@/components/rq/Badges";
@@ -110,6 +115,8 @@ export default function Overview() {
         <Kpi icon={Rocket} label="Bu ay Go-Live" value={goLiveMonth.length} />
       </div>
 
+      <AiInsightCard />
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="p-4 space-y-3 lg:col-span-2">
           <div>
@@ -204,6 +211,27 @@ function Kpi({ icon: Icon, label, value, sub }: { icon: React.ElementType; label
       <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Icon className="h-3.5 w-3.5" />{label}</p>
       <p className="mt-1 text-2xl font-bold">{value}</p>
       {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+    </Card>
+  );
+}
+
+function AiInsightCard() {
+  const { state } = useRq();
+  const { user } = useAuth();
+  const [f, setF] = useState(DEFAULT_FILTER);
+  const pending = visibleInsights(state, user).filter((i) => effectiveStatus(state, i) === "pending");
+  const list = applyFilter(pending, f).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return (
+    <Card className="p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" />AI Insight <Pill tone={pending.length ? "info" : "muted"}>{pending.length} bekleyen</Pill></h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <InsightFilters f={f} setF={setF} projects={visibleProjects(state, user)} />
+          <Button asChild variant="outline" size="sm"><Link to="/app/insights">Tümünü gör</Link></Button>
+        </div>
+      </div>
+      {list.length ? <div className="space-y-3">{list.slice(0, 5).map((i) => <InsightCard key={i.id} insight={i} />)}</div>
+        : <p className="text-sm text-muted-foreground py-4 text-center">İncelenecek AI önerisi yok.</p>}
     </Card>
   );
 }
