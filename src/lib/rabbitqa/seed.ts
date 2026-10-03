@@ -72,7 +72,7 @@ export const PHASE_TEMPLATE: PhaseTpl[] = [
   { code: "05", name: "Uyarlama", steps: [] },
   { code: "06", name: "Uygulama", steps: [
     { title: "CS check-in toplantıları", ball: "csm", required: false },
-    { title: "Destek kayıtlarının takibi", ball: "care", required: false },
+    { key: "support_track", title: "Destek kayıtlarının takibi", ball: "care", required: false },
     { title: "KPI ölçümleri", ball: "csm", required: false },
   ]},
   { code: "07", name: "Go-Live", steps: [
