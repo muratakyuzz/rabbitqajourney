@@ -65,7 +65,7 @@ interface Ctx {
   updateRisk: (id: string, patch: Partial<RiskDecision>, reason?: string) => void;
   approveGoLive: (projectId: string, reason: string) => string | null;
   setConfig: <K extends "modules" | "questions" | "template" | "integrations">(key: K, value: RqState[K], label: string) => void;
-  testConnection: (kind: "teams" | "email") => Promise<{ ok: boolean; message: string; channels?: ChatChannel[] }>;
+  testConnection: (kind: "teams" | "email", override?: IntegrationConfig) => Promise<{ ok: boolean; message: string; channels?: ChatChannel[] }>;
   disconnect: (kind: "teams" | "email") => void;
   logSecretView: (field: string) => void;
   setProjectIntegration: (projectId: string, patch: { chat?: Partial<ProjectIntegrations["chat"]>; email?: Partial<ProjectIntegrations["email"]> }) => string | null;
@@ -369,9 +369,9 @@ export function RqProvider({ children }: { children: ReactNode }) {
       }
       return { ...s, [key]: val, audit: [...s.audit, mkAudit({ projectId: "system", kind: "update", entity: "config", entityId: key, label: lbl, field: key })] };
     }),
-    testConnection: (kind) => new Promise((resolve) => {
+    testConnection: (kind, override) => new Promise((resolve) => {
       setTimeout(() => {
-        const cfg = state.integrations;
+        const cfg = override ?? state.integrations;
         let missing: string[] = [];
         if (kind === "teams") {
           const t = cfg.chat.teams;
