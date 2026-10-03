@@ -77,7 +77,7 @@ export default function ManagementReport() {
         <Card className="p-4 space-y-2">
           <h2 className="font-semibold">Kritik uyarılar</h2>
           {critical.length ? <ul className="text-sm space-y-1">{critical.map((a) => (
-            <li key={a.id} className="flex gap-2 items-start"><Pill tone="red">Kritik</Pill>{state.projects.find((p) => p.id === a.projectId)?.customerName} — {a.title}</li>
+            <li key={a.id} className="flex gap-2 items-start"><Pill tone="danger">Kritik</Pill>{state.projects.find((p) => p.id === a.projectId)?.customerName} — {a.title}</li>
           ))}</ul> : <p className="text-sm text-muted-foreground">Açık kritik uyarı yok.</p>}
         </Card>
       </div>
