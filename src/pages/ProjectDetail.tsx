@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, FileText, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileText, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState } from "@/components/EmptyState";
 import { AccessTab, AdaptationTab, DocumentsTab, KickoffTab, KpiSection, TeamRow, TrainingTab } from "./project/Phase2Tabs";
 import { AlertsTab, GoLiveTab, RisksTab, TicketsTab } from "./project/Phase3Tabs";
+import { IntegrationsTab } from "./project/IntegrationsTab";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
 import {
   ActionStatusBadge, HealthBadge, PhaseStatusBadge, Pill, PriorityBadge, StepStatusBadge, isOverdue,
 } from "@/components/rq/Badges";
