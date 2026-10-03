@@ -210,6 +210,53 @@ export interface DocumentRec {
   addedAt: string;
 }
 
+export type AlertSeverity = "info" | "warning" | "critical";
+export type AlertStatus = "open" | "resolved";
+
+export interface Alert {
+  id: string;
+  projectId: string;
+  title: string;
+  detail: string;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  source: "rule" | "manual";
+  createdAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+}
+
+export type TicketStatus = "open" | "in_progress" | "waiting_customer" | "resolved" | "closed";
+
+export interface SupportTicket {
+  id: string;
+  projectId: string;
+  title: string;
+  description: string;
+  module: string;
+  priority: Priority;
+  status: TicketStatus;
+  ownerId: string | null;
+  openedAt: string;
+  resolvedAt: string | null;
+}
+
+export type RiskKind = "risk" | "decision";
+export type RiskStatus = "open" | "mitigated" | "accepted" | "realized";
+
+export interface RiskDecision {
+  id: string;
+  projectId: string;
+  kind: RiskKind;
+  title: string;
+  description: string;
+  impact: Priority;
+  status: RiskStatus;
+  ownerId: string | null;
+  due: string | null;
+  createdAt: string;
+}
+
 export interface RqState {
   version: number;
   users: User[];
@@ -228,5 +275,8 @@ export interface RqState {
   adaptations: AdaptationSession[];
   credentials: Credential[];
   documents: DocumentRec[];
+  alerts: Alert[];
+  tickets: SupportTicket[];
+  risks: RiskDecision[];
   audit: AuditEntry[];
 }
