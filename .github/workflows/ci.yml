@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # L1 + L2 (pg-mem) + L3, lint, typecheck, build, bağımlılık denetimi
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck --if-present
+      - run: npm test --if-present
+      - run: npm run build
+      - name: Dependency audit (high+)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Forbidden packages
+        run: |
+          if npm ls xlsx --all >/dev/null 2>&1; then echo "::error::xlsx (SheetJS npm) yasaklı — ADR-0001"; exit 1; fi
+
+  # L5: aynı entegrasyon testleri gerçek PostgreSQL'de (ADR-0002)
+  parity:
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('migrations/*.sql') != '' }}
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: app_admin
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: rabbitqa_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U app_admin -d rabbitqa_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DB_DRIVER: pg
+      DATABASE_URL: postgres://app_admin:ci_only_password@localhost:5432/rabbitqa_ci
+      TZ: Europe/Istanbul
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Ephemeral encryption key
+        run: echo "CREDENTIALS_KEY=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+      - name: Migrations (shared + pg-only)
+        run: npm run db:migrate -- --pg-only
+      - name: Integration tests on PostgreSQL
+        run: npm run test:int
+      - name: Critical query plans
+        run: npm run db:explain --if-present -- --out explain-report.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: parity-explain-report
+          path: explain-report.md
+          if-no-files-found: ignore
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
