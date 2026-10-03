@@ -17,13 +17,15 @@ import { useRq } from "@/lib/rabbitqa/store";
 import { uid } from "@/lib/rabbitqa/seed";
 import { BALL_LABEL, ROLE_LABEL, fmtDateTime } from "@/lib/rabbitqa/labels";
 import { IntegrationsAdmin } from "./admin/IntegrationsAdmin";
+import { AlertsAdmin, SalespeopleAdmin } from "./admin/AlertsAdmin";
+import { canAccessAdmin } from "@/lib/rabbitqa/perm";
 import type { Ball, Dependency, PhaseTpl } from "@/lib/rabbitqa/types";
 
 export default function Admin() {
   const { user } = useAuth();
   const { state } = useRq();
-  if (user?.role !== "admin") return <Navigate to="/app/projects" replace />;
-  const configAudit = state.audit.filter((a) => a.entity === "config").slice(-10).reverse();
+  if (!canAccessAdmin(user)) return <Navigate to="/app/projects" replace />;
+  const configAudit = state.audit.filter((a) => a.entity === "config").slice(-30).reverse();
 
   return (
     <div className="space-y-6">
@@ -32,12 +34,14 @@ export default function Admin() {
         <p className="text-sm text-muted-foreground">Şablon değişiklikleri yalnızca yeni açılan projeleri etkiler.</p>
       </div>
       <Tabs defaultValue="template">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="template">Aşama şablonu</TabsTrigger>
           <TabsTrigger value="modules">Modüller</TabsTrigger>
           <TabsTrigger value="integrations">Entegrasyonlar</TabsTrigger>
           <TabsTrigger value="questions">Keşif soruları</TabsTrigger>
           <TabsTrigger value="users">Kullanıcılar</TabsTrigger>
+          <TabsTrigger value="salespeople">Satışçılar</TabsTrigger>
+          <TabsTrigger value="alerts">Uyarılar</TabsTrigger>
           <TabsTrigger value="log">Değişiklikler</TabsTrigger>
         </TabsList>
         <TabsContent value="template"><TemplateEditor /></TabsContent>
@@ -55,6 +59,8 @@ export default function Admin() {
             <p className="text-xs text-muted-foreground mt-3">Demo sürümde kullanıcılar sabittir; gerçek kullanıcı yönetimi canlı sürümde eklenir.</p>
           </Card>
         </TabsContent>
+        <TabsContent value="salespeople"><SalespeopleAdmin /></TabsContent>
+        <TabsContent value="alerts"><AlertsAdmin /></TabsContent>
         <TabsContent value="log">
           <Card className="p-4">
             {configAudit.length ? <ul className="text-sm space-y-1">{configAudit.map((a) => (
