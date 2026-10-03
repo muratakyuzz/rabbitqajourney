@@ -232,6 +232,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
       if (p.status && p.status !== ph.status) {
         if (ph.status === "locked") return "Aşamanın sırası gelmedi";
         if (p.status === "locked") return "\"Sırası gelmedi\" elle seçilemez";
+        if (p.status === "late" || p.status === "at_risk") return "\"Gecikti\" ve \"Risk altında\" uyarılardan otomatik belirlenir";
       }
       patch<Phase>("phases", id, p, reason);
       return null;
