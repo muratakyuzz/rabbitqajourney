@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { HealthBadge, Pill } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { isAllSeeing } from "@/lib/rabbitqa/perm";
-import { activePhase, personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
+import { activePhase, personName, projectProgress, useRq , useAlertViews } from "@/lib/rabbitqa/store";
 import { fmtDate, todayISO } from "@/lib/rabbitqa/labels";
 
 export default function ManagementReport() {
@@ -17,7 +17,7 @@ export default function ManagementReport() {
   const projects = state.projects;
   const count = (h: string) => projects.filter((p) => p.health === h).length;
   const latePhases = state.phases.filter((p) => p.status !== "done" && p.status !== "out_of_scope" && p.planEnd && p.planEnd < today);
-  const critical = state.alerts.filter((a) => a.status === "open" && a.severity === "critical");
+  const critical = alertViews.filter((a) => a.status === "open" && a.level === "red");
   const openRisks = state.risks.filter((r) => r.kind === "risk" && r.status === "open");
   const openTickets = state.tickets.filter((t) => t.status !== "resolved" && t.status !== "closed");
   const team = state.users.filter((u) => ["csm", "devops", "care"].includes(u.role)).map((u) => ({
