@@ -17,6 +17,7 @@ import MyWork from "./pages/MyWork";
 import CustomerReport from "./pages/CustomerReport";
 import ManagementReport from "./pages/ManagementReport";
 import Admin from "./pages/Admin";
+import Overview from "./pages/Overview";
 
 const queryClient = new QueryClient();
 
@@ -43,7 +44,8 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/app" element={<ProtectedRoute />}>
                 <Route element={<AppShell />}>
-                  <Route index element={<Navigate to="/app/projects" replace />} />
+                  <Route index element={<Navigate to="/app/overview" replace />} />
+                  <Route path="overview" element={<Overview />} />
                   <Route path="projects" element={<Projects />} />
                   <Route path="projects/:id" element={<ProjectDetail />} />
                   <Route path="my-work" element={<MyWork />} />

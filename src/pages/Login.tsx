@@ -22,7 +22,7 @@ export default function Login() {
     setError(null);
     try {
       await login(mail, password || "demo");
-      navigate("/app/projects");
+      navigate("/app/overview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Giriş başarısız");
     } finally {
