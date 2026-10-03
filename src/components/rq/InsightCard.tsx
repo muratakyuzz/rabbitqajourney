@@ -61,7 +61,7 @@ export function targetChanged(state: RqState, i: AiInsight) {
   return Object.entries(i.current).some(([k, v]) => String(t[k] ?? "") !== String(v ?? ""));
 }
 
-const confTone = (c: number) => (c >= 80 ? "success" : c >= 60 ? "warning" : "muted") as const;
+const confTone = (c: number): "success" | "warning" | "muted" => (c >= 80 ? "success" : c >= 60 ? "warning" : "muted");
 const statusTone = { pending: "info", approved: "success", rejected: "danger", expired: "muted" } as const;
 
 export function SourceIcon({ source, className = "h-4 w-4" }: { source: AiInsight["source"]; className?: string }) {

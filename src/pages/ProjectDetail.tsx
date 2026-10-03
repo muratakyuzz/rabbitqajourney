@@ -28,7 +28,7 @@ import { personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
 import { canEditItem, canManageProject, isAllSeeing } from "@/lib/rabbitqa/perm";
 import {
   ACTION_STATUS_LABEL, BALL_LABEL, COMMIT_STATUS_LABEL, CONTACT_ROLE_LABEL, ENTITY_LABEL, HEALTH_LABEL, MEETING_TYPE_LABEL,
-  PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, fmtDate, fmtDateTime, todayISO,
+  PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, SOURCE_LABEL, fmtDate, fmtDateTime, todayISO,
 } from "@/lib/rabbitqa/labels";
 import type {
   Action, ActionStatus, Ball, Commitment, CommitmentStatus, ContactRole, Health, MeetingType, Phase, PhaseStatus, Priority, Project, Step, StepStatus,
