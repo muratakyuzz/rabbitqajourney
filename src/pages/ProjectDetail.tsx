@@ -460,7 +460,7 @@ function PhaseDialog({ phase, onClose }: { phase: Phase; onClose: () => void }) 
           <Button onClick={() => {
             if (needsReason && !reason.trim()) return toast.error("Gerekçe zorunlu");
             const err = updatePhase(phase.id, {
-              status, planStart: planStart || null, planEnd: planEnd || null, actualStart: actualStart || null,
+              ...(status !== initialStatus ? { status } : {}), planStart: planStart || null, planEnd: planEnd || null, actualStart: actualStart || null,
               baselineEnd: phase.baselineEnd ?? (planEnd || null),
             }, reason.trim() || undefined);
             if (err) return toast.error(err);
