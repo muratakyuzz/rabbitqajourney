@@ -1,115 +1,190 @@
-import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Printer } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, FilePlus2, Printer } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/EmptyState";
-import { HealthBadge, PhaseStatusBadge, PriorityBadge, isOverdue } from "@/components/rq/Badges";
-import { activePhase, personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
-import { BALL_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
-
-const addDays = (iso: string, n: number) => {
-  const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10);
-};
+import { HealthBadge, PhaseStatusBadge, Pill } from "@/components/rq/Badges";
+import { useAuth } from "@/lib/auth-context";
+import { canEditReport, canMarkReportSent } from "@/lib/rabbitqa/perm";
+import { personName, useRq } from "@/lib/rabbitqa/store";
+import { weekStartOf } from "@/lib/rabbitqa/alerts";
+import { PRIORITY_LABEL, REPORT_STATUS_LABEL, fmtDate, fmtDateTime, todayISO } from "@/lib/rabbitqa/labels";
+import type { ReportSnapshot } from "@/lib/rabbitqa/reports";
+import type { CustomerReport as Rep, PhaseStatus, Priority } from "@/lib/rabbitqa/types";
 
 export default function CustomerReport() {
   const { id } = useParams();
-  const { state } = useRq();
+  const [params, setParams] = useSearchParams();
+  const { user } = useAuth();
+  const { state, createCustomerReport, updateCustomerReport, markReportSent } = useRq();
+  const [week, setWeek] = useState(todayISO());
   const project = state.projects.find((p) => p.id === id);
   if (!project) return <Card><EmptyState title="Proje bulunamadı" description="Rapor oluşturulamadı." /></Card>;
 
-  const today = todayISO();
-  const weekAgo = addDays(today, -7);
-  const nextWeek = addDays(today, 7);
-  const phases = state.phases.filter((p) => p.projectId === project.id).sort((a, b) => a.order - b.order);
-  const steps = state.steps.filter((s) => s.projectId === project.id);
-  const doneThisWeek = state.audit.filter((a) => a.projectId === project.id && a.entity === "step" && a.field === "status" && a.newValue === "done" && a.at.slice(0, 10) >= weekAgo);
-  const upcoming = steps.filter((s) => (s.status === "pending" || s.status === "in_progress") && s.due && s.due <= nextWeek).sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
-  const actions = state.actions.filter((a) => a.projectId === project.id && (a.status === "open" || a.status === "in_progress"));
-  const risks = state.risks.filter((r) => r.projectId === project.id && r.kind === "risk" && r.status === "open");
-  const commits = state.commitments.filter((c) => c.projectId === project.id && c.status === "open");
-  const progress = projectProgress(state, project.id);
-  const ph = activePhase(state, project.id);
+  const reports = state.customerReports.filter((r) => r.projectId === project.id).sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+  const current = reports.find((r) => r.id === params.get("r")) ?? reports.find((r) => r.weekStart === weekStartOf(todayISO())) ?? null;
+  const canEdit = canEditReport(user, project);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between print:hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
         <Link to={`/app/projects/${project.id}`} className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
           <ArrowLeft className="h-4 w-4" /> Projeye dön
         </Link>
-        <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Yazdır / PDF kaydet</Button>
+        <div className="flex flex-wrap items-end gap-2">
+          {canEdit && (
+            <>
+              <div className="grid gap-1"><Label className="text-xs">Hafta</Label><Input type="date" className="h-9 w-40" value={week} onChange={(e) => setWeek(e.target.value)} /></div>
+              <Button variant="outline" onClick={() => {
+                const rid = createCustomerReport(project.id, week || todayISO());
+                if (rid) { setParams({ r: rid }); toast.success("Rapor taslağı hazır"); }
+              }}><FilePlus2 className="h-4 w-4 mr-2" />Rapor oluştur</Button>
+            </>
+          )}
+          {current && <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Yazdır / PDF</Button>}
+        </div>
       </div>
+
+      <Card className="print:hidden">
+        <CardHeader><CardTitle className="text-base">Rapor arşivi</CardTitle></CardHeader>
+        <CardContent>
+          {reports.length === 0 ? <EmptyState title="Rapor yok" description="Bu proje için henüz haftalık rapor oluşturulmadı." /> : (
+            <Table>
+              <TableHeader><TableRow><TableHead>Hafta</TableHead><TableHead>Oluşturan</TableHead><TableHead>Durum</TableHead><TableHead>Gönderilme</TableHead><TableHead className="w-20" /></TableRow></TableHeader>
+              <TableBody>{reports.map((r) => (
+                <TableRow key={r.id} className={current?.id === r.id ? "bg-muted/50" : ""}>
+                  <TableCell>{fmtDate(r.weekStart)} haftası</TableCell>
+                  <TableCell>{personName(state, r.createdBy)}</TableCell>
+                  <TableCell><Pill tone={r.status === "sent" ? "success" : "warning"}>{REPORT_STATUS_LABEL[r.status]}</Pill></TableCell>
+                  <TableCell>{r.sentAt ? `${fmtDateTime(r.sentAt)} · ${personName(state, r.sentBy)}` : "—"}</TableCell>
+                  <TableCell><Button size="sm" variant="ghost" onClick={() => setParams({ r: r.id })}>Aç</Button></TableCell>
+                </TableRow>
+              ))}</TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {current ? (
+        <ReportView key={current.id} rep={current} canEdit={canEdit && current.status === "draft"} canSend={canMarkReportSent(user, project) && current.status === "draft"}
+          onSave={(p) => { const e = updateCustomerReport(current.id, p); e ? toast.error(e) : toast.success("Rapor kaydedildi"); }}
+          onSend={() => { const e = markReportSent(current.id); e ? toast.error(e) : toast.success("Rapor gönderildi olarak işaretlendi"); }} />
+      ) : (
+        <Card><EmptyState title="Bu haftanın raporu oluşturulmadı" description={canEdit ? "Hafta seçip \"Rapor oluştur\" ile taslak hazırlayın." : "Arşivden bir rapor açın."} /></Card>
+      )}
+    </div>
+  );
+}
+
+function ReportView({ rep, canEdit, canSend, onSave, onSend }: { rep: Rep; canEdit: boolean; canSend: boolean; onSave: (p: { summary: string; nextWeek: string }) => void; onSend: () => void }) {
+  const s = rep.snapshot as unknown as ReportSnapshot;
+  const [summary, setSummary] = useState(rep.summary);
+  const [nextWeek, setNextWeek] = useState(rep.nextWeek);
+  useEffect(() => { setSummary(rep.summary); setNextWeek(rep.nextWeek); }, [rep.summary, rep.nextWeek]);
+  const dirty = summary !== rep.summary || nextWeek !== rep.nextWeek;
+  if (!s?.phases) return <Card><EmptyState title="Rapor içeriği yok" description="Bu rapor için dondurulmuş veri bulunamadı." /></Card>;
+
+  return (
+    <div className="space-y-3">
+      {(canEdit || canSend) && (
+        <div className="flex flex-wrap justify-end gap-2 print:hidden">
+          {canEdit && <Button variant="outline" disabled={!dirty} onClick={() => onSave({ summary, nextWeek })}>Değişiklikleri kaydet</Button>}
+          {canSend && <Button onClick={() => { if (dirty) onSave({ summary, nextWeek }); onSend(); }}><CheckCircle2 className="h-4 w-4 mr-2" />Gönderildi olarak işaretle</Button>}
+        </div>
+      )}
+      {rep.status === "sent" && <p className="text-xs text-muted-foreground print:hidden">Bu rapor gönderildi; düzenlenemez.</p>}
 
       <div className="bg-card text-card-foreground rounded-xl border p-8 space-y-6 print:border-0 print:p-0">
         <header className="flex items-start justify-between border-b pb-4">
           <div>
             <p className="text-xs uppercase tracking-wider text-muted-foreground">Haftalık müşteri durum raporu</p>
-            <h1 className="text-2xl font-bold">{project.customerName}</h1>
-            <p className="text-sm text-muted-foreground">{project.name} · {fmtDate(weekAgo)} – {fmtDate(today)}</p>
+            <h1 className="text-2xl font-bold">{s.customerName}</h1>
+            <p className="text-sm text-muted-foreground">{s.projectName} · {fmtDate(s.weekStart)} – {fmtDate(s.weekEnd)}</p>
           </div>
           <img src="/brand/vector.png" alt="RabbitQA" className="h-12 w-12 object-contain" />
         </header>
 
-        <section className="grid grid-cols-4 gap-4 text-sm">
-          <div><p className="text-muted-foreground text-xs">Sağlık</p><HealthBadge health={project.health} /></div>
-          <div><p className="text-muted-foreground text-xs">Aktif aşama</p><p className="font-medium">{ph ? `${ph.code} — ${ph.name}` : "—"}</p></div>
-          <div><p className="text-muted-foreground text-xs">Hedef Go-Live</p><p className="font-medium">{fmtDate(project.goLiveDate)}</p></div>
-          <div><p className="text-muted-foreground text-xs">İlerleme</p><div className="flex items-center gap-2"><Progress value={progress} className="h-2" /><span>%{progress}</span></div></div>
+        <section className="grid grid-cols-3 gap-4 text-sm">
+          <div><p className="text-muted-foreground text-xs">Proje sağlığı</p><HealthBadge health={s.health} /></div>
+          <div><p className="text-muted-foreground text-xs">Hedef Go-Live</p><p className="font-medium">{fmtDate(s.goLiveDate)}</p></div>
+          <div><p className="text-muted-foreground text-xs">CSM</p><p className="font-medium">{s.csmName}</p></div>
         </section>
 
-        <Section title="Aşama durumu">
+        <Section title="Özet">
+          {canEdit ? <Textarea className="print:hidden" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Bu haftanın kısa özeti" /> : null}
+          <p className={`text-sm whitespace-pre-line ${canEdit ? "hidden print:block" : ""}`}>{summary || "—"}</p>
+        </Section>
+
+        <Section title="Aşama ilerlemesi">
           <Table>
-            <TableHeader><TableRow><TableHead>Aşama</TableHead><TableHead>Plan bitiş</TableHead><TableHead>Gerçekleşen</TableHead><TableHead>Durum</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {phases.map((p) => (
-                <TableRow key={p.id}><TableCell>{p.code} — {p.name}</TableCell><TableCell>{fmtDate(p.planEnd)}</TableCell><TableCell>{fmtDate(p.actualEnd)}</TableCell><TableCell><PhaseStatusBadge status={p.status} /></TableCell></TableRow>
-              ))}
-            </TableBody>
+            <TableHeader><TableRow><TableHead>Aşama</TableHead><TableHead>Plan</TableHead><TableHead>Gerçekleşen</TableHead><TableHead>Durum</TableHead></TableRow></TableHeader>
+            <TableBody>{s.phases.map((p) => (
+              <TableRow key={p.code}>
+                <TableCell>{p.code} — {p.name}</TableCell>
+                <TableCell>{fmtDate(p.planStart)} – {fmtDate(p.planEnd)}</TableCell>
+                <TableCell>{fmtDate(p.actualStart)} – {fmtDate(p.actualEnd)}</TableCell>
+                <TableCell><PhaseStatusBadge status={p.status as PhaseStatus} /></TableCell>
+              </TableRow>
+            ))}</TableBody>
           </Table>
         </Section>
 
         <Section title="Bu hafta tamamlananlar">
-          {doneThisWeek.length ? <ul className="list-disc pl-5 text-sm space-y-1">{doneThisWeek.map((a) => <li key={a.id}>{a.label} <span className="text-muted-foreground">({fmtDate(a.at)})</span></li>)}</ul> : <Muted>Bu hafta tamamlanan adım yok.</Muted>}
+          {s.completed.length ? <ul className="list-disc pl-5 text-sm space-y-1">{s.completed.map((c, i) => <li key={i}>{c.title} <span className="text-muted-foreground">({fmtDate(c.date)})</span></li>)}</ul> : <Muted>Bu hafta tamamlanan iş yok.</Muted>}
         </Section>
 
-        <Section title="Önümüzdeki hafta ve gecikenler">
-          {upcoming.length ? (
-            <Table>
-              <TableHeader><TableRow><TableHead>Adım</TableHead><TableHead>Top kimde</TableHead><TableHead>Termin</TableHead></TableRow></TableHeader>
-              <TableBody>{upcoming.map((s) => (
-                <TableRow key={s.id}><TableCell>{s.title}</TableCell><TableCell>{BALL_LABEL[s.ball]}</TableCell><TableCell className={isOverdue(s.due, false) ? "text-destructive font-medium" : ""}>{fmtDate(s.due)}</TableCell></TableRow>
-              ))}</TableBody>
-            </Table>
-          ) : <Muted>Yaklaşan adım yok.</Muted>}
-        </Section>
-
-        <Section title="Açık aksiyonlar">
-          {actions.length ? (
-            <Table>
-              <TableHeader><TableRow><TableHead>Aksiyon</TableHead><TableHead>Sorumlu</TableHead><TableHead>Top kimde</TableHead><TableHead>Termin</TableHead><TableHead>Öncelik</TableHead></TableRow></TableHeader>
-              <TableBody>{actions.map((a) => (
-                <TableRow key={a.id}><TableCell>{a.title}</TableCell><TableCell>{personName(state, a.ownerId)}</TableCell><TableCell>{BALL_LABEL[a.ball]}</TableCell><TableCell>{fmtDate(a.due)}</TableCell><TableCell><PriorityBadge p={a.priority} /></TableCell></TableRow>
-              ))}</TableBody>
-            </Table>
-          ) : <Muted>Açık aksiyon yok.</Muted>}
-        </Section>
-
-        <div className="grid grid-cols-2 gap-6">
-          <Section title="Açık riskler">
-            {risks.length ? <ul className="list-disc pl-5 text-sm space-y-1">{risks.map((r) => <li key={r.id}>{r.title}</li>)}</ul> : <Muted>Açık risk yok.</Muted>}
+        <div className="grid gap-6 md:grid-cols-2">
+          <Section title="Açık aksiyonlar — Virgosol">
+            <ItemList items={s.actionsVirgosol.map((a) => ({ t: a.title, sub: `${a.owner} · ${fmtDate(a.due)}` }))} empty="Açık aksiyon yok." />
           </Section>
-          <Section title="Açık taahhütler">
-            {commits.length ? <ul className="list-disc pl-5 text-sm space-y-1">{commits.map((c) => <li key={c.id}>{c.text}</li>)}</ul> : <Muted>Açık taahhüt yok.</Muted>}
+          <Section title="Açık aksiyonlar — Müşteri">
+            <ItemList items={s.actionsCustomer.map((a) => ({ t: a.title, sub: `${a.owner} · ${fmtDate(a.due)}` }))} empty="Açık aksiyon yok." />
           </Section>
         </div>
 
-        <footer className="border-t pt-3 text-xs text-muted-foreground">CSM: {personName(state, project.csmId)} · Rapor tarihi {fmtDate(today)} · Virgosol RabbitQA</footer>
+        <Section title="Sizden beklenenler">
+          <ItemList items={s.expected.map((e) => ({ t: e.title, sub: `${e.waitingDays} iş günüdür bekliyor${e.due ? ` · termin ${fmtDate(e.due)}` : ""}` }))} empty="Sizden beklenen bir adım yok." />
+        </Section>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <Section title="Açık riskler">
+            <ItemList items={s.risks.map((r) => ({ t: r.title, sub: `Etki: ${PRIORITY_LABEL[r.impact as Priority] ?? r.impact}${r.mitigation ? ` · ${r.mitigation}` : ""}` }))} empty="Açık risk yok." />
+          </Section>
+          <Section title="Bu haftanın kararları">
+            <ItemList items={s.decisions.map((d) => ({ t: d.title, sub: fmtDate(d.date) }))} empty="Bu hafta karar alınmadı." />
+          </Section>
+        </div>
+
+        <Section title="KPI'lar">
+          {s.kpis.length ? (
+            <Table>
+              <TableHeader><TableRow><TableHead>KPI</TableHead><TableHead>Hedef</TableHead><TableHead>Mevcut</TableHead></TableRow></TableHeader>
+              <TableBody>{s.kpis.map((k, i) => <TableRow key={i}><TableCell>{k.name}</TableCell><TableCell>{k.target ?? "—"} {k.unit}</TableCell><TableCell>{k.current ?? "—"} {k.unit}</TableCell></TableRow>)}</TableBody>
+            </Table>
+          ) : <Muted>KPI tanımlanmadı.</Muted>}
+        </Section>
+
+        <Section title="Gelecek hafta yapılacaklar">
+          {canEdit ? <Textarea className="print:hidden" rows={4} value={nextWeek} onChange={(e) => setNextWeek(e.target.value)} /> : null}
+          <p className={`text-sm whitespace-pre-line ${canEdit ? "hidden print:block" : ""}`}>{nextWeek || "—"}</p>
+        </Section>
+
+        <footer className="border-t pt-3 text-xs text-muted-foreground">CSM: {s.csmName} · Rapor haftası {fmtDate(s.weekStart)} · Virgosol RabbitQA</footer>
       </div>
     </div>
   );
 }
 
+function ItemList({ items, empty }: { items: { t: string; sub: string }[]; empty: string }) {
+  if (!items.length) return <Muted>{empty}</Muted>;
+  return <ul className="text-sm space-y-1.5">{items.map((x, i) => <li key={i}><span className="font-medium">{x.t}</span><span className="block text-xs text-muted-foreground">{x.sub}</span></li>)}</ul>;
+}
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <section className="space-y-2 break-inside-avoid"><h2 className="font-semibold">{title}</h2>{children}</section>;
 }

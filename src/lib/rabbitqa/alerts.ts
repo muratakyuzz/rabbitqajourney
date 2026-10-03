@@ -113,7 +113,7 @@ export function computeAlerts(state: RqState, today: string): ComputedAlert[] {
     const wd = new Date(today + "T00:00:00Z").getUTCDay();
     if (!goLiveDone && (wd === 5 || wd === 6 || wd === 0)) {
       const ws = weekStartOf(today);
-      if (!(state.reportsSent ?? []).some((r) => r.projectId === pid && r.weekStart === ws)) {
+      if (!(state.customerReports ?? []).some((r) => r.projectId === pid && r.weekStart === ws && r.status === "sent")) {
         push({ type: "report_not_sent", level: "yellow", projectId: pid, entity: "project", entityId: `${pid}:${ws}`, ownerId: csm, title: "Haftalık rapor gönderilmedi", detail: `${fmt(ws)} haftasının müşteri raporu "Gönderildi" olarak işaretlenmedi.` });
       }
     }

@@ -17,6 +17,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState } from "@/components/EmptyState";
 import { AccessTab, AdaptationTab, DocumentsTab, KickoffTab, KpiSection, TeamRow, TrainingTab } from "./project/Phase2Tabs";
 import { AlertsTab, GoLiveTab, RisksTab, TicketsTab } from "./project/Phase3Tabs";
+import { ContinuityTab, MeetingExtras } from "./project/ContinuityTab";
+import { VisibleIcon } from "@/components/rq/VisibleIcon";
+import { Switch } from "@/components/ui/switch";
 import { IntegrationsTab } from "./project/IntegrationsTab";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
@@ -26,7 +29,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { personName, projectProgress, useComputedAlerts, useRq } from "@/lib/rabbitqa/store";
 import { derivePhaseStatus } from "@/lib/rabbitqa/alerts";
-import { canEditFlow, canEditItem, canManageProject, isAllSeeing } from "@/lib/rabbitqa/perm";
+import { canEditFlow, canEditItem, canManageProject, isAllSeeing, selectableCsms, selectableUsers } from "@/lib/rabbitqa/perm";
 import { isActivePhase, isOpenStep, previousStep } from "@/lib/rabbitqa/flow";
 import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
 import {
@@ -46,7 +49,7 @@ function PersonSelect({ value, onChange, projectId, includeContacts = true }: { 
       <SelectTrigger><SelectValue /></SelectTrigger>
       <SelectContent>
         <SelectItem value={NONE}>Atanmadı</SelectItem>
-        {state.users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+        {selectableUsers(state, value).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
         {includeContacts && state.contacts.filter((c) => c.projectId === projectId).map((c) => (
           <SelectItem key={c.id} value={c.id}>{c.name} (müşteri)</SelectItem>
         ))}
@@ -139,6 +142,7 @@ export default function ProjectDetail() {
           <TabsTrigger value="tickets">Destek kayıtları</TabsTrigger>
           <TabsTrigger value="risks">Riskler ve kararlar</TabsTrigger>
           <TabsTrigger value="golive">Go-Live</TabsTrigger>
+          <TabsTrigger value="continuity">Süreklilik</TabsTrigger>
           <TabsTrigger value="integrations">Entegrasyonlar</TabsTrigger>
           <TabsTrigger value="contacts">Müşteri kişileri</TabsTrigger>
           <TabsTrigger value="history">Müşteri geçmişi</TabsTrigger>
@@ -157,6 +161,7 @@ export default function ProjectDetail() {
         <TabsContent value="tickets"><TicketsTab project={project} /></TabsContent>
         <TabsContent value="risks"><RisksTab project={project} /></TabsContent>
         <TabsContent value="golive"><GoLiveTab project={project} /></TabsContent>
+        <TabsContent value="continuity"><ContinuityTab project={project} renderCheckinDialog={(close) => <MeetingDialog project={project} onClose={close} defaultType="checkin" />} /></TabsContent>
         <TabsContent value="integrations"><IntegrationsTab project={project} /></TabsContent>
         <TabsContent value="contacts"><ContactsTab project={project} /></TabsContent>
         <TabsContent value="history"><HistoryTab project={project} /></TabsContent>
@@ -495,7 +500,7 @@ function ActionsTab({ project }: { project: Project }) {
             <TableBody>
               {actions.map((a) => (
                 <TableRow key={a.id}>
-                  <TableCell className="font-medium">{a.title}</TableCell>
+                  <TableCell className="font-medium">{a.title}<VisibleIcon visible={a.isCustomerVisible} /></TableCell>
                   <TableCell>{personName(state, a.ownerId)}</TableCell>
                   <TableCell>{BALL_LABEL[a.ball]}</TableCell>
                   <TableCell className={isOverdue(a.due, a.status === "done" || a.status === "cancelled") ? "text-destructive font-medium" : ""}>{fmtDate(a.due)}</TableCell>
@@ -521,11 +526,11 @@ function ActionsTab({ project }: { project: Project }) {
   );
 }
 
-type ActionDraft = { title: string; ownerId: string | null; ball: Ball; due: string | null; priority: Priority; status: ActionStatus };
+type ActionDraft = { title: string; ownerId: string | null; ball: Ball; due: string | null; priority: Priority; status: ActionStatus; isCustomerVisible: boolean };
 
 function ActionDialog({ project, action, onClose, onCreate }: { project: Project; action: Action | null; onClose: () => void; onCreate: (a: ActionDraft) => void }) {
   const { updateAction, state } = useRq();
-  const [d, setD] = useState<ActionDraft>(action ? { title: action.title, ownerId: action.ownerId, ball: action.ball, due: action.due, priority: action.priority, status: action.status } : { title: "", ownerId: project.csmId, ball: "csm", due: null, priority: "medium", status: "open" });
+  const [d, setD] = useState<ActionDraft>(action ? { title: action.title, ownerId: action.ownerId, ball: action.ball, due: action.due, priority: action.priority, status: action.status, isCustomerVisible: action.isCustomerVisible } : { title: "", ownerId: project.csmId, ball: "csm", due: null, priority: "medium", status: "open", isCustomerVisible: true });
   const [reason, setReason] = useState("");
   const needsReason = !!action && (d.due !== action.due || d.status !== action.status);
   return (
@@ -562,6 +567,7 @@ function ActionFields({ d, setD, projectId, showStatus }: { d: ActionDraft; setD
         <div className="grid gap-2"><Label>Öncelik</Label><EnumSelect value={d.priority} onChange={(v) => setD({ ...d, priority: v })} labels={PRIORITY_LABEL} /></div>
         {showStatus && <div className="grid gap-2"><Label>Durum</Label><EnumSelect value={d.status} onChange={(v) => setD({ ...d, status: v })} labels={ACTION_STATUS_LABEL} /></div>}
       </div>
+      <label className="flex items-center gap-3 text-sm"><Switch checked={d.isCustomerVisible} onCheckedChange={(c) => setD({ ...d, isCustomerVisible: c })} />Müşteriye görünür</label>
     </div>
   );
 }
@@ -584,7 +590,7 @@ function MeetingsTab({ project }: { project: Project }) {
           <Card key={m.id}>
             <CardContent className="p-4 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <Pill tone="info">{MEETING_TYPE_LABEL[m.type]}</Pill>
+                <Pill tone="info">{MEETING_TYPE_LABEL[m.type]}</Pill><VisibleIcon visible={m.isCustomerVisible} />
                 <span className="text-sm font-medium">{fmtDate(m.date)}</span>
                 <span className="text-xs text-muted-foreground ml-auto">
                   İç: {m.internalIds.map((i) => personName(state, i)).join(", ") || "—"} · Müşteri: {m.contactIds.map((i) => personName(state, i)).join(", ") || "—"}
@@ -598,6 +604,7 @@ function MeetingsTab({ project }: { project: Project }) {
                   <ul className="list-disc pl-5 text-muted-foreground">{acts.map((a) => <li key={a.id}>{a.title} — {personName(state, a.ownerId)} ({fmtDate(a.due)})</li>)}</ul>
                 </div>
               )}
+              <MeetingExtras meeting={m} canEdit={canManageProject(user, project)} />
             </CardContent>
           </Card>
         );
@@ -607,9 +614,12 @@ function MeetingsTab({ project }: { project: Project }) {
   );
 }
 
-function MeetingDialog({ project, onClose }: { project: Project; onClose: () => void }) {
-  const { state, addMeeting } = useRq();
-  const [type, setType] = useState<MeetingType>("checkin");
+export function MeetingDialog({ project, onClose, defaultType = "checkin" }: { project: Project; onClose: () => void; defaultType?: MeetingType }) {
+  const { state, addMeeting, addDocument } = useRq();
+  const [type, setType] = useState<MeetingType>(defaultType);
+  const [visible, setVisible] = useState(false);
+  const [docs, setDocs] = useState<string[]>([]);
+  const [docName, setDocName] = useState("");
   const [date, setDate] = useState(todayISO());
   const [internalIds, setInternalIds] = useState<string[]>(project.csmId ? [project.csmId] : []);
   const [contactIds, setContactIds] = useState<string[]>([]);
@@ -629,7 +639,7 @@ function MeetingDialog({ project, onClose }: { project: Project; onClose: () => 
           </div>
           <div className="grid gap-2">
             <Label>İç katılımcılar</Label>
-            <div className="flex flex-wrap gap-3">{state.users.map((u) => (
+            <div className="flex flex-wrap gap-3">{selectableUsers(state).map((u) => (
               <label key={u.id} className="flex items-center gap-2 text-sm"><Checkbox checked={internalIds.includes(u.id)} onCheckedChange={(c) => toggle(internalIds, setInternalIds, u.id, !!c)} />{u.name}</label>
             ))}</div>
           </div>
@@ -644,9 +654,16 @@ function MeetingDialog({ project, onClose }: { project: Project; onClose: () => 
           <div className="grid gap-2"><Label>Notlar</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
           <div className="grid gap-2"><Label>Alınan kararlar</Label><Textarea value={decisions} onChange={(e) => setDecisions(e.target.value)} /></div>
           <div className="grid gap-2">
+            <Label>Ekler</Label>
+            {docs.length === 0 ? <p className="text-xs text-muted-foreground">Ek yok.</p> : <ul className="text-sm list-disc pl-5">{docs.map((d, i) => <li key={i}>{d}</li>)}</ul>}
+            <div className="flex gap-2"><Input placeholder="Doküman adı (örn. Sunum.pdf)" value={docName} onChange={(e) => setDocName(e.target.value)} />
+              <Button type="button" variant="outline" onClick={() => { if (docName.trim()) { setDocs([...docs, docName.trim()]); setDocName(""); } }}>Ek ekle</Button></div>
+          </div>
+          <label className="flex items-center gap-3 text-sm"><Switch checked={visible} onCheckedChange={setVisible} />Müşteriye görünür</label>
+          <div className="grid gap-2">
             <div className="flex items-center justify-between">
               <Label>Toplantıdan doğan aksiyonlar</Label>
-              <Button size="sm" variant="outline" onClick={() => setActions([...actions, { title: "", ownerId: project.csmId, ball: "csm", due: null, priority: "medium", status: "open" }])}><Plus className="h-3.5 w-3.5 mr-1" />Aksiyon</Button>
+              <Button size="sm" variant="outline" onClick={() => setActions([...actions, { title: "", ownerId: project.csmId, ball: "csm", due: null, priority: "medium", status: "open", isCustomerVisible: true }])}><Plus className="h-3.5 w-3.5 mr-1" />Aksiyon</Button>
             </div>
             {actions.map((a, i) => (
               <div key={i} className="rounded-lg border p-3 relative">
@@ -660,7 +677,8 @@ function MeetingDialog({ project, onClose }: { project: Project; onClose: () => 
           <Button variant="outline" onClick={onClose}>Vazgeç</Button>
           <Button onClick={() => {
             if (actions.some((a) => !a.title.trim())) return toast.error("Aksiyon başlıkları boş olamaz");
-            addMeeting({ projectId: project.id, type, date, internalIds, contactIds, notes, decisions }, actions);
+            const mid = addMeeting({ projectId: project.id, type, date, internalIds, contactIds, notes, decisions, isCustomerVisible: visible }, actions);
+            docs.forEach((name) => addDocument({ projectId: project.id, type: "other", name, linkType: "meeting", linkId: mid }));
             toast.success("Toplantı kaydedildi");
             onClose();
           }}>Kaydet</Button>
@@ -692,7 +710,7 @@ function HandoverTab({ project }: { project: Project }) {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>Atanmadı</SelectItem>
-                {state.users.filter((u) => u.role === "csm").map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                {selectableCsms(state, project.csmId).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -794,7 +812,7 @@ function DiscoveryTab({ project }: { project: Project }) {
   const [team, setTeam] = useState("");
   const groups = useMemo(() => {
     const g: Record<string, typeof state.questions> = {};
-    state.questions.forEach((q) => { (g[q.group] ??= []).push(q); });
+    [...state.questions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).forEach((q) => { (g[q.group] ??= []).push(q); });
     return g;
   }, [state.questions]);
   const mismatch = project.desiredModules.filter((m) => !project.purchasedModules.includes(m));
@@ -810,11 +828,22 @@ function DiscoveryTab({ project }: { project: Project }) {
               {qs.map((q) => (
                 <div key={q.id} className="grid gap-1.5">
                   <Label className="leading-snug">{q.text}{q.required && <span className="text-destructive ml-1">*</span>}</Label>
-                  <Textarea
+                  {q.type === "modules" ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {state.modules.map((m) => (
+                        <label key={m} className="flex items-center gap-2 text-sm">
+                          <Checkbox disabled={!manage} checked={project.desiredModules.includes(m)} onCheckedChange={(c) => {
+                            const next = c ? [...project.desiredModules, m] : project.desiredModules.filter((x) => x !== m);
+                            updateProject(project.id, { desiredModules: next, discoveryAnswers: { ...project.discoveryAnswers, [q.id]: next.join(", ") } });
+                          }} />{m}
+                        </label>
+                      ))}
+                    </div>
+                  ) : <Textarea
                     defaultValue={project.discoveryAnswers[q.id] ?? ""} disabled={!manage} rows={2}
                     className={q.required && !project.discoveryAnswers[q.id] ? "border-warning" : ""}
                     onBlur={(e) => updateProject(project.id, { discoveryAnswers: { ...project.discoveryAnswers, [q.id]: e.target.value } })}
-                  />
+                  />}
                 </div>
               ))}
             </div>
@@ -825,7 +854,11 @@ function DiscoveryTab({ project }: { project: Project }) {
               {state.modules.map((m) => (
                 <label key={m} className="flex items-center gap-2 text-sm">
                   <Checkbox disabled={!manage} checked={project.desiredModules.includes(m)}
-                    onCheckedChange={(c) => updateProject(project.id, { desiredModules: c ? [...project.desiredModules, m] : project.desiredModules.filter((x) => x !== m) })} />
+                    onCheckedChange={(c) => {
+                      const next = c ? [...project.desiredModules, m] : project.desiredModules.filter((x) => x !== m);
+                      const mq = state.questions.filter((q) => q.type === "modules");
+                      updateProject(project.id, { desiredModules: next, ...(mq.length ? { discoveryAnswers: { ...project.discoveryAnswers, ...Object.fromEntries(mq.map((q) => [q.id, next.join(", ")])) } } : {}) });
+                    }} />
                   {m}
                 </label>
               ))}

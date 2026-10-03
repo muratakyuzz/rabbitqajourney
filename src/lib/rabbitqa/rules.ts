@@ -88,7 +88,7 @@ export function applyLlmChoice(s: RqState, projectId: string, choice: LlmChoice,
     if (actions.some((a) => a.projectId === projectId && a.ruleKey === def.key)) continue;
     const a: Action = {
       id: uid("a"), projectId, title: def.title, ownerId: def.ball === "devops" ? devopsId(s) : project?.csmId ?? null, ball: def.ball,
-      due: null, priority: "medium", status: "open", source: "rule", meetingId: null, createdAt: new Date().toISOString(), ruleKey: def.key,
+      due: null, priority: "medium", status: "open", source: "rule", meetingId: null, createdAt: new Date().toISOString(), ruleKey: def.key, isCustomerVisible: true,
     };
     actions = [...actions, a];
     audit.push(mk({ projectId, kind: "create", entity: "action", entityId: a.id, label: `${a.title} — aksiyon açıldı`, reason: r }));

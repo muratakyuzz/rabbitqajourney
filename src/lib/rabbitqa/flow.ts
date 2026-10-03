@@ -85,7 +85,7 @@ function pass(s: RqState, projectId: string, mk: MkAudit, now: Date): RqState {
     else if (ready && !open) {
       const a: Action = {
         id: uid("a"), projectId, title: `Aşama onayı bekliyor: ${ph.code} ${ph.name}`, ownerId: project.csmId, ball: "csm",
-        due: addBusinessDays(today, 2, hol), priority: "medium", status: "open", source: "rule", meetingId: null, createdAt: nowIso, ruleKey: key,
+        due: addBusinessDays(today, 2, hol), priority: "medium", status: "open", source: "rule", meetingId: null, createdAt: nowIso, ruleKey: key, isCustomerVisible: false,
       };
       newActions.push(a);
       audit.push(mk({ projectId, kind: "create", entity: "action", entityId: a.id, label: `${a.title} — aksiyon açıldı`, reason: "Otomatik kural: akış — zorunlu adımlar tamamlandı" }));

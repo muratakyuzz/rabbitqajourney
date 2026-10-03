@@ -52,3 +52,13 @@ export function canManageTickets(u: AuthUser | null, p: Project) {
 export function canHandleAlert(u: AuthUser | null, p: Project, a: Pick<ComputedAlert, "ownerId">) {
   return canManageProject(u, p) || (!!u && a.ownerId === u.id);
 }
+export const canManageUsers = (u: AuthUser | null) => u?.role === "admin";
+/** Haftalık raporu oluşturma / düzenleme / gönderildi işaretleme. */
+export const canEditReport = (u: AuthUser | null, p: Project) => canManageProject(u, p);
+export const canMarkReportSent = canEditReport;
+/** Yeni atamalarda seçilebilir kullanıcılar (pasifler hariç; mevcut değer korunur). */
+export function selectableUsers(state: RqState, current?: string | null) {
+  return state.users.filter((x) => x.active !== false || x.id === current);
+}
+export const selectableCsms = (state: RqState, current?: string | null) => selectableUsers(state, current).filter((x) => x.role === "csm");
+export const isWorkforceUser = (role: string) => role === "csm" || role === "devops" || role === "care";

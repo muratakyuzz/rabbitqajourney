@@ -1,14 +1,16 @@
 import { TR_HOLIDAY_DEFS, addBusinessDays, isBusinessDay } from "./business-days";
 import { DEFAULT_THRESHOLDS, weekStartOf } from "./alerts";
 import { advanceAll } from "./flow";
+import { buildReportSnapshot } from "./reports";
 import type { AuditEntry, Action, AiInsight, Ball, IntegrationConfig, ProjectIntegrations, UnmatchedEmail, DiscoveryQuestion, Phase, PhaseTpl, Project, RqState, Salesperson, Step, StepTpl, User } from "./types";
 
 export const SEED_USERS: User[] = [
-  { id: "u_deniz", name: "Deniz Uzun", email: "deniz.uzun@virgosol.com", role: "csm" },
-  { id: "u_gencay", name: "Gençay Genç", email: "gencay.genc@virgosol.com", role: "care" },
-  { id: "u_cagla", name: "Çağla Kahriman", email: "cagla.kahriman@virgosol.com", role: "devops" },
-  { id: "u_manager", name: "Örnek Manager", email: "manager@virgosol.com", role: "manager" },
-  { id: "u_admin", name: "Örnek Administrator", email: "admin@virgosol.com", role: "admin" },
+  { id: "u_deniz", name: "Deniz Uzun", email: "deniz.uzun@virgosol.com", role: "csm", active: true },
+  { id: "u_gencay", name: "Gençay Genç", email: "gencay.genc@virgosol.com", role: "care", active: true },
+  { id: "u_cagla", name: "Çağla Kahriman", email: "cagla.kahriman@virgosol.com", role: "devops", active: true },
+  { id: "u_manager", name: "Örnek Manager", email: "manager@virgosol.com", role: "manager", active: true },
+  { id: "u_admin", name: "Örnek Administrator", email: "admin@virgosol.com", role: "admin", active: true },
+  { id: "u_emre", name: "Emre Yıldız (ayrıldı)", email: "emre.yildiz@virgosol.com", role: "csm", active: false },
 ];
 
 export const SEED_MODULES = [
@@ -23,13 +25,14 @@ export const SEED_SALESPEOPLE: Salesperson[] = [
 ];
 
 export const SEED_QUESTIONS: DiscoveryQuestion[] = [
-  { id: "q_teams", group: "Şirket & Takım Yapısı", text: "Ürünü kullanacak kaç bağımsız agile takımınız var?", required: true },
-  { id: "q_roles", group: "Şirket & Takım Yapısı", text: "Takımlarda ürünü hangi rollerin daha aktif olarak kullanması bekleniyor?", required: true },
-  { id: "q_channels", group: "Sprint & Geliştirme Profili", text: "RabbitQA'i kaç farklı yazılım ürünü veya dijital kanal kapsamında kullanmayı planlıyorsunuz?", required: true },
-  { id: "q_regression", group: "Test Yönetimi & Otomasyon", text: "Regresyon setiniz bulunuyor mu? Varsa otomasyon ile mi veya manuel olarak mı koşum gerçekleştiriyorsunuz?", required: true },
-  { id: "q_scenarios", group: "Test Yönetimi & Otomasyon", text: "Kapsam dahilindeki ürün / kanal bazında mevcut regression test setinizde kaç test senaryosu bulunmaktadır?", required: true },
-  { id: "q_notes", group: "Diğer", text: "Notlar", required: false },
-  { id: "q_kpi", group: "Diğer", text: "KPI", required: false },
+  { id: "q_teams", group: "Şirket & Takım Yapısı", text: "Ürünü kullanacak kaç bağımsız agile takımınız var?", required: true, type: "text", order: 0 },
+  { id: "q_roles", group: "Şirket & Takım Yapısı", text: "Takımlarda ürünü hangi rollerin daha aktif olarak kullanması bekleniyor?", required: true, type: "text", order: 1 },
+  { id: "q_channels", group: "Sprint & Geliştirme Profili", text: "RabbitQA'i kaç farklı yazılım ürünü veya dijital kanal kapsamında kullanmayı planlıyorsunuz?", required: true, type: "text", order: 2 },
+  { id: "q_regression", group: "Test Yönetimi & Otomasyon", text: "Regresyon setiniz bulunuyor mu? Varsa otomasyon ile mi veya manuel olarak mı koşum gerçekleştiriyorsunuz?", required: true, type: "text", order: 3 },
+  { id: "q_scenarios", group: "Test Yönetimi & Otomasyon", text: "Kapsam dahilindeki ürün / kanal bazında mevcut regression test setinizde kaç test senaryosu bulunmaktadır?", required: true, type: "text", order: 4 },
+  { id: "q_modules", group: "Modül Tercihleri", text: "Kullanmayı planladığınız modüller hangileri?", required: false, type: "modules", order: 5 },
+  { id: "q_notes", group: "Diğer", text: "Notlar", required: false, type: "text", order: 6 },
+  { id: "q_kpi", group: "Diğer", text: "KPI", required: false, type: "text", order: 7 },
 ];
 
 
@@ -126,6 +129,7 @@ function localToday() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+function prevWeek(iso: string) { return new Date(new Date(iso + "T00:00:00Z").getTime() - 7 * 86400000).toISOString().slice(0, 10); }
 function prevBusinessDay(iso: string) {
   let d = new Date(iso + "T00:00:00Z");
   do { d = new Date(d.getTime() - 86400000); } while (!isBusinessDay(d.toISOString().slice(0, 10)));
@@ -244,12 +248,13 @@ export function createSeed(): RqState {
     { id: "c_2", projectId: project.id, name: "Mehmet Ertuğrul Elitop", title: "İş Analisti", email: "mehmet.elitop@isyatirim.com.tr", phone: "", role: "tech" as const },
   ];
   const meetings = [
-    { id: "m_1", projectId: project.id, type: "kickoff" as const, date: "2026-08-28", internalIds: ["u_deniz"], contactIds: ["c_1"], notes: "Tanışma ve onboarding planının paylaşılması.", decisions: "Kurulum tipi On-prem olarak belirlendi." },
-    { id: "m_2", projectId: project.id, type: "discovery" as const, date: "2026-08-28", internalIds: ["u_deniz"], contactIds: ["c_1", "c_2"], notes: "Keşif formu birlikte dolduruldu.", decisions: "İki takım ile başlanacak." },
+    { id: "m_1", projectId: project.id, type: "kickoff" as const, date: "2026-08-28", internalIds: ["u_deniz"], contactIds: ["c_1"], notes: "Tanışma ve onboarding planının paylaşılması.", decisions: "Kurulum tipi On-prem olarak belirlendi.", isCustomerVisible: true },
+    { id: "m_2", projectId: project.id, type: "discovery" as const, date: "2026-08-28", internalIds: ["u_deniz"], contactIds: ["c_1", "c_2"], notes: "Keşif formu birlikte dolduruldu.", decisions: "İki takım ile başlanacak.", isCustomerVisible: false },
   ];
   const actions: Action[] = [
-    { id: "a_1", projectId: project.id, title: "Trade Master için senaryo sayısının netleştirilmesi", ownerId: "c_2", ball: "customer" as const, due: "2026-09-30", priority: "medium" as const, status: "open" as const, source: "meeting" as const, meetingId: "m_2", createdAt: "2026-08-28T12:00:00.000Z" },
-    { id: "a_2", projectId: project.id, title: "Go/No-Go toplantısının planlanması", ownerId: "u_deniz", ball: "csm" as const, due: "2026-09-29", priority: "high" as const, status: "open" as const, source: "manual" as const, meetingId: null, createdAt: "2026-09-20T09:00:00.000Z" },
+    { id: "a_1", projectId: project.id, title: "Trade Master için senaryo sayısının netleştirilmesi", ownerId: "c_2", ball: "customer" as const, due: "2026-09-30", priority: "medium" as const, status: "open" as const, source: "meeting" as const, meetingId: "m_2", createdAt: "2026-08-28T12:00:00.000Z", isCustomerVisible: true },
+    { id: "a_2", projectId: project.id, title: "Go/No-Go toplantısının planlanması", ownerId: "u_deniz", ball: "csm" as const, due: "2026-09-29", priority: "high" as const, status: "open" as const, source: "manual" as const, meetingId: null, createdAt: "2026-09-20T09:00:00.000Z", isCustomerVisible: true },
+    { id: "a_3", projectId: project.id, title: "İç değerlendirme: lisans genişletme teklifi hazırlığı", ownerId: "u_deniz", ball: "csm" as const, due: "2026-10-09", priority: "medium" as const, status: "open" as const, source: "manual" as const, meetingId: null, createdAt: "2026-09-25T09:00:00.000Z", isCustomerVisible: false },
   ];
   const commitments = [
     { id: "cm_1", projectId: project.id, text: "Mobil kanal için MobileHub demosu yapılacak", targetPhaseCode: "04", status: "open" as const, note: "" },
@@ -305,7 +310,7 @@ export function createSeed(): RqState {
   }
   phases.push(...b2.phases);
   steps.push(...b2.steps);
-  meetings.push({ id: "m_3", projectId: p2.id, type: "kickoff" as const, date: "2026-09-24", internalIds: ["u_deniz"], contactIds: ["c_3"], notes: "Kick-off yapıldı.", decisions: "Kurulum tipi On-prem." });
+  meetings.push({ id: "m_3", projectId: p2.id, type: "kickoff" as const, date: "2026-09-24", internalIds: ["u_deniz"], contactIds: ["c_3"], notes: "Kick-off yapıldı.", decisions: "Kurulum tipi On-prem.", isCustomerVisible: false });
 
   // Üçüncü örnek proje — keşif aşamasında, uzun süredir hareketsiz
   const p3: Project = {
@@ -379,7 +384,7 @@ export function createSeed(): RqState {
     { ...base, id: "ai_h5", projectId: pid, source: "teams", kind: "action_create", status: "rejected", createdAt: ago(170), reviewedBy: "u_gencay", reviewedAt: ago(160), reviewNote: "Zaten destek kaydı olarak açık.", targetId: null, current: null,
       sourceRef: ref("teams", "Müşteriler › İş Yatırım", "Mehmet Ertuğrul Elitop", 170, "Zaman aşımı sorununu inceleyeceğiz."), proposed: { title: "Zaman aşımı sorununun incelenmesi", ownerId: null, due: null, priority: "medium", ball: "care" }, rationale: "İnceleme taahhüdü.", confidence: 62 },
   ];
-  actions.push({ id: "a_ai1", projectId: pid, title: "Trade Master test kullanıcılarının açılması", ownerId: "c_2", ball: "customer" as const, due: "2026-10-01", priority: "medium" as const, status: "done" as const, source: "teams" as const, meetingId: null, createdAt: ago(110), insightId: "ai_h1" });
+  actions.push({ id: "a_ai1", projectId: pid, title: "Trade Master test kullanıcılarının açılması", ownerId: "c_2", ball: "customer" as const, due: "2026-10-01", priority: "medium" as const, status: "done" as const, source: "teams" as const, meetingId: null, createdAt: ago(110), insightId: "ai_h1", isCustomerVisible: true });
 
   const todayS = localToday();
   const plusDays = (n: number) => { const d = new Date(todayS + "T00:00:00Z"); return new Date(d.getTime() + n * 86400000).toISOString().slice(0, 10); };
@@ -390,7 +395,7 @@ export function createSeed(): RqState {
   ];
 
   const seedState: RqState = {
-    version: 7,
+    version: 8,
     template: PHASE_TEMPLATE,
     users,
     salespeople: SEED_SALESPEOPLE,
@@ -404,8 +409,8 @@ export function createSeed(): RqState {
     contacts,
     commitments,
     kpis: [
-      { id: "k_1", projectId: pid, name: "Yüklenen regresyon senaryosu oranı", unit: "%", baseline: 0, target: 100, targetDate: "2026-10-02", measurements: [{ date: "2026-09-18", value: 25 }, { date: "2026-09-25", value: 40 }] },
-      { id: "k_2", projectId: p2.id, name: "Otomasyon kapsama oranı", unit: "%", baseline: 10, target: null, targetDate: null, measurements: [] },
+      { id: "k_1", projectId: pid, name: "Yüklenen regresyon senaryosu oranı", unit: "%", baseline: 0, target: 100, targetDate: "2026-10-02", measurements: [{ date: "2026-09-18", value: 25 }, { date: "2026-09-25", value: 40 }], isCustomerVisible: true },
+      { id: "k_2", projectId: p2.id, name: "Otomasyon kapsama oranı", unit: "%", baseline: 10, target: null, targetDate: null, measurements: [], isCustomerVisible: true },
     ],
     trainings: [
       { id: "t_1", projectId: pid, date: "2026-09-08", trainerId: "u_deniz", attendees: "Herkese Borsa ekibi (İş analistleri, PO'lar)", modules: ["TestPilot", "CaseWriter"], recordingUrl: "", notes: "", status: "done" },
@@ -426,12 +431,13 @@ export function createSeed(): RqState {
       { id: "al_2", projectId: pid, title: "Go-Live tarihi yaklaşıyor", detail: "Hedef Go-Live: 02.10.2026. Go/No-Go toplantısı planlanmadı.", severity: "critical", status: "open", source: "rule", createdAt: "2026-09-28T08:00:00.000Z", resolvedAt: null, resolvedBy: null },
     ],
     tickets: [
-      { id: "tk_1", projectId: pid, title: "TestPilot koşumunda zaman aşımı", description: "Trade Master regresyon setinde uzun süren senaryolar zaman aşımına uğruyor.", module: "TestPilot", priority: "high", status: "in_progress", ownerId: "u_gencay", openedAt: "2026-09-22T10:00:00.000Z", resolvedAt: null },
-      { id: "tk_2", projectId: pid, title: "DataCrate içe aktarma hatası", description: "Excel şablonunda Türkçe karakterli başlıklar hata veriyor.", module: "DataCrate", priority: "medium", status: "resolved", ownerId: "u_gencay", openedAt: "2026-09-19T14:00:00.000Z", resolvedAt: "2026-09-21T09:30:00.000Z" },
+      { id: "tk_1", projectId: pid, title: "TestPilot koşumunda zaman aşımı", description: "Trade Master regresyon setinde uzun süren senaryolar zaman aşımına uğruyor.", module: "TestPilot", priority: "high", status: "in_progress", ownerId: "u_gencay", openedAt: "2026-09-22T10:00:00.000Z", resolvedAt: null, type: "technical", resolution: "", boardDecision: null, customerNotifiedAt: null },
+      { id: "tk_2", projectId: pid, title: "DataCrate içe aktarma hatası", description: "Excel şablonunda Türkçe karakterli başlıklar hata veriyor.", module: "DataCrate", priority: "medium", status: "resolved", ownerId: "u_gencay", openedAt: "2026-09-19T14:00:00.000Z", resolvedAt: "2026-09-21T09:30:00.000Z", type: "usage", resolution: "Şablon başlıkları UTF-8 olarak kaydedildi; müşteriye doğru şablon paylaşıldı.", boardDecision: null, customerNotifiedAt: null },
+      { id: "tk_3", projectId: pid, title: "TestPilot için Jira Xray entegrasyonu talebi", description: "Müşteri koşum sonuçlarının Xray'e otomatik aktarılmasını istiyor.", module: "TestPilot", priority: "medium", status: "in_progress", ownerId: "u_gencay", openedAt: "2026-09-24T11:00:00.000Z", resolvedAt: null, type: "feature_request", resolution: "", boardDecision: "planned", customerNotifiedAt: "2026-09-30" },
     ],
     risks: [
-      { id: "r_1", projectId: pid, kind: "risk", title: "Dedicated test ekibi yok", description: "Müşteride dedicated test ekibi bulunmuyor; senaryo bakımı PO'lara kalabilir.", impact: "medium", status: "open", ownerId: "u_deniz", due: "2026-10-15", createdAt: "2026-09-05T09:00:00.000Z" },
-      { id: "r_2", projectId: pid, kind: "decision", title: "On-prem kurulum kararı", description: "Kick-off'ta kurulum tipi On-prem olarak belirlendi; VPN ve sunucu müşteride.", impact: "high", status: "accepted", ownerId: "u_deniz", due: null, createdAt: "2026-08-28T12:00:00.000Z" },
+      { id: "r_1", projectId: pid, kind: "risk", title: "Dedicated test ekibi yok", description: "Müşteride dedicated test ekibi bulunmuyor; senaryo bakımı PO'lara kalabilir.", impact: "medium", status: "open", ownerId: "u_deniz", due: "2026-10-15", createdAt: "2026-09-05T09:00:00.000Z", probability: "high", mitigation: "PO'lara haftalık senaryo bakım saati ayrılacak; Go-Live sonrası test ekibi kurulumu müşteriyle planlanacak.", meetingId: null, decidedAt: null, isCustomerVisible: true },
+      { id: "r_2", projectId: pid, kind: "decision", title: "On-prem kurulum kararı", description: "Kick-off'ta kurulum tipi On-prem olarak belirlendi; VPN ve sunucu müşteride.", impact: "high", status: "accepted", ownerId: "u_deniz", due: null, createdAt: "2026-08-28T12:00:00.000Z", probability: "medium", mitigation: "", meetingId: "m_1", decidedAt: "2026-08-28", isCustomerVisible: true },
     ],
     audit: [
       { id: "au_seed", projectId: project.id, at: project.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: project.id, label: "Proje oluşturuldu" },
@@ -455,7 +461,15 @@ export function createSeed(): RqState {
       { key: `report_not_sent:p_akbank:${weekStartOf(todayS)}`, status: "snoozed", snoozedUntil: plusDays(7), reason: "Müşteri bu hafta tatilde, rapor gelecek hafta birlikte gönderilecek.", by: "u_deniz", at: new Date().toISOString() },
     ],
     reportsSent: [],
+    customerReports: [
+      { id: "cr_r1", projectId: pid, weekStart: weekStartOf(prevWeek(todayS)), createdBy: "u_deniz", createdAt: prevWeek(todayS) + "T15:00:00.000Z", status: "sent", sentAt: prevWeek(todayS) + "T16:00:00.000Z", sentBy: "u_deniz",
+        summary: "Uygulama aşaması devam ediyor; regresyon senaryolarının %40'ı yüklendi.", nextWeek: "Go/No-Go toplantısının yapılması; kalan senaryoların yüklenmesi.", snapshot: { legacy: true } },
+      { id: "cr_r2", projectId: pid, weekStart: weekStartOf(todayS), createdBy: "u_deniz", createdAt: new Date().toISOString(), status: "draft", sentAt: null, sentBy: null,
+        summary: "Go-Live hazırlıkları sürüyor.", nextWeek: "Müşteri onayının alınması.", snapshot: { legacy: true } },
+    ],
   };
   const sysAudit = (e: Omit<AuditEntry, "id" | "at" | "userId">): AuditEntry => ({ ...e, id: uid("au"), at: new Date().toISOString(), userId: "system" });
-  return advanceAll(seedState, sysAudit);
+  const advanced = advanceAll(seedState, sysAudit);
+  advanced.customerReports = advanced.customerReports.map((r) => ({ ...r, snapshot: buildReportSnapshot(advanced, r.projectId, r.weekStart, todayS) as unknown as Record<string, unknown> }));
+  return advanced;
 }
