@@ -46,8 +46,16 @@ export const ENTITY_LABEL: Record<string, string> = {
   kpi: "KPI", training: "Eğitim", adaptation: "Uyarlama", credential: "Erişim bilgisi", document: "Doküman",
   alert: "Uyarı", ticket: "Destek kaydı", risk: "Risk/Karar", insight: "AI Insight", integration: "Entegrasyon",
 };
-export const ALERT_SEVERITY_LABEL = { info: "Bilgi", warning: "Uyarı", critical: "Kritik" } as const;
-export const ALERT_STATUS_LABEL = { open: "Açık", resolved: "Çözüldü" } as const;
+export const ALERT_SEVERITY_LABEL = { info: "Sarı", warning: "Sarı", critical: "Kırmızı" } as const;
+export const ALERT_STATUS_LABEL = { open: "Açık", resolved: "Kapatıldı" } as const;
+export const ALERT_LEVEL_LABEL = { yellow: "Sarı", red: "Kırmızı" } as const;
+export const ALERT_STATE_LABEL = { open: "Açık", snoozed: "Ertelendi", closed: "Kapatıldı" } as const;
+export const ALERT_TYPE_LABEL = {
+  phase_late: "Aşama gecikti", phase_at_risk: "Aşama risk altında", item_late: "Aksiyon/adım gecikti", action_due_soon: "Termin yaklaşıyor",
+  waiting_customer: "Müşteride bekleyen adım", reqdoc_not_shared: "Gereksinim dokümanı paylaşılmadı", handover_missing: "Satış devri eksik",
+  open_commitment: "Açık taahhüt", discovery_missing: "Keşif eksik", kpi_unmeasurable: "KPI ölçülemez", license_mismatch: "Lisans uyumsuzluğu",
+  credential_expiring: "Erişim bilgisi süresi doluyor", report_not_sent: "Rapor gönderilmedi", silent_project: "Sessiz proje", manual: "Elle eklenen",
+} as const;
 export const TICKET_STATUS_LABEL = {
   open: "Açık", in_progress: "İşleniyor", waiting_customer: "Müşteri bekleniyor", resolved: "Çözüldü", closed: "Kapatıldı",
 } as const;
