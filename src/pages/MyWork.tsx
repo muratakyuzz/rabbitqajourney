@@ -1,4 +1,8 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { previousStep } from "@/lib/rabbitqa/flow";
+import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
@@ -10,7 +14,7 @@ import { visibleInsights } from "@/lib/rabbitqa/perm";
 import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
 import { BALL_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
 
-interface Item { id: string; kind: "Adım" | "Aksiyon"; title: string; due: string | null; projectId: string; badge: React.ReactNode; ball: string }
+interface Item { id: string; kind: "Adım" | "Aksiyon"; title: string; due: string | null; projectId: string; badge: React.ReactNode; ball: string; isNew?: boolean }
 
 export default function MyWork() {
   const { state } = useRq();
@@ -19,11 +23,17 @@ export default function MyWork() {
   const weekEnd = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })();
 
   const items: Item[] = [
-    ...state.steps.filter((s) => s.ownerId === user?.id && s.status !== "done" && s.status !== "out_of_scope")
-      .map((s) => ({ id: s.id, kind: "Adım" as const, title: s.title, due: s.due, projectId: s.projectId, badge: <StepStatusBadge status={s.status} />, ball: BALL_LABEL[s.ball] })),
+    ...state.steps.filter((s) => s.ownerId === user?.id && (s.status === "pending" || s.status === "in_progress"))
+      .map((s) => ({ id: s.id, kind: "Adım" as const, title: s.title, due: s.due, projectId: s.projectId, badge: <StepStatusBadge status={s.status} />, ball: BALL_LABEL[s.ball], isNew: !!s.activatedAt && businessDaysBetween(s.activatedAt.slice(0, 10), today) <= 1 })),
     ...state.actions.filter((a) => a.ownerId === user?.id && a.status !== "done" && a.status !== "cancelled")
       .map((a) => ({ id: a.id, kind: "Aksiyon" as const, title: a.title, due: a.due, projectId: a.projectId, badge: <ActionStatusBadge status={a.status} />, ball: BALL_LABEL[a.ball] })),
   ].sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999"));
+
+  const [showNext, setShowNext] = useState(false);
+  const upcoming = state.steps
+    .filter((s) => s.ownerId === user?.id && s.status === "locked" && state.phases.find((p) => p.id === s.phaseId)?.status !== "locked")
+    .map((s) => ({ s, prev: previousStep(state.steps, s) }))
+    .filter(({ s, prev }) => s.dependency === "previous" && prev && (prev.status === "pending" || prev.status === "in_progress"));
 
   const myAi = visibleInsights(state, user).filter((i) => effectiveStatus(state, i) === "pending" && (i.proposed as { ownerId?: string }).ownerId === user?.id);
 
@@ -43,6 +53,25 @@ export default function MyWork() {
           <CardContent className="space-y-3">{myAi.map((i) => <InsightCard key={i.id} insight={i} />)}</CardContent>
         </Card>
       )}
+      <Card>
+        <CardHeader className="pb-3">
+          <button type="button" className="flex items-center gap-2 text-left" onClick={() => setShowNext((v) => !v)}>
+            {showNext ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <CardTitle className="text-base flex items-center gap-2">Sıradaki işlerim <Pill tone="muted">{upcoming.length}</Pill></CardTitle>
+          </button>
+        </CardHeader>
+        {showNext && (
+          <CardContent className="space-y-2">
+            {upcoming.length === 0 && <p className="text-sm text-muted-foreground">Sırası yaklaşan işiniz yok</p>}
+            {upcoming.map(({ s, prev }) => (
+              <Link key={s.id} to={`/app/projects/${s.projectId}`} className="block rounded-lg border p-3 opacity-80 hover:bg-accent/40">
+                <p className="text-sm font-medium">{s.title}</p>
+                <p className="text-xs text-muted-foreground">{state.projects.find((p) => p.id === s.projectId)?.customerName} · {prev!.title} tamamlanınca açılacak · süre {s.durationDays} iş günü</p>
+              </Link>
+            ))}
+          </CardContent>
+        )}
+      </Card>
       {items.length === 0 ? (
         <Card><EmptyState title="Açık işiniz yok" description="Size atanmış açık adım veya aksiyon bulunmuyor." /></Card>
       ) : (
@@ -60,7 +89,7 @@ export default function MyWork() {
                     <Link key={i.id} to={`/app/projects/${i.projectId}`} className="block rounded-lg border p-3 hover:bg-accent/40 transition-colors">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{i.title}</p>
+                          <p className="text-sm font-medium truncate">{i.title}{i.isNew && <Pill tone="info" className="ml-2">Yeni</Pill>}</p>
                           <p className="text-xs text-muted-foreground">{p?.customerName} · {i.kind} · Top: {i.ball}</p>
                         </div>
                         <div className="text-right shrink-0 space-y-1">

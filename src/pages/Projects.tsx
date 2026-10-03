@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/EmptyState";
 import { HealthBadge } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
-import { activePhase, personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
+import { activePhase, activePhaseCount, personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
 import { visibleProjects, isAllSeeing } from "@/lib/rabbitqa/perm";
 import { fmtDate, HEALTH_LABEL, todayISO } from "@/lib/rabbitqa/labels";
 import { toast } from "sonner";
@@ -102,7 +102,7 @@ export default function Projects() {
                     <div className="text-xs text-muted-foreground">{p.name}</div>
                   </TableCell>
                   <TableCell>{personName(state, p.csmId)}</TableCell>
-                  <TableCell>{ph ? `${ph.code} — ${ph.name}` : "—"}</TableCell>
+                  <TableCell>{ph ? `${ph.code} — ${ph.name}` : "—"}{activePhaseCount(state, p.id) > 1 && <span className="ml-1 text-xs text-muted-foreground">+{activePhaseCount(state, p.id) - 1}</span>}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Progress value={progress} className="h-2" />

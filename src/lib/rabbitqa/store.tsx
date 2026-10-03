@@ -578,7 +578,13 @@ export function projectProgress(state: RqState, projectId: string) {
 
 export function activePhase(state: RqState, projectId: string) {
   const phases = state.phases.filter((p) => p.projectId === projectId).sort((a, b) => a.order - b.order);
-  return phases.find((p) => p.status !== "done" && p.status !== "out_of_scope") ?? phases[phases.length - 1];
+  const act = phases.filter((p) => p.status === "in_progress" || p.status === "at_risk" || p.status === "late");
+  return act[0] ?? phases.find((p) => p.status !== "done" && p.status !== "out_of_scope") ?? phases[phases.length - 1];
+}
+
+/** Aktif (devam eden/riskte/geciken) aşama sayısı. */
+export function activePhaseCount(state: RqState, projectId: string) {
+  return state.phases.filter((p) => p.projectId === projectId && (p.status === "in_progress" || p.status === "at_risk" || p.status === "late")).length;
 }
 
 export function personName(state: RqState, id: string | null) {

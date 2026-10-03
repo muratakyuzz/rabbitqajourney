@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { HealthBadge, Pill } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { isAllSeeing, visibleProjects } from "@/lib/rabbitqa/perm";
+import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
 import { activePhase, personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
 import { BALL_LABEL, MEETING_TYPE_LABEL, ROLE_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
 
@@ -68,7 +69,7 @@ export default function Overview() {
     radarTitle = "Darboğazlar ve gecikmeler";
     radar = [
       ...state.phases.filter((ph) => pids.has(ph.projectId) && ph.status !== "done" && ph.status !== "out_of_scope" && ph.planEnd && ph.planEnd < today).map((ph) => ({ id: ph.id, title: `Geciken aşama: ${ph.code} ${ph.name}`, projectId: ph.projectId, due: ph.planEnd, late: true })),
-      ...lateSteps.map((s) => ({ id: s.id, title: `Geciken adım: ${s.title}`, projectId: s.projectId, due: s.due, late: true })),
+      ...lateSteps.map((s) => ({ id: s.id, title: `Geciken adım: ${s.title} · ${businessDaysBetween(s.due!, today)} iş günü`, projectId: s.projectId, due: s.due, late: true })),
     ];
   }
 
