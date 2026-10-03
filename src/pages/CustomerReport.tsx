@@ -25,7 +25,7 @@ export default function CustomerReport() {
   const phases = state.phases.filter((p) => p.projectId === project.id).sort((a, b) => a.order - b.order);
   const steps = state.steps.filter((s) => s.projectId === project.id);
   const doneThisWeek = state.audit.filter((a) => a.projectId === project.id && a.entity === "step" && a.field === "status" && a.newValue === "done" && a.at.slice(0, 10) >= weekAgo);
-  const upcoming = steps.filter((s) => s.status !== "done" && s.status !== "out_of_scope" && s.due && s.due <= nextWeek).sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
+  const upcoming = steps.filter((s) => (s.status === "pending" || s.status === "in_progress") && s.due && s.due <= nextWeek).sort((a, b) => (a.due ?? "").localeCompare(b.due ?? ""));
   const actions = state.actions.filter((a) => a.projectId === project.id && (a.status === "open" || a.status === "in_progress"));
   const risks = state.risks.filter((r) => r.projectId === project.id && r.kind === "risk" && r.status === "open");
   const commits = state.commitments.filter((c) => c.projectId === project.id && c.status === "open");

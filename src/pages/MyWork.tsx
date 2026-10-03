@@ -19,7 +19,7 @@ export default function MyWork() {
   const weekEnd = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); })();
 
   const items: Item[] = [
-    ...state.steps.filter((s) => s.ownerId === user?.id && s.status !== "done" && s.status !== "out_of_scope")
+    ...state.steps.filter((s) => s.ownerId === user?.id && (s.status === "pending" || s.status === "in_progress"))
       .map((s) => ({ id: s.id, kind: "Adım" as const, title: s.title, due: s.due, projectId: s.projectId, badge: <StepStatusBadge status={s.status} />, ball: BALL_LABEL[s.ball] })),
     ...state.actions.filter((a) => a.ownerId === user?.id && a.status !== "done" && a.status !== "cancelled")
       .map((a) => ({ id: a.id, kind: "Aksiyon" as const, title: a.title, due: a.due, projectId: a.projectId, badge: <ActionStatusBadge status={a.status} />, ball: BALL_LABEL[a.ball] })),
