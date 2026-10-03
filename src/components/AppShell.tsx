@@ -17,7 +17,10 @@ import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/lib/auth-context";
 import { useRq } from "@/lib/rabbitqa/store";
 import { ROLE_SHORT } from "@/lib/rabbitqa/labels";
-import { visibleInsights } from "@/lib/rabbitqa/perm";
+import { canAccessAdmin, canSeeManagementReport, visibleInsights, visibleProjects } from "@/lib/rabbitqa/perm";
+import { useAlertViews } from "@/lib/rabbitqa/store";
+import { ALERT_LEVEL_LABEL } from "@/lib/rabbitqa/labels";
+import type { AuthUser } from "@/lib/auth-api";
 import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
 import { toast } from "sonner";
 import {
@@ -50,13 +53,14 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const mainNav = [
-  { title: "Genel bakış", url: "/app/overview", icon: Gauge, roles: null },
-  { title: "AI Insight", url: "/app/insights", icon: Sparkles, roles: null },
-  { title: "Müşteri projeleri", url: "/app/projects", icon: Building2, roles: null },
-  { title: "Bana atananlar", url: "/app/my-work", icon: ListChecks, roles: null },
-  { title: "Yönetim raporu", url: "/app/reports", icon: BarChart3, roles: ["manager", "admin"] },
-  { title: "Sistem ayarları", url: "/app/admin", icon: Settings, roles: ["admin"] },
-];
+  { title: "Genel bakış", url: "/app/overview", icon: Gauge, can: null },
+  { title: "AI Insight", url: "/app/insights", icon: Sparkles, can: null },
+  { title: "Müşteri projeleri", url: "/app/projects", icon: Building2, can: null },
+  { title: "Bana atananlar", url: "/app/my-work", icon: ListChecks, can: null },
+  { title: "Yönetim raporu", url: "/app/reports", icon: BarChart3, can: canSeeManagementReport },
+  { title: "Sistem ayarları", url: "/app/admin", icon: Settings, can: canAccessAdmin },
+] as { title: string; url: string; icon: typeof Gauge; can: ((u: AuthUser | null) => boolean) | null }[];
+
 
 function SidebarNav() {
   const { user } = useAuth();
@@ -64,7 +68,7 @@ function SidebarNav() {
   const collapsed = state === "collapsed";
   const { state: rq } = useRq();
   const pendingAi = visibleInsights(rq, user).filter((i) => effectiveStatus(rq, i) === "pending").length;
-  const items = mainNav.filter((i) => !i.roles || (user && i.roles.includes(user.role)));
+  const items = mainNav.filter((i) => !i.can || i.can(user));
 
   return (
     <Sidebar collapsible="icon" className="print:hidden border-r border-sidebar-border/70 bg-sidebar">
@@ -128,6 +132,40 @@ function SidebarNav() {
   );
 }
 
+function AlertBell() {
+  const { user } = useAuth();
+  const { state } = useRq();
+  const navigate = useNavigate();
+  const all = useAlertViews();
+  const pids = new Set(visibleProjects(state, user).map((p) => p.id));
+  const open = all.filter((a) => a.status === "open" && pids.has(a.projectId))
+    .sort((a, b) => (a.level === b.level ? (b.createdAt ?? "").localeCompare(a.createdAt ?? "") : a.level === "red" ? -1 : 1));
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="text-muted-foreground relative" aria-label={`Uyarılar (${open.length})`}>
+          <Bell className="h-4 w-4" />
+          {open.length > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold leading-4 text-center">{open.length > 99 ? "99+" : open.length}</span>}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80">
+        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Açık uyarılar ({open.length})</div>
+        <DropdownMenuSeparator />
+        {open.length === 0 && <div className="px-2 py-3 text-sm text-muted-foreground">Açık uyarı yok</div>}
+        {open.slice(0, 8).map((a) => (
+          <DropdownMenuItem key={a.key} className="flex items-start gap-2" onClick={() => navigate(`/app/projects/${a.projectId}?tab=alerts`)}>
+            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${a.level === "red" ? "bg-destructive" : "bg-warning"}`} title={ALERT_LEVEL_LABEL[a.level]} />
+            <span className="min-w-0">
+              <span className="block text-xs text-muted-foreground">{state.projects.find((p) => p.id === a.projectId)?.customerName}</span>
+              <span className="block text-sm truncate">{a.title}</span>
+            </span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function Topbar() {
   const { user, logout, role } = useAuth();
   const { reset } = useRq();
@@ -144,10 +182,7 @@ function Topbar() {
           {role ? ROLE_SHORT[role] : ""}
         </span>
 
-        <Button variant="ghost" size="icon" className="text-muted-foreground relative">
-          <Bell className="h-4 w-4" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
-        </Button>
+        <AlertBell />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
