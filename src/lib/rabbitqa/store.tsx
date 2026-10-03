@@ -1,20 +1,23 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { ADAPTATION_STEPS, buildFromTemplate, createSeed, uid } from "./seed";
+import { ADAPTATION_STEPS, DEFAULT_PROJECT_INTEGRATIONS, buildFromTemplate, createSeed, uid } from "./seed";
+import { analyzeText, type IncomingMeta } from "./ai-mock";
+import { matchEmail } from "./email-match";
 import type {
+  AiInsight, ChatChannel, InsightSource, IntegrationConfig, ProjectIntegrations, UnmatchedEmail,
   Action, AdaptationSession, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RiskDecision, RqState, Step, SupportTicket, TrainingSession,
 } from "./types";
 import { todayISO } from "./labels";
 import { applyInstallType, applyLlmChoice, setStepByKey } from "./rules";
 
-const KEY = "rabbitqa-demo-state-v4";
+const KEY = "rabbitqa-demo-state-v5";
 
 function load(): RqState {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as RqState;
-      if (s.version === 4) return s;
+      if (s.version === 5) return s;
     }
   } catch { /* ignore */ }
   return createSeed();
@@ -61,7 +64,18 @@ interface Ctx {
   addRisk: (r: Omit<RiskDecision, "id" | "createdAt">) => void;
   updateRisk: (id: string, patch: Partial<RiskDecision>, reason?: string) => void;
   approveGoLive: (projectId: string, reason: string) => string | null;
-  setConfig: <K extends "modules" | "questions" | "template">(key: K, value: RqState[K], label: string) => void;
+  setConfig: <K extends "modules" | "questions" | "template" | "integrations">(key: K, value: RqState[K], label: string) => void;
+  testConnection: (kind: "teams" | "email", override?: IntegrationConfig) => Promise<{ ok: boolean; message: string; channels?: ChatChannel[] }>;
+  disconnect: (kind: "teams" | "email") => void;
+  logSecretView: (field: string) => void;
+  setProjectIntegration: (projectId: string, patch: { chat?: Partial<ProjectIntegrations["chat"]>; email?: Partial<ProjectIntegrations["email"]> }) => string | null;
+  approveInsight: (id: string, edited?: Record<string, unknown>, note?: string) => string | null;
+  rejectInsight: (id: string, note?: string) => void;
+  rejectInsights: (ids: string[], note?: string) => void;
+  assignUnmatchedEmail: (id: string, projectId: string, addAsContact?: { name: string; role: Contact["role"] }) => number;
+  ignoreUnmatchedEmail: (id: string) => void;
+  simulateIncoming: (projectId: string, source: InsightSource, text: string, meta: IncomingMeta) => { created: AiInsight[]; message?: string };
+  receiveEmail: (mail: { from: string; to: string[]; cc: string[]; subject: string; text: string; direction: "in" | "out" }) => { projectId: string | null; created: number };
   reset: () => void;
 }
 
@@ -120,13 +134,39 @@ export function RqProvider({ children }: { children: ReactNode }) {
     [mkAudit],
   );
 
-  const value = useMemo<Ctx>(() => ({
+  const value = useMemo<Ctx>(() => {
+    const sysAudit = (label: string, extra: Partial<AuditEntry> = {}) => mkAudit({ projectId: "system", kind: "update", entity: "config", entityId: "integrations", label, field: "integrations", ...extra });
+
+    /** Taslakları ekler; aynı hedef için bekleyen öneri varsa kaynağına ekler. */
+    const insertDrafts = (drafts: ReturnType<typeof analyzeText>): AiInsight[] => {
+      const created: AiInsight[] = [];
+      setState((s) => {
+        let insights = [...s.insights];
+        const audit = [...s.audit];
+        drafts.forEach((d) => {
+          const dup = d.targetId ? insights.find((i) => i.status === "pending" && i.targetId === d.targetId && i.kind === d.kind) : null;
+          if (dup) {
+            insights = insights.map((i) => (i.id === dup.id ? { ...i, sourceRef: { ...i.sourceRef, excerpt: `${i.sourceRef.excerpt}\n— ${d.sourceRef.from}: ${d.sourceRef.excerpt}` } } : i));
+            return;
+          }
+          const ins: AiInsight = { ...d, id: uid("ai"), status: "pending", createdAt: new Date().toISOString(), reviewedBy: null, reviewedAt: null, reviewNote: "", appliedEntityId: null };
+          created.push(ins);
+          insights.push(ins);
+          audit.push(mkAudit({ projectId: d.projectId, kind: "create", entity: "insight", entityId: ins.id, label: `AI önerisi oluştu (${d.source === "teams" ? "Teams" : "E-posta"}) — ${d.kind}` }));
+        });
+        return { ...s, insights, audit };
+      });
+      return created;
+    };
+
+    const api: Ctx = {
     state,
     userId,
     createProject: (input) => {
       const project: Project = {
         ...input, id: uid("p"), health: "green", healthReason: "", teams: [], desiredModules: [], discoveryAnswers: {}, teamInfo: {},
         installType: null, llmChoice: null, presentationShared: false, reqDocShared: false, reqDocSharedAt: null, createdAt: new Date().toISOString(),
+        integrations: structuredClone(DEFAULT_PROJECT_INTEGRATIONS),
       };
       setState((s) => {
         const { phases, steps } = buildFromTemplate(project, s.users, {}, s.template);
@@ -317,13 +357,161 @@ export function RqProvider({ children }: { children: ReactNode }) {
       });
       return null;
     },
-    setConfig: (key, val, label) => setState((s) => ({
+    setConfig: (key, val, label) => setState((s) => {
+      let lbl = label;
+      if (key === "integrations") {
+        const o = s.integrations, n = val as IntegrationConfig;
+        const changed: string[] = [];
+        if (o.chat.teams.clientSecret !== n.chat.teams.clientSecret) changed.push("Teams client secret");
+        if (o.email.clientSecret !== n.email.clientSecret) changed.push("E-posta client secret");
+        if (o.email.password !== n.email.password) changed.push("IMAP şifresi");
+        if (changed.length) lbl += ` (${changed.join(", ")} değiştirildi)`;
+      }
+      return { ...s, [key]: val, audit: [...s.audit, mkAudit({ projectId: "system", kind: "update", entity: "config", entityId: key, label: lbl, field: key })] };
+    }),
+    testConnection: (kind, override) => new Promise((resolve) => {
+      setTimeout(() => {
+        const cfg = override ?? state.integrations;
+        let missing: string[] = [];
+        if (kind === "teams") {
+          const t = cfg.chat.teams;
+          missing = [!t.tenantId && "Tenant ID", !t.clientId && "Client ID", !t.clientSecret && "Client secret"].filter(Boolean) as string[];
+        } else {
+          const e = cfg.email;
+          missing = (e.provider === "m365"
+            ? [!e.mailbox && "Posta kutusu", !e.tenantId && "Tenant ID", !e.clientId && "Client ID", !e.clientSecret && "Client secret"]
+            : [!e.mailbox && "Posta kutusu", !e.imapHost && "IMAP sunucusu", !e.imapPort && "Port", !e.username && "Kullanıcı adı", !e.password && "Şifre"]).filter(Boolean) as string[];
+        }
+        const ok = missing.length === 0;
+        const message = ok ? (kind === "teams" ? `${state.chatChannels.length} kanal bulundu` : "Posta kutusuna bağlanıldı") : `Eksik alan: ${missing.join(", ")}`;
+        setState((s) => {
+          const now = new Date().toISOString();
+          const integrations = structuredClone(s.integrations);
+          if (kind === "teams") Object.assign(integrations.chat.teams, { connected: ok, status: ok ? "connected" : "error", statusMessage: ok ? "" : message, lastSyncAt: ok ? now : integrations.chat.teams.lastSyncAt });
+          else Object.assign(integrations.email, { status: ok ? "connected" : "error", statusMessage: ok ? "" : message, lastSyncAt: ok ? now : integrations.email.lastSyncAt });
+          return { ...s, integrations, audit: [...s.audit, sysAudit(`${kind === "teams" ? "Teams" : "E-posta"} bağlantı testi: ${ok ? "başarılı" : "hata — " + message}`)] };
+        });
+        resolve({ ok, message, channels: kind === "teams" && ok ? state.chatChannels : undefined });
+      }, 800);
+    }),
+    disconnect: (kind) => setState((s) => {
+      const integrations = structuredClone(s.integrations);
+      if (kind === "teams") Object.assign(integrations.chat.teams, { connected: false, status: "disconnected", statusMessage: "" });
+      else Object.assign(integrations.email, { enabled: false, status: "disconnected", statusMessage: "" });
+      return { ...s, integrations, audit: [...s.audit, sysAudit(`${kind === "teams" ? "Teams" : "E-posta"} bağlantısı kesildi`)] };
+    }),
+    logSecretView: (field) => setState((s) => ({ ...s, audit: [...s.audit, sysAudit(`Gizli alan görüntülendi — ${field}`, { kind: "view" })] })),
+    setProjectIntegration: (projectId, p) => {
+      const proj = state.projects.find((x) => x.id === projectId);
+      if (!proj) return "Proje bulunamadı";
+      const next: ProjectIntegrations = { chat: { ...proj.integrations.chat, ...p.chat }, email: { ...proj.integrations.email, ...p.email } };
+      if (next.chat.channelId) {
+        const other = state.projects.find((x) => x.id !== projectId && x.integrations.chat.channelId === next.chat.channelId && x.integrations.chat.active);
+        if (other) return `Bu kanal zaten "${other.customerName}" projesine bağlı`;
+      }
+      const now = new Date().toISOString();
+      if (next.chat.active && !proj.integrations.chat.active) next.chat.since = now;
+      if (next.chat.channelId !== proj.integrations.chat.channelId && next.chat.active) next.chat.since = now;
+      if (next.email.active && !proj.integrations.email.active) next.email.since = now;
+      const labels: string[] = [];
+      const chName = (id: string | null) => { const c = state.chatChannels.find((x) => x.id === id); return c ? `${c.teamName} › ${c.channelName}` : "—"; };
+      if (next.chat.channelId !== proj.integrations.chat.channelId) labels.push(`Sohbet kanalı: ${chName(proj.integrations.chat.channelId)} → ${chName(next.chat.channelId)}`);
+      if (next.chat.active !== proj.integrations.chat.active) labels.push(`Sohbet takibi ${next.chat.active ? "aktif" : "pasif"}`);
+      if (next.email.active !== proj.integrations.email.active) labels.push(`E-posta takibi ${next.email.active ? "aktif" : "pasif"}`);
+      if (next.email.extraDomains.join() !== proj.integrations.email.extraDomains.join()) labels.push(`Ek domainler: ${next.email.extraDomains.join(", ") || "—"}`);
+      setState((s) => ({
+        ...s,
+        projects: s.projects.map((x) => (x.id === projectId ? { ...x, integrations: next } : x)),
+        audit: [...s.audit, ...labels.map((l) => mkAudit({ projectId, kind: "update" as const, entity: "integration", entityId: projectId, label: l }))],
+      }));
+      return null;
+    },
+    approveInsight: (id, edited, note) => {
+      const ins = state.insights.find((i) => i.id === id);
+      if (!ins || ins.status !== "pending") return "Öneri bulunamadı veya zaten incelendi";
+      const v = { ...ins.proposed, ...(edited ?? {}) } as Record<string, any>;
+      const reason = `AI Insight onaylandı (${ins.source === "teams" ? "Teams" : "E-posta"}): ${ins.rationale}${note ? ` — Not: ${note}` : ""}`;
+      let applied: string | null = ins.targetId;
+      switch (ins.kind) {
+        case "action_create": {
+          const aid = uid("a");
+          applied = aid;
+          setState((s) => ({
+            ...s,
+            actions: [...s.actions, { id: aid, projectId: ins.projectId, title: String(v.title ?? "AI aksiyonu"), ownerId: v.ownerId ?? null, ball: v.ball ?? "csm", due: v.due ?? null, priority: v.priority ?? "medium", status: "open", source: ins.source, meetingId: null, createdAt: new Date().toISOString(), insightId: ins.id }],
+            audit: [...s.audit, mkAudit({ projectId: ins.projectId, kind: "create", entity: "action", entityId: aid, label: String(v.title), reason })],
+          }));
+          break;
+        }
+        case "action_update": if (ins.targetId) api.updateAction(ins.targetId, v, reason); break;
+        case "step_update": if (ins.targetId) api.updateStep(ins.targetId, v, reason); break;
+        case "risk_create":
+        case "decision_create": {
+          const rid = uid("r");
+          applied = rid;
+          const kind = ins.kind === "risk_create" ? "risk" as const : "decision" as const;
+          setState((s) => ({
+            ...s,
+            risks: [...s.risks, { id: rid, projectId: ins.projectId, kind, title: String(v.title), description: String(v.description ?? ""), impact: v.impact ?? "medium", status: kind === "risk" ? "open" : "accepted", ownerId: null, due: null, createdAt: new Date().toISOString() }],
+            audit: [...s.audit, mkAudit({ projectId: ins.projectId, kind: "create", entity: "risk", entityId: rid, label: `${kind === "risk" ? "Risk" : "Karar"} eklendi — ${v.title}`, reason })],
+          }));
+          break;
+        }
+        case "health_change": api.updateProject(ins.projectId, { health: v.health, healthReason: v.healthReason ?? "" }, reason); break;
+        case "date_change":
+          if (v.phaseId) { applied = v.phaseId; api.updatePhase(v.phaseId, { planEnd: v.planEnd }, reason); }
+          else api.updateProject(ins.projectId, { goLiveDate: v.goLiveDate }, reason);
+          break;
+      }
+      setState((s) => ({
+        ...s,
+        insights: s.insights.map((i) => (i.id === id ? { ...i, status: "approved", reviewedBy: userId, reviewedAt: new Date().toISOString(), reviewNote: note ?? "", appliedEntityId: applied, proposed: v } : i)),
+        audit: [...s.audit, mkAudit({ projectId: ins.projectId, kind: "update", entity: "insight", entityId: id, label: `AI önerisi onaylandı`, reason })],
+      }));
+      return null;
+    },
+    rejectInsight: (id, note) => api.rejectInsights([id], note),
+    rejectInsights: (ids, note) => setState((s) => ({
       ...s,
-      [key]: val,
-      audit: [...s.audit, mkAudit({ projectId: "system", kind: "update", entity: "config", entityId: key, label, field: key })],
+      insights: s.insights.map((i) => (ids.includes(i.id) && i.status === "pending" ? { ...i, status: "rejected", reviewedBy: userId, reviewedAt: new Date().toISOString(), reviewNote: note ?? "" } : i)),
+      audit: [...s.audit, ...s.insights.filter((i) => ids.includes(i.id) && i.status === "pending").map((i) => mkAudit({ projectId: i.projectId, kind: "update" as const, entity: "insight", entityId: i.id, label: "AI önerisi reddedildi", reason: note || undefined }))],
     })),
+    assignUnmatchedEmail: (id, projectId, addAsContact) => {
+      const m = state.unmatchedEmails.find((x) => x.id === id);
+      if (!m) return 0;
+      setState((s) => ({
+        ...s,
+        unmatchedEmails: s.unmatchedEmails.map((x) => (x.id === id ? { ...x, status: "assigned", assignedProjectId: projectId } : x)),
+        audit: [...s.audit, mkAudit({ projectId, kind: "update", entity: "integration", entityId: id, label: `Eşleşmeyen e-posta projeye atandı — ${m.subject}` })],
+      }));
+      if (addAsContact) api.addContact({ projectId, name: addAsContact.name, title: "", email: m.from, phone: "", role: addAsContact.role });
+      const drafts = analyzeText(state, projectId, "email", m.excerpt, { title: m.subject, from: m.from, at: m.at, direction: m.direction });
+      return insertDrafts(drafts).length;
+    },
+    ignoreUnmatchedEmail: (id) => setState((s) => ({
+      ...s,
+      unmatchedEmails: s.unmatchedEmails.map((x) => (x.id === id ? { ...x, status: "ignored" } : x)),
+      audit: [...s.audit, sysAudit(`Eşleşmeyen e-posta yok sayıldı — ${s.unmatchedEmails.find((x) => x.id === id)?.subject ?? ""}`)],
+    })),
+    simulateIncoming: (projectId, source, text, meta) => {
+      const p = state.projects.find((x) => x.id === projectId);
+      if (!p) return { created: [], message: "Proje bulunamadı" };
+      if (source === "teams" && (!p.integrations.chat.active || !state.integrations.chat.teams.connected)) return { created: [], message: "Bu projede Teams takibi pasif" };
+      if (source === "email" && (!p.integrations.email.active || !state.integrations.email.enabled)) return { created: [], message: "Bu projede E-posta takibi pasif" };
+      const created = insertDrafts(analyzeText(state, projectId, source, text, meta));
+      return { created, message: created.length ? undefined : "Metinden öneri çıkarılamadı" };
+    },
+    receiveEmail: (mail) => {
+      const { projectId } = matchEmail(state, mail);
+      if (projectId) return { projectId, created: insertDrafts(analyzeText(state, projectId, "email", mail.text, { title: mail.subject, from: mail.from, direction: mail.direction })).length };
+      const ue: UnmatchedEmail = { id: uid("ue"), from: mail.from, to: mail.to, cc: mail.cc, subject: mail.subject, at: new Date().toISOString(), excerpt: mail.text.slice(0, state.integrations.ai.excerptMaxChars), direction: mail.direction, status: "open", assignedProjectId: null };
+      setState((s) => ({ ...s, unmatchedEmails: [ue, ...s.unmatchedEmails], audit: [...s.audit, sysAudit(`E-posta eşleşmedi, kuyruğa alındı — ${mail.subject}`)] }));
+      return { projectId: null, created: 0 };
+    },
     reset: () => setState(createSeed()),
-  }), [state, userId, patch, add, mkAudit]);
+    };
+    return api;
+  }, [state, userId, patch, add, mkAudit]);
 
   return <RqContext.Provider value={value}>{children}</RqContext.Provider>;
 }

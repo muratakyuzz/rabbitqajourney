@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, FileText, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileText, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState } from "@/components/EmptyState";
 import { AccessTab, AdaptationTab, DocumentsTab, KickoffTab, KpiSection, TeamRow, TrainingTab } from "./project/Phase2Tabs";
 import { AlertsTab, GoLiveTab, RisksTab, TicketsTab } from "./project/Phase3Tabs";
+import { IntegrationsTab } from "./project/IntegrationsTab";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
 import {
   ActionStatusBadge, HealthBadge, PhaseStatusBadge, Pill, PriorityBadge, StepStatusBadge, isOverdue,
 } from "@/components/rq/Badges";
@@ -25,7 +28,7 @@ import { personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
 import { canEditItem, canManageProject, isAllSeeing } from "@/lib/rabbitqa/perm";
 import {
   ACTION_STATUS_LABEL, BALL_LABEL, COMMIT_STATUS_LABEL, CONTACT_ROLE_LABEL, ENTITY_LABEL, HEALTH_LABEL, MEETING_TYPE_LABEL,
-  PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, fmtDate, fmtDateTime, todayISO,
+  PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, SOURCE_LABEL, fmtDate, fmtDateTime, todayISO,
 } from "@/lib/rabbitqa/labels";
 import type {
   Action, ActionStatus, Ball, Commitment, CommitmentStatus, ContactRole, Health, MeetingType, Phase, PhaseStatus, Priority, Project, Step, StepStatus,
@@ -60,6 +63,20 @@ function EnumSelect<T extends string>({ value, onChange, labels }: { value: T; o
   );
 }
 
+function AiSourceBadge({ action }: { action: Action }) {
+  const { state } = useRq();
+  if (action.source !== "teams" && action.source !== "email") return <span className="text-xs text-muted-foreground">{SOURCE_LABEL[action.source]}</span>;
+  const ins = state.insights.find((i) => i.id === action.insightId);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild><span><Pill tone="info"><Sparkles className="h-3 w-3" />{SOURCE_LABEL[action.source]}</Pill></span></TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        {ins ? <><p className="text-xs">“{ins.sourceRef.excerpt}”</p>{ins.reviewedBy && <p className="text-xs mt-1 opacity-80">Onaylayan: {personName(state, ins.reviewedBy)}, {ins.reviewedAt ? fmtDate(ins.reviewedAt) : ""}</p>}</> : <p className="text-xs">AI önerisinden oluşturuldu</p>}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export default function ProjectDetail() {
   const { id } = useParams();
   const { state } = useRq();
@@ -71,6 +88,7 @@ export default function ProjectDetail() {
   }
   const progress = projectProgress(state, project.id);
   const manage = canManageProject(user, project);
+  const pendingAi = state.insights.filter((i) => i.projectId === project.id && effectiveStatus(state, i) === "pending").length;
 
   return (
     <div className="space-y-6">
@@ -80,7 +98,9 @@ export default function ProjectDetail() {
         </Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{project.customerName}</h1>
+            <h1 className="text-2xl font-bold tracking-tight flex flex-wrap items-center gap-2">{project.customerName}
+              {pendingAi > 0 && <Link to={`/app/insights?project=${project.id}`}><Pill tone="info"><Sparkles className="h-3 w-3" />{pendingAi} AI önerisi</Pill></Link>}
+            </h1>
             <p className="text-sm text-muted-foreground">{project.name}</p>
           </div>
           <div className="flex items-start gap-2">
@@ -115,6 +135,7 @@ export default function ProjectDetail() {
           <TabsTrigger value="tickets">Destek kayıtları</TabsTrigger>
           <TabsTrigger value="risks">Riskler ve kararlar</TabsTrigger>
           <TabsTrigger value="golive">Go-Live</TabsTrigger>
+          <TabsTrigger value="integrations">Entegrasyonlar</TabsTrigger>
           <TabsTrigger value="contacts">Müşteri kişileri</TabsTrigger>
           <TabsTrigger value="history">Müşteri geçmişi</TabsTrigger>
         </TabsList>
@@ -132,6 +153,7 @@ export default function ProjectDetail() {
         <TabsContent value="tickets"><TicketsTab project={project} /></TabsContent>
         <TabsContent value="risks"><RisksTab project={project} /></TabsContent>
         <TabsContent value="golive"><GoLiveTab project={project} /></TabsContent>
+        <TabsContent value="integrations"><IntegrationsTab project={project} /></TabsContent>
         <TabsContent value="contacts"><ContactsTab project={project} /></TabsContent>
         <TabsContent value="history"><HistoryTab project={project} /></TabsContent>
       </Tabs>
@@ -378,7 +400,7 @@ function ActionsTab({ project }: { project: Project }) {
                   <TableCell className={isOverdue(a.due, a.status === "done" || a.status === "cancelled") ? "text-destructive font-medium" : ""}>{fmtDate(a.due)}</TableCell>
                   <TableCell><PriorityBadge p={a.priority} /></TableCell>
                   <TableCell><ActionStatusBadge status={a.status} /></TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{a.source === "meeting" ? "Toplantı" : a.source === "rule" ? "Otomatik kural" : "Elle"}</TableCell>
+                  <TableCell><AiSourceBadge action={a} /></TableCell>
                   <TableCell>{canEditItem(user, project, a.ownerId) && <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEdit(a)} aria-label="Aksiyonu düzenle"><Pencil className="h-3.5 w-3.5" /></Button>}</TableCell>
                 </TableRow>
               ))}
@@ -401,14 +423,17 @@ function ActionsTab({ project }: { project: Project }) {
 type ActionDraft = { title: string; ownerId: string | null; ball: Ball; due: string | null; priority: Priority; status: ActionStatus };
 
 function ActionDialog({ project, action, onClose, onCreate }: { project: Project; action: Action | null; onClose: () => void; onCreate: (a: ActionDraft) => void }) {
-  const { updateAction } = useRq();
-  const [d, setD] = useState<ActionDraft>(action ?? { title: "", ownerId: project.csmId, ball: "csm", due: null, priority: "medium", status: "open" });
+  const { updateAction, state } = useRq();
+  const [d, setD] = useState<ActionDraft>(action ? { title: action.title, ownerId: action.ownerId, ball: action.ball, due: action.due, priority: action.priority, status: action.status } : { title: "", ownerId: project.csmId, ball: "csm", due: null, priority: "medium", status: "open" });
   const [reason, setReason] = useState("");
   const needsReason = !!action && (d.due !== action.due || d.status !== action.status);
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader><DialogTitle>{action ? "Aksiyonu düzenle" : "Yeni aksiyon"}</DialogTitle></DialogHeader>
+        {action?.insightId && (() => { const ins = state.insights.find((i) => i.id === action.insightId); return ins ? (
+          <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs"><Sparkles className="inline h-3 w-3 mr-1 text-primary" />Kaynak mesaj ({ins.source === "teams" ? "Teams" : "E-posta"} · {ins.sourceRef.from}): “{ins.sourceRef.excerpt}”</p>
+        ) : null; })()}
         <ActionFields d={d} setD={setD} projectId={project.id} showStatus />
         {needsReason && <div className="grid gap-2"><Label>Gerekçe (zorunlu)</Label><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></div>}
         <DialogFooter>
@@ -814,7 +839,7 @@ function HistoryTab({ project }: { project: Project }) {
     ...state.audit.filter((a) => a.projectId === project.id && !(a.entity === "meeting" && a.kind === "create")).map((a) => ({ at: a.at, type: a.entity, userId: a.userId, a, m: null as null | (typeof state.meetings)[number] })),
     ...state.meetings.filter((m) => m.projectId === project.id).map((m) => ({ at: m.date + "T12:00:00", type: "meeting", userId: m.internalIds[0] ?? "", a: null, m })),
   ]
-    .filter((e) => (kind === "all" || e.type === kind) && (userF === "all" || e.userId === userF) && (!from || e.at.slice(0, 10) >= from) && (!to || e.at.slice(0, 10) <= to))
+    .filter((e) => (kind === "all" || e.type === kind || (kind === "insight" && !!e.a?.reason?.startsWith("AI Insight"))) && (userF === "all" || e.userId === userF) && (!from || e.at.slice(0, 10) >= from) && (!to || e.at.slice(0, 10) <= to))
     .sort((x, y) => y.at.localeCompare(x.at));
 
   return (

@@ -17,6 +17,8 @@ import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/lib/auth-context";
 import { useRq } from "@/lib/rabbitqa/store";
 import { ROLE_SHORT } from "@/lib/rabbitqa/labels";
+import { visibleInsights } from "@/lib/rabbitqa/perm";
+import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
 import { toast } from "sonner";
 import {
   ListChecks,
@@ -35,6 +37,7 @@ import {
   Settings2,
   BarChart3,
   Gauge,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +51,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const mainNav = [
   { title: "Genel bakış", url: "/app/overview", icon: Gauge, roles: null },
+  { title: "AI Insight", url: "/app/insights", icon: Sparkles, roles: null },
   { title: "Müşteri projeleri", url: "/app/projects", icon: Building2, roles: null },
   { title: "Bana atananlar", url: "/app/my-work", icon: ListChecks, roles: null },
   { title: "Yönetim raporu", url: "/app/reports", icon: BarChart3, roles: ["manager", "admin"] },
@@ -58,6 +62,8 @@ function SidebarNav() {
   const { user } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const { state: rq } = useRq();
+  const pendingAi = visibleInsights(rq, user).filter((i) => effectiveStatus(rq, i) === "pending").length;
   const items = mainNav.filter((i) => !i.roles || (user && i.roles.includes(user.role)));
 
   return (
@@ -91,7 +97,8 @@ function SidebarNav() {
                       activeClassName="bg-[hsl(var(--sidebar-primary)/0.10)] text-[hsl(var(--sidebar-primary))] shadow-[inset_0_0_0_1px_hsl(var(--sidebar-primary)/0.32)] [&>svg]:text-[hsl(var(--sidebar-primary))]"
                     >
                       <item.icon className="h-4 w-4 shrink-0 text-sidebar-foreground/70 group-hover:text-sidebar-foreground" />
-                      {!collapsed && <span>{item.title}</span>}
+                      {!collapsed && <span className="flex-1">{item.title}</span>}
+                      {!collapsed && item.url === "/app/insights" && pendingAi > 0 && <span className="rounded-full bg-primary text-primary-foreground text-[10px] font-semibold px-1.5 py-0.5 leading-none">{pendingAi}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
