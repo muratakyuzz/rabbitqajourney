@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Info, Plus, Trash2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { projectPlan } from "@/lib/rabbitqa/flow";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,7 +17,7 @@ import { useRq } from "@/lib/rabbitqa/store";
 import { uid } from "@/lib/rabbitqa/seed";
 import { BALL_LABEL, ROLE_LABEL, fmtDateTime } from "@/lib/rabbitqa/labels";
 import { IntegrationsAdmin } from "./admin/IntegrationsAdmin";
-import type { Ball, PhaseTpl } from "@/lib/rabbitqa/types";
+import type { Ball, Dependency, PhaseTpl } from "@/lib/rabbitqa/types";
 
 export default function Admin() {
   const { user } = useAuth();
