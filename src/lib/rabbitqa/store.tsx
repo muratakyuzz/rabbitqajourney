@@ -300,11 +300,20 @@ export function RqProvider({ children }: { children: ReactNode }) {
       const openCommits = state.commitments.filter((c) => c.projectId === projectId && c.status === "open");
       if (openCommits.length) return `${openCommits.length} açık taahhüt var — önce kapatın veya karşılanamadı olarak işaretleyin`;
       const phase = state.phases.find((p) => p.projectId === projectId && p.code === "07");
-      setState((s) => setStepByKey(s, projectId, "customer_approval", { status: "done" }, mkAudit, reason));
-      if (phase) {
-        const err = (() => { const e = valueRef.completePhase(phase.id); return e; })();
-        if (err) return err;
-      }
+      setState((s) => {
+        let next = setStepByKey(s, projectId, "customer_approval", { status: "done" }, mkAudit, reason);
+        if (phase) {
+          const open = next.steps.filter((x) => x.phaseId === phase.id && x.required && x.status !== "done" && x.status !== "out_of_scope");
+          if (!open.length) {
+            next = {
+              ...next,
+              phases: next.phases.map((p) => (p.id === phase.id ? { ...p, status: "done" as const, actualEnd: todayISO(), actualStart: p.actualStart ?? todayISO(), approvedBy: userId, approvedAt: new Date().toISOString() } : p)),
+              audit: [...next.audit, mkAudit({ projectId, kind: "update", entity: "phase", entityId: phase.id, label: phase.name, field: "status", oldValue: phase.status, newValue: "done", reason: "Müşteri onayı ile Go-Live tamamlandı" })],
+            };
+          }
+        }
+        return next;
+      });
       return null;
     },
     reset: () => setState(createSeed()),
