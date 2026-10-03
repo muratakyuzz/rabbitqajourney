@@ -5,7 +5,7 @@ export type PhaseStatus = "not_started" | "in_progress" | "at_risk" | "late" | "
 export type Health = "green" | "yellow" | "red";
 export type ActionStatus = "open" | "in_progress" | "done" | "cancelled";
 export type Priority = "low" | "medium" | "high";
-export type ActionSource = "meeting" | "rule" | "manual";
+export type ActionSource = "meeting" | "rule" | "manual" | "teams" | "email";
 export type ContactRole = "sponsor" | "pm" | "tech";
 export type CommitmentStatus = "open" | "met" | "unmet";
 export type MeetingType =
@@ -64,6 +64,7 @@ export interface Project {
   reqDocShared: boolean;
   reqDocSharedAt: string | null;
   createdAt: string;
+  integrations: ProjectIntegrations;
 }
 
 export interface Phase {
@@ -110,6 +111,7 @@ export interface Action {
   meetingId: string | null;
   createdAt: string;
   ruleKey?: string;
+  insightId?: string;
 }
 
 export interface Meeting {
@@ -283,4 +285,62 @@ export interface RqState {
   tickets: SupportTicket[];
   risks: RiskDecision[];
   audit: AuditEntry[];
+  integrations: IntegrationConfig;
+  chatChannels: ChatChannel[];
+  insights: AiInsight[];
+  unmatchedEmails: UnmatchedEmail[];
+}
+
+export type ChatProvider = "teams" | "slack";
+export type ConnStatus = "disconnected" | "connected" | "error";
+export type InsightKind = "action_create" | "action_update" | "step_update" | "risk_create" | "decision_create" | "health_change" | "date_change";
+export type InsightStatus = "pending" | "approved" | "rejected" | "expired";
+export type InsightSource = "teams" | "email";
+
+export interface ProjectIntegrations {
+  chat: { provider: ChatProvider; channelId: string | null; active: boolean; since: string | null };
+  email: { active: boolean; extraDomains: string[]; since: string | null };
+}
+
+export interface TeamsConfig {
+  connected: boolean; tenantId: string; clientId: string; clientSecret: string; botName: string;
+  pollMinutes: number; lastSyncAt: string | null; status: ConnStatus; statusMessage: string;
+}
+export interface EmailConfig {
+  enabled: boolean; mailbox: string; provider: "m365" | "imap"; tenantId: string; clientId: string; clientSecret: string;
+  imapHost: string; imapPort: number | null; username: string; password: string;
+  processIncoming: boolean; processOutgoing: boolean; matchByDomain: boolean;
+  ignoredAddresses: string[]; ignoredDomains: string[];
+  lastSyncAt: string | null; status: ConnStatus; statusMessage: string;
+}
+export interface IntegrationConfig {
+  chat: { teams: TeamsConfig; slack: { connected: false } };
+  email: EmailConfig;
+  ai: { enabledKinds: InsightKind[]; minConfidence: number; excerptMaxChars: number; autoExpireDays: number };
+}
+
+export interface ChatChannel { id: string; provider: ChatProvider; teamName: string; channelName: string; webUrl: string }
+
+export interface AiInsight {
+  id: string;
+  projectId: string;
+  source: InsightSource;
+  kind: InsightKind;
+  sourceRef: { title: string; from: string; at: string; excerpt: string; link: string; direction?: "in" | "out" };
+  targetId: string | null;
+  current: Record<string, unknown> | null;
+  proposed: Record<string, unknown>;
+  rationale: string;
+  confidence: number;
+  status: InsightStatus;
+  createdAt: string;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNote: string;
+  appliedEntityId: string | null;
+}
+
+export interface UnmatchedEmail {
+  id: string; from: string; to: string[]; cc: string[]; subject: string; at: string; excerpt: string;
+  direction: "in" | "out"; status: "open" | "assigned" | "ignored"; assignedProjectId: string | null;
 }

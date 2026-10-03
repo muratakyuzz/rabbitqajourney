@@ -1,5 +1,5 @@
 import type { AuthUser } from "@/lib/auth-api";
-import type { Project, RqState } from "./types";
+import type { AiInsight, Project, RqState } from "./types";
 
 export const isAllSeeing = (u: AuthUser | null) => u?.role === "manager" || u?.role === "admin";
 
@@ -26,4 +26,15 @@ export function visibleProjects(state: RqState, u: AuthUser | null) {
 export function canSeeCredentials(u: AuthUser | null, p: Project) {
   if (!u) return false;
   return u.role === "devops" || (u.role === "csm" && p.csmId === u.id);
+}
+
+export const canManageIntegrations = (u: AuthUser | null) => u?.role === "admin";
+export const canSeeSecrets = canManageIntegrations;
+export const canSetProjectIntegration = (u: AuthUser | null, p: Project) => canManageProject(u, p);
+export function canReviewInsight(state: RqState, u: AuthUser | null, i: AiInsight) {
+  return visibleProjects(state, u).some((p) => p.id === i.projectId);
+}
+export function visibleInsights(state: RqState, u: AuthUser | null) {
+  const ids = new Set(visibleProjects(state, u).map((p) => p.id));
+  return state.insights.filter((i) => ids.has(i.projectId));
 }

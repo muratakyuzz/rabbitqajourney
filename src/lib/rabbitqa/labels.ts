@@ -26,7 +26,7 @@ export const ACTION_STATUS_LABEL: Record<ActionStatus, string> = {
   open: "Açık", in_progress: "Devam ediyor", done: "Tamamlandı", cancelled: "İptal",
 };
 export const PRIORITY_LABEL: Record<Priority, string> = { low: "Düşük", medium: "Orta", high: "Yüksek" };
-export const SOURCE_LABEL: Record<ActionSource, string> = { meeting: "Toplantı", rule: "Otomatik kural", manual: "Elle" };
+export const SOURCE_LABEL: Record<ActionSource, string> = { meeting: "Toplantı", rule: "Otomatik kural", manual: "Elle", teams: "AI · Teams", email: "AI · E-posta" };
 export const CONTACT_ROLE_LABEL: Record<ContactRole, string> = { sponsor: "Sponsor", pm: "Proje sorumlusu", tech: "Teknik sorumlu" };
 export const COMMIT_STATUS_LABEL: Record<CommitmentStatus, string> = { open: "Açık", met: "Karşılandı", unmet: "Karşılanamadı" };
 export const MEETING_TYPE_LABEL: Record<MeetingType, string> = {
@@ -43,7 +43,7 @@ export const MEETING_TYPE_LABEL: Record<MeetingType, string> = {
 export const ENTITY_LABEL: Record<string, string> = {
   project: "Proje", phase: "Aşama", step: "Adım", action: "Aksiyon", meeting: "Toplantı", contact: "Kişi", commitment: "Taahhüt",
   kpi: "KPI", training: "Eğitim", adaptation: "Uyarlama", credential: "Erişim bilgisi", document: "Doküman",
-  alert: "Uyarı", ticket: "Destek kaydı", risk: "Risk/Karar",
+  alert: "Uyarı", ticket: "Destek kaydı", risk: "Risk/Karar", insight: "AI Insight", integration: "Entegrasyon",
 };
 export const ALERT_SEVERITY_LABEL = { info: "Bilgi", warning: "Uyarı", critical: "Kritik" } as const;
 export const ALERT_STATUS_LABEL = { open: "Açık", resolved: "Çözüldü" } as const;
@@ -76,3 +76,11 @@ export const LLM_LABEL = {
 export const DOC_TYPE_LABEL = {
   offer: "Teklif", contract: "Sözleşme", req_doc: "Kurulum gereksinim dokümanı", presentation: "Onboarding sunumu", other: "Diğer",
 } as const;
+
+export const INSIGHT_KIND_LABEL = {
+  action_create: "Yeni aksiyon", action_update: "Aksiyon güncelleme", step_update: "Adım durumu", risk_create: "Yeni risk",
+  decision_create: "Yeni karar", health_change: "Sağlık değişikliği", date_change: "Tarih değişikliği",
+} as const;
+export const INSIGHT_STATUS_LABEL = { pending: "Bekliyor", approved: "Onaylandı", rejected: "Reddedildi", expired: "Süresi doldu" } as const;
+export const INSIGHT_SOURCE_LABEL = { teams: "Teams", email: "E-posta" } as const;
+export const CONN_STATUS_LABEL = { disconnected: "Bağlı değil", connected: "Bağlı", error: "Hata" } as const;
