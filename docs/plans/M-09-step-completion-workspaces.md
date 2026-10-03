@@ -1,4 +1,4 @@
-# M-09 — Adım tamamlama motoru ve aşama çalışma alanları (demo, Codex)
+# M-09 — Adım tamamlama motoru ve aşama çalışma alanları (demo, uygulama oturumu)
 
 **Durum:** Onaylandı (Murat, 2026-10-03) · uygulanmadı
 **Spec referansı:** `docs/PRODUCT_SPEC.md` → Ek B.2
@@ -21,7 +21,7 @@
 
 ---
 
-## §0 Bağlam — her Codex görev metninin başına ekleyin
+## §0 Bağlam — her Uygulama görev metninin başına ekleyin
 ```
 BAĞLAM — RabbitQA Onboarding Tracker (Faz M, demo uygulama)
 - AGENTS.md'yi oku (özellikle "Demo kuralları" bölümü).

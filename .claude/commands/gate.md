@@ -1,9 +1,12 @@
 ---
-description: Bir branch için reviewer + qa-verifier (+ gerekiyorsa rules-reviewer) gate'lerini paralel çalıştırır ve Codex'e tek düzeltme direktifi üretir (örn. /gate feat/f1-02-audit)
+description: Bir branch için reviewer + qa-verifier (+ gerekiyorsa rules-reviewer) gate'lerini paralel çalıştırır ve uygulama oturumuna tek düzeltme direktifi üretir (örn. /gate feat/f1-02-audit)
 argument-hint: <branch>
 ---
 
 Hedef branch: **$ARGUMENTS**
+
+### 0. Rol kontrolü
+`echo "${CLAUDE_ROLE:-auditor}"` → `builder` ise **dur**: "/gate uygulama oturumunda çalışmaz. Denetim sekmesinde (`claude`) `/clear` yazıp tekrar deneyin." (yazan ≠ denetleyen)
 
 ### 1. Hazırlık
 ```bash
@@ -38,7 +41,7 @@ qa-verifier yanıtında "Komut kanıtları" tablosu yoksa ya da PASS satırları
 | CI (app / parity / secrets) | … | | | | |
 **Genel karar:** MERGE'E HAZIR | DÜZELTME GEREKLİ | BLOKE | DOĞRULANAMADI
 
-## Codex düzeltme direktifi
+## Düzeltme direktifi
 (Tüm bulguları birleştir, tekrarları tek maddeye indir. Sıra: Critical → High → Medium.
 Her madde: bulgu ID'leri + dosya + beklenen davranış + eklenecek test.
 Son satır: "Her düzeltmeyi ayrı commit'te, mesajında bulgu ID'si ile yap. Bitince lint/typecheck/test/build çalıştır, PR'daki 'Review düzeltmeleri' tablosunu güncelle ve push et.")
@@ -48,4 +51,4 @@ Genel karar: herhangi biri BLOCKED → BLOKE; UNVERIFIED veya parity bitmemiş �
 ### 6. Temizlik ve bildirim
 - Medium/Low bulguları `docs/reviews/BACKLOG.md`'ye ekle.
 - `git worktree remove --force "$D"` (ekran görüntüleri gerekiyorsa önce `docs/reviews/<branch>/screens/` altına kopyala).
-- Kullanıcıya genel kararı, gate tablosunu ve Codex direktifini kod bloğu içinde göster.
+- Kullanıcıya genel kararı, gate tablosunu ve düzeltme direktifini kod bloğu içinde göster.

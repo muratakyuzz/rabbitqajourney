@@ -1,7 +1,7 @@
 # Geliştirme Fazları
 
 **İlke:** Önce FE tam mockup olarak tamamlanır ve dondurulur; BE, dondurulmuş mockup'ın sözleşmesine (`docs/API_CONTRACT.md`) göre yazılır ve ekranlar modül modül gerçek API'ye bağlanır.
-Durum tespiti: `docs/AUDIT.md` v3 (2026-10-03, main @ 4bfa4cb). Lovable ile mockup geliştirmesi bitti; tüm geliştirme Codex ile, bu dokümandaki döngüyle yapılır.
+Durum tespiti: `docs/AUDIT.md` v3 (2026-10-03, main @ 4bfa4cb). Lovable ile mockup geliştirmesi bitti; tüm geliştirme uygulama oturumu ile, bu dokümandaki döngüyle yapılır.
 
 Her görev = 1 plan = 1 branch = 1 PR. Görev kodu: `M-<no>` veya `F<faz>-<no>`.
 Her PR'da **reviewer** + **qa-verifier** zorunlu; CI'da **app** (+ migration olunca **parity**) ve **secrets** yeşil olmalı.
@@ -10,17 +10,17 @@ Faz geçişi yalnızca `/phase-close <faz>` → **GO** ile olur.
 
 | Faz | Ad | Nerede | Çıktı | Durum |
 |---|---|---|---|---|
-| M | Mockup tamamlama & dondurma | Codex (demo) | M-09 adım tamamlama + çalışma alanları; görsel referans; `mockup-freeze` | 🟡 M-09a/b/c + M-06 kaldı |
-| F0 | Temizlik, yapı & sözleşme | Codex | API sözleşmesi, temiz repo, monorepo, güncel stack, FE veri katmanı (mock adaptör), API iskeleti, test altyapısı, CI | ⬜ |
-| F1 | Veri modeli, çekirdek & yetki | Codex | DATA_MODEL, şema, oturum (gerçek giriş), RBAC, audit, soft delete | ⬜ |
-| F2 | Admin konfigürasyonu → API | Codex | Kullanıcı, satışçı, modül, şablon, keşif soruları, eşikler | ⬜ |
-| F3 | Proje çekirdeği → API | Codex | Proje listesi/oluşturma, sıralı akış, aşama-adım, aksiyon, toplantı, kişi, satış devri, doküman | ⬜ |
-| F4 | Aşamalar 01–03 + kurallar → API | Codex | Kural ve adım tamamlama motoru, kick-off, keşif/takım/KPI, kurulum, şifreli erişim bilgisi | ⬜ |
-| F5 | Aşamalar 04–08 → API | Codex | Eğitim, uyarlama, risk/karar, Go-Live, süreklilik (destek kayıtları Faz 2) | ⬜ |
-| F6 | Uyarı motoru → API | Codex | İş günü (TR tatil), 14 uyarı, erteleme/kapatma | ⬜ |
-| F7 | Raporlar & geçmiş → API | Codex | Müşteri geçmişi, haftalık müşteri raporu, iç yönetim raporu, PDF/Excel, arşiv | ⬜ |
-| F8 | AI Insight & entegrasyonlar → API | Codex | İşçi süreci, Teams/e-posta okuma, e-posta eşleştirme, AI analizi, öneri onay API'si (spec Ek A, ADR-0003) | ⬜ |
-| F9 | Sertleştirme & yayın | Codex | Mock adaptörün kaldırılması, güvenlik, performans, a11y, E2E, Docker, test ortamı | ⬜ |
+| M | Mockup tamamlama & dondurma | Claude Code — uygulama oturumu (demo) | M-09 adım tamamlama + çalışma alanları; görsel referans; `mockup-freeze` | 🟡 M-09a/b/c + M-06 kaldı |
+| F0 | Temizlik, yapı & sözleşme | Claude Code — uygulama oturumu | API sözleşmesi, temiz repo, monorepo, güncel stack, FE veri katmanı (mock adaptör), API iskeleti, test altyapısı, CI | ⬜ |
+| F1 | Veri modeli, çekirdek & yetki | Claude Code — uygulama oturumu | DATA_MODEL, şema, oturum (gerçek giriş), RBAC, audit, soft delete | ⬜ |
+| F2 | Admin konfigürasyonu → API | Claude Code — uygulama oturumu | Kullanıcı, satışçı, modül, şablon, keşif soruları, eşikler | ⬜ |
+| F3 | Proje çekirdeği → API | Claude Code — uygulama oturumu | Proje listesi/oluşturma, sıralı akış, aşama-adım, aksiyon, toplantı, kişi, satış devri, doküman | ⬜ |
+| F4 | Aşamalar 01–03 + kurallar → API | Claude Code — uygulama oturumu | Kural ve adım tamamlama motoru, kick-off, keşif/takım/KPI, kurulum, şifreli erişim bilgisi | ⬜ |
+| F5 | Aşamalar 04–08 → API | Claude Code — uygulama oturumu | Eğitim, uyarlama, risk/karar, Go-Live, süreklilik (destek kayıtları Faz 2) | ⬜ |
+| F6 | Uyarı motoru → API | Claude Code — uygulama oturumu | İş günü (TR tatil), 14 uyarı, erteleme/kapatma | ⬜ |
+| F7 | Raporlar & geçmiş → API | Claude Code — uygulama oturumu | Müşteri geçmişi, haftalık müşteri raporu, iç yönetim raporu, PDF/Excel, arşiv | ⬜ |
+| F8 | AI Insight & entegrasyonlar → API | Claude Code — uygulama oturumu | İşçi süreci, Teams/e-posta okuma, e-posta eşleştirme, AI analizi, öneri onay API'si (spec Ek A, ADR-0003) | ⬜ |
+| F9 | Sertleştirme & yayın | Claude Code — uygulama oturumu | Mock adaptörün kaldırılması, güvenlik, performans, a11y, E2E, Docker, test ortamı | ⬜ |
 
 "→ API" görevlerinin ortak şekli (F2–F7):
 1. **BE:** endpoint(ler) + servis + repository + migration (DATA_MODEL'e göre); kural mantığı FE store/`rules.ts`'ten **taşınır** (kopyalanmaz).
@@ -31,7 +31,7 @@ Faz geçişi yalnızca `/phase-close <faz>` → **GO** ile olur.
 ---
 
 ## M — Mockup tamamlama & dondurma
-Lovable turları (Faz 1–4, AI Insight, akış, uyarı motoru, kapanış) tamamlandı — ayrıntı `docs/AUDIT.md` v3. Kalan iş **Codex** ile, demo uygulama üzerinde (backend yok) ve kitteki `/gate` döngüsüyle yapılır; reviewer ve qa-verifier **demo modunda** çalışır (`AGENTS.md` → Demo kuralları).
+Lovable turları (Faz 1–4, AI Insight, akış, uyarı motoru, kapanış) tamamlandı — ayrıntı `docs/AUDIT.md` v3. Kalan iş **uygulama oturumu** ile, demo uygulama üzerinde (backend yok) ve kitteki `/gate` döngüsüyle yapılır; reviewer ve qa-verifier **demo modunda** çalışır (`AGENTS.md` → Demo kuralları).
 
 | Kod | Görev | Kural | Durum |
 |---|---|---|---|

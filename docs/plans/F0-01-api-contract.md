@@ -32,7 +32,7 @@ BE'nin mockup'a göre yazılabilmesi için mockup'ın örtük sözleşmesini aç
 - [ ] qa-verifier — uygulanmaz (kod değişmiyor)
 - [x] rules-reviewer — kural kolonunun doğruluğu (rules.ts ↔ tablo)
 
-## 12. Codex görev metni
+## 12. Uygulama görev metni
 ```
 AGENTS.md, docs/PRODUCT_SPEC.md, docs/RBAC.md ve docs/AUDIT.md dosyalarını oku.
 Ardından docs/plans/F0-01-api-contract.md planını uygula.

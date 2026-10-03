@@ -1,6 +1,6 @@
 # API Sözleşmesi
 
-> **Durum:** Şablon — F0-01'de dondurulmuş mockup'tan çıkarılır (planner + Codex). BE bu sözleşmeye göre yazılır; FE `http` adaptörü bu sözleşmeyi tüketir.
+> **Durum:** Şablon — F0-01'de dondurulmuş mockup'tan çıkarılır (planner + uygulama oturumu). BE bu sözleşmeye göre yazılır; FE `http` adaptörü bu sözleşmeyi tüketir.
 > Kaynaklar: `apps/web` (mockup) → store `Ctx` arayüzü (M-09 sonrası; v3'te 52 işlem — `docs/AUDIT.md` §3), `types.ts`, `perm.ts`, `rules.ts`, ekranlar · `docs/PRODUCT_SPEC.md` · `docs/RBAC.md`.
 > Şemaların tek kaynağı `packages/shared/src/schemas/` (INV-19). Bu doküman şemaları tekrar yazmaz; şema adına referans verir.
 

@@ -5,7 +5,7 @@ Lovable ile mockup geliştirmesi **bitti**; Lovable artık kullanılmaz. Bu sür
 ## 1. Özet
 - Demo uygulama (backend yok, veri localStorage'da) spec'in tamamını ve Ek A'yı (AI Insight + entegrasyonlar) ekranda karşılıyor. State sürümü **v8** (`rabbitqa-demo-state-v8`), store'da **52 işlem**.
 - Lovable'ın son turları: sıralı akış (bağlılık, iş günü süresi, kilitli adım), 14 tipli uyarı motoru, tatil takvimi ve eşikler, satışçı ve kullanıcı yönetimi, "müşteriye görünür" işareti, haftalık rapor arşivi (snapshot), yönetim raporu, Süreklilik sekmesi, risk/destek/Go-Live alanları.
-- **Kalan mockup işi Codex'te:** M-09 (adım tamamlama motoru + aşama çalışma alanları + sekme sadeleştirme), ardından M-06 dondurma. Planlar: `docs/plans/M-09-step-completion-workspaces.md`.
+- **Kalan mockup işi uygulama oturumunda:** M-09 (adım tamamlama motoru + aşama çalışma alanları + sekme sadeleştirme), ardından M-06 dondurma. Planlar: `docs/plans/M-09-step-completion-workspaces.md`.
 - Kit dosyaları (AGENTS.md, CLAUDE.md, `.claude/`, `docs/`, CI) **hâlâ repoda değil**; repodaki `AGENTS.md` Lovable'ın notu.
 
 ## 2. Ekranlar (son hal)
@@ -62,6 +62,6 @@ M-09 sonrası proje detayı **13 sekmeye** iner (Satış devri, Kick-off, Eğiti
 | Kullanılmayan | xlsx, supabase, confetti, mcp-js, lovable-tagger | aynı | aynı + `.lovable/` planları, README'deki Lovable metni |
 
 ## 6. Sonuç
-1. Lovable'a bağlı hiçbir iş kalmadı. Mockup'ın kalanı (M-09) Codex ile, kitteki `/plan → Codex → /gate` döngüsüyle yapılır.
+1. Lovable'a bağlı hiçbir iş kalmadı. Mockup'ın kalanı (M-09) uygulama oturumu ile, kitteki `/plan → uygulama oturumu → /gate` döngüsüyle yapılır.
 2. M-09c bitince **M-06 dondurma**: görsel referans + `mockup-freeze` etiketi → F0 başlar.
 3. F0-02 temizliği büyüdü: `.lovable/`, README, Supabase dosyaları, kullanılmayan paketler, kilit dosyaları, lint, bundle.

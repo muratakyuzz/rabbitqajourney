@@ -12,6 +12,6 @@ Görev: **$ARGUMENTS**
    - Kaydedilen dosya(lar)ın yolu
    - Gerekli gate'ler (reviewer + qa-verifier her zaman; rules-reviewer gerekiyor mu?)
    - "Açık sorular" — varsa **cevaplarını iste**; cevaplar gelince planner'ı tekrar çalıştırıp dosyayı güncelle
-   - "Codex görev metni" bölümü, bir kod bloğu içinde
+   - "Uygulama görev metni" bölümü, bir kod bloğu içinde
    - F1-00 ise: ERD'yi ve "projeye özgü kararlar" tablosunu özetle, onay iste
 4. Uygulama kodu yazma.
