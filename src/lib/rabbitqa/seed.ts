@@ -1,4 +1,4 @@
-import type { Ball, DiscoveryQuestion, Phase, PhaseTpl, Project, RqState, Salesperson, Step, StepTpl, User } from "./types";
+import type { AiInsight, Ball, IntegrationConfig, ProjectIntegrations, UnmatchedEmail, DiscoveryQuestion, Phase, PhaseTpl, Project, RqState, Salesperson, Step, StepTpl, User } from "./types";
 
 export const SEED_USERS: User[] = [
   { id: "u_deniz", name: "Deniz Uzun", email: "deniz.uzun@virgosol.com", role: "csm" },
@@ -84,6 +84,24 @@ export const PHASE_TEMPLATE: PhaseTpl[] = [
   ]},
 ];
 
+export const DEFAULT_PROJECT_INTEGRATIONS: ProjectIntegrations = {
+  chat: { provider: "teams", channelId: null, active: false, since: null },
+  email: { active: false, extraDomains: [], since: null },
+};
+
+export const SEED_INTEGRATIONS: IntegrationConfig = {
+  chat: {
+    teams: { connected: true, tenantId: "3f2a9c1e-demo-tenant", clientId: "8b7d6e5f-demo-client", clientSecret: "demo-teams-secret", botName: "RabbitQA Insight", pollMinutes: 5, lastSyncAt: "2026-10-03T06:45:00.000Z", status: "connected", statusMessage: "" },
+    slack: { connected: false },
+  },
+  email: {
+    enabled: true, mailbox: "cs@rabbitqa.com", provider: "m365", tenantId: "3f2a9c1e-demo-tenant", clientId: "8b7d6e5f-demo-client", clientSecret: "demo-mail-secret",
+    imapHost: "", imapPort: null, username: "", password: "", processIncoming: true, processOutgoing: true, matchByDomain: true,
+    ignoredAddresses: ["noreply", "no-reply"], ignoredDomains: ["rabbitqa.com", "virgosol.com"], lastSyncAt: "2026-10-03T06:50:00.000Z", status: "connected", statusMessage: "",
+  },
+  ai: { enabledKinds: ["action_create", "action_update", "step_update", "risk_create", "decision_create", "health_change", "date_change"], minConfidence: 60, excerptMaxChars: 280, autoExpireDays: 14 },
+};
+
 export const ADAPTATION_STEPS = [
   "Proje oluşturma",
   "Yüklenecek dokümanların belirlenmesi",
@@ -164,6 +182,10 @@ export function createSeed(): RqState {
     reqDocShared: true,
     reqDocSharedAt: "2026-08-28",
     createdAt: "2026-08-21T09:00:00.000Z",
+    integrations: {
+      chat: { provider: "teams", channelId: "ch_isy", active: true, since: "2026-08-28T09:00:00.000Z" },
+      email: { active: true, extraDomains: [], since: "2026-08-28T09:00:00.000Z" },
+    },
   };
   const { phases, steps } = buildFromTemplate(project, users, {
     "00": "2026-08-27", "01": "2026-08-28", "02": "2026-08-28", "03": "2026-09-04", "04": "2026-09-11",
@@ -190,8 +212,8 @@ export function createSeed(): RqState {
   });
 
   const contacts = [
-    { id: "c_1", projectId: project.id, name: "Sevcan Vural", title: "Product Owner", email: "", phone: "", role: "pm" as const },
-    { id: "c_2", projectId: project.id, name: "Mehmet Ertuğrul Elitop", title: "İş Analisti", email: "", phone: "", role: "tech" as const },
+    { id: "c_1", projectId: project.id, name: "Sevcan Vural", title: "Product Owner", email: "sevcan.vural@isyatirim.com.tr", phone: "", role: "pm" as const },
+    { id: "c_2", projectId: project.id, name: "Mehmet Ertuğrul Elitop", title: "İş Analisti", email: "mehmet.elitop@isyatirim.com.tr", phone: "", role: "tech" as const },
   ];
   const meetings = [
     { id: "m_1", projectId: project.id, type: "kickoff" as const, date: "2026-08-28", internalIds: ["u_deniz"], contactIds: ["c_1"], notes: "Tanışma ve onboarding planının paylaşılması.", decisions: "Kurulum tipi On-prem olarak belirlendi." },
@@ -211,14 +233,86 @@ export function createSeed(): RqState {
     required: false, ownerId: "u_deniz", ball: "csm", ballSince: project.createdAt, due: d, status: "done", order: 10 + i,
   }));
   steps.push(...trainingSteps);
+
+  // İkinci örnek proje — entegrasyon takibi pasif
+  const p2: Project = {
+    id: "p_garanti", customerName: "Garanti Teknoloji", name: "RabbitQA Customer Onboarding", csmId: "u_deniz", salespersonId: "s_2",
+    licenseModel: "Yıllık abonelik", purchasedModules: ["TestPilot", "CaseWriter"], desiredModules: ["TestPilot", "CaseWriter"],
+    startDate: "2026-09-21", goLiveDate: "2026-11-20", health: "green", healthReason: "", teams: [], discoveryAnswers: {}, teamInfo: {},
+    installType: null, llmChoice: null, presentationShared: false, reqDocShared: false, reqDocSharedAt: null, createdAt: "2026-09-18T09:00:00.000Z",
+    integrations: {
+      chat: { provider: "teams", channelId: null, active: false, since: null },
+      email: { active: false, extraDomains: ["garantibbva.com.tr"], since: null },
+    },
+  };
+  const b2 = buildFromTemplate(p2, users, { "00": "2026-09-22", "01": "2026-10-02", "02": "2026-10-09", "03": "2026-10-20", "04": "2026-10-27", "05": "2026-11-05", "06": "2026-11-13", "07": "2026-11-20", "08": "2026-12-20" });
+  b2.phases.forEach((ph) => { if (ph.code === "00") { ph.status = "done"; ph.actualStart = "2026-09-18"; ph.actualEnd = "2026-09-22"; b2.steps.filter((x) => x.phaseId === ph.id).forEach((x) => { x.status = "done"; }); } if (ph.code === "01") { ph.status = "in_progress"; ph.actualStart = "2026-09-23"; } });
+  phases.push(...b2.phases);
+  steps.push(...b2.steps);
+  contacts.push({ id: "c_3", projectId: p2.id, name: "Burak Aydın", title: "QA Lead", email: "burak.aydin@garantibbva.com.tr", phone: "", role: "tech" as const });
+
+  const step = (title: string) => steps.find((x) => x.projectId === pid && x.title.toLowerCase().includes(title.toLowerCase()) && x.status !== "done");
+  const stepAny = steps.find((x) => x.projectId === pid && (x.status === "pending" || x.status === "in_progress"));
+  const supportStep = step("Destek") ?? stepAny;
+  const now = Date.now();
+  const ago = (h: number) => new Date(now - h * 3600000).toISOString();
+  const base = { reviewedBy: null, reviewedAt: null, reviewNote: "", appliedEntityId: null };
+  const ref = (source: "teams" | "email", title: string, from: string, h: number, excerpt: string, direction?: "in" | "out") =>
+    ({ title, from, at: ago(h), excerpt, link: source === "teams" ? "https://teams.microsoft.com/l/channel/demo" : "#", direction });
+  const insights: AiInsight[] = [
+    { ...base, id: "ai_1", projectId: pid, source: "teams", kind: "action_create", status: "pending", createdAt: ago(2), targetId: null, current: null,
+      sourceRef: ref("teams", "Müşteriler › İş Yatırım", "Sevcan Vural", 2, "VPN erişim bilgilerini Çağla Hanım'a 10.10.2026 tarihine kadar göndereceğiz."),
+      proposed: { title: "VPN erişim bilgilerinin gönderilmesi", ownerId: "c_1", due: "2026-10-10", priority: "high", ball: "customer" }, rationale: "Müşteri tarihli bir gönderim taahhüdü verdi.", confidence: 86 },
+    { ...base, id: "ai_2", projectId: pid, source: "email", kind: "action_update", status: "pending", createdAt: ago(5), targetId: "a_1", current: { status: "open" },
+      sourceRef: ref("email", "Trade Master senaryo listesi", "mehmet.elitop@isyatirim.com.tr", 5, "Trade Master için senaryo sayısını netleştirdik, listeyi ekte bulabilirsiniz. Bu iş yapıldı.", "in"),
+      proposed: { status: "done" }, rationale: "Müşteri senaryo sayısının netleştirildiğini bildirdi.", confidence: 82 },
+    { ...base, id: "ai_3", projectId: pid, source: "teams", kind: "step_update", status: "pending", createdAt: ago(8), targetId: supportStep?.id ?? null, current: { status: supportStep?.status ?? "pending" },
+      sourceRef: ref("teams", "Müşteriler › İş Yatırım", "Çağla Kahriman", 8, "Destek kayıtlarının takibi için haftalık kontrol tamamlandı, açık kayıt kalmadı."),
+      proposed: { status: "done" }, rationale: `Mesajda "${supportStep?.title ?? "adım"}" adımının tamamlandığı belirtiliyor.`, confidence: 72 },
+    { ...base, id: "ai_4", projectId: pid, source: "email", kind: "risk_create", status: "pending", createdAt: ago(20), targetId: null, current: null,
+      sourceRef: ref("email", "RE: Regresyon koşumları", "sevcan.vural@isyatirim.com.tr", 20, "Koşum sürelerinin uzaması konusunda endişemiz var, Go-Live öncesi çözülmezse sorun olabilir.", "in"),
+      proposed: { title: "Koşum sürelerinin uzaması Go-Live'ı riske atıyor", description: "Müşteri koşum sürelerinden endişeli; Go-Live öncesi çözülmeli.", impact: "high" }, rationale: "Müşteri açıkça endişe belirtti.", confidence: 78 },
+    { ...base, id: "ai_5", projectId: pid, source: "teams", kind: "decision_create", status: "pending", createdAt: ago(26), targetId: null, current: null,
+      sourceRef: ref("teams", "Müşteriler › İş Yatırım", "Sevcan Vural", 26, "MobileHub demosunu Go-Live sonrasına almak konusunda anlaştık."),
+      proposed: { title: "MobileHub demosu Go-Live sonrasına alındı", description: "Taraflar MobileHub demosunun Go-Live sonrasında yapılmasında anlaştı.", impact: "medium" }, rationale: "Mesajda alınmış bir karar paylaşılıyor.", confidence: 74 },
+    { ...base, id: "ai_6", projectId: pid, source: "email", kind: "health_change", status: "pending", createdAt: ago(30), targetId: pid, current: { health: "yellow" },
+      sourceRef: ref("email", "Go-Live tarihi hk.", "sevcan.vural@isyatirim.com.tr", 30, "İç onay süreçlerimiz nedeniyle Go-Live bir hafta gecikecek.", "in"),
+      proposed: { health: "red", healthReason: "Müşteri iç onay süreçleri nedeniyle Go-Live'ın gecikeceğini bildirdi." }, rationale: "Gecikme bildirimi ve mevcut sarı sağlık birlikte kırmızıyı işaret ediyor.", confidence: 68 },
+    { ...base, id: "ai_7", projectId: pid, source: "email", kind: "date_change", status: "pending", createdAt: ago(30), targetId: pid, current: { goLiveDate: "2026-10-02" },
+      sourceRef: ref("email", "Go-Live tarihi hk.", "sevcan.vural@isyatirim.com.tr", 30, "İç onay süreçlerimiz nedeniyle Go-Live bir hafta gecikecek, yeni hedef 09.10.2026.", "in"),
+      proposed: { goLiveDate: "2026-10-09" }, rationale: "Müşteri yeni Go-Live tarihini paylaştı.", confidence: 80 },
+    { ...base, id: "ai_8", projectId: pid, source: "teams", kind: "action_create", status: "pending", createdAt: ago(40), targetId: null, current: null,
+      sourceRef: ref("teams", "Müşteriler › İş Yatırım", "Deniz Uzun", 40, "Go/No-Go sunumunu Deniz hazırlayacak, 06.10 tarihine kadar paylaşacağız."),
+      proposed: { title: "Go/No-Go sunumunun hazırlanması", ownerId: "u_deniz", due: "2026-10-06", priority: "medium", ball: "csm" }, rationale: "İç ekipten tarihli bir hazırlık taahhüdü.", confidence: 64 },
+    { ...base, id: "ai_h1", projectId: pid, source: "teams", kind: "action_create", status: "approved", createdAt: ago(120), reviewedBy: "u_deniz", reviewedAt: ago(110), targetId: null, current: null, appliedEntityId: "a_ai1",
+      sourceRef: ref("teams", "Müşteriler › İş Yatırım", "Ezel Sarıtepe", 120, "Trade Master test kullanıcılarını yarına kadar açacağız."),
+      proposed: { title: "Trade Master test kullanıcılarının açılması", ownerId: "c_2", due: "2026-10-01", priority: "medium", ball: "customer" }, rationale: "Müşteri taahhüdü.", confidence: 84 },
+    { ...base, id: "ai_h2", projectId: pid, source: "email", kind: "risk_create", status: "approved", createdAt: ago(200), reviewedBy: "u_deniz", reviewedAt: ago(190), targetId: null, current: null, appliedEntityId: "r_1",
+      sourceRef: ref("email", "Test ekibi", "sevcan.vural@isyatirim.com.tr", 200, "Dedicated test ekibimiz henüz yok, bu bir risk olabilir.", "in"),
+      proposed: { title: "Dedicated test ekibi yok", description: "", impact: "medium" }, rationale: "Müşteri risk belirtti.", confidence: 77 },
+    { ...base, id: "ai_h3", projectId: pid, source: "teams", kind: "step_update", status: "approved", createdAt: ago(300), reviewedBy: "u_cagla", reviewedAt: ago(290), targetId: null, current: null,
+      sourceRef: ref("teams", "Müşteriler › İş Yatırım", "Çağla Kahriman", 300, "Sunucu kurulumu tamamlandı."), proposed: { status: "done" }, rationale: "Kurulum tamamlandı bildirimi.", confidence: 88 },
+    { ...base, id: "ai_h4", projectId: pid, source: "email", kind: "health_change", status: "rejected", createdAt: ago(150), reviewedBy: "u_deniz", reviewedAt: ago(140), reviewNote: "Gecikme sadece bir gün, sağlığı değiştirmeye gerek yok.", targetId: pid, current: { health: "yellow" },
+      sourceRef: ref("email", "Toplantı ertelendi", "sevcan.vural@isyatirim.com.tr", 150, "Yarınki toplantıyı bir gün erteledik.", "in"), proposed: { health: "red", healthReason: "Toplantı ertelendi" }, rationale: "Erteleme bildirimi.", confidence: 61 },
+    { ...base, id: "ai_h5", projectId: pid, source: "teams", kind: "action_create", status: "rejected", createdAt: ago(170), reviewedBy: "u_gencay", reviewedAt: ago(160), reviewNote: "Zaten destek kaydı olarak açık.", targetId: null, current: null,
+      sourceRef: ref("teams", "Müşteriler › İş Yatırım", "Mehmet Ertuğrul Elitop", 170, "Zaman aşımı sorununu inceleyeceğiz."), proposed: { title: "Zaman aşımı sorununun incelenmesi", ownerId: null, due: null, priority: "medium", ball: "care" }, rationale: "İnceleme taahhüdü.", confidence: 62 },
+  ];
+  actions.push({ id: "a_ai1", projectId: pid, title: "Trade Master test kullanıcılarının açılması", ownerId: "c_2", ball: "customer" as const, due: "2026-10-01", priority: "medium" as const, status: "done" as const, source: "teams" as const, meetingId: null, createdAt: ago(110), insightId: "ai_h1" } as typeof actions[number]);
+
+  const unmatchedEmails: UnmatchedEmail[] = [
+    { id: "ue_1", from: "ali.kaya@yenifirma.com", to: ["cs@rabbitqa.com"], cc: [], subject: "RabbitQA demo talebi", at: ago(6), excerpt: "Merhaba, ekibimiz için RabbitQA demosu planlamak istiyoruz.", direction: "in", status: "open", assignedProjectId: null },
+    { id: "ue_2", from: "proje.ofisi@ortakholding.com", to: ["cs@rabbitqa.com", "sevcan.vural@isyatirim.com.tr", "burak.aydin@garantibbva.com.tr"], cc: [], subject: "Ortak eğitim takvimi", at: ago(12), excerpt: "İki şirket için ortak eğitim takvimini paylaşıyoruz, tamamlandı bilgisini bekliyoruz.", direction: "in", status: "open", assignedProjectId: null },
+    { id: "ue_3", from: "ezel.saritepe@gmail.com", to: ["cs@rabbitqa.com"], cc: [], subject: "Kişisel adresimden yazıyorum", at: ago(18), excerpt: "Trade Master senaryolarını 08.10 tarihine kadar göndereceğiz.", direction: "in", status: "open", assignedProjectId: null },
+  ];
+
   return {
-    version: 4,
+    version: 5,
     template: PHASE_TEMPLATE,
     users,
     salespeople: SEED_SALESPEOPLE,
     modules: SEED_MODULES,
     questions: SEED_QUESTIONS,
-    projects: [project],
+    projects: [project, p2],
     phases,
     steps,
     actions,
@@ -257,6 +351,16 @@ export function createSeed(): RqState {
     ],
     audit: [
       { id: "au_seed", projectId: project.id, at: project.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: project.id, label: "Proje oluşturuldu" },
+      { id: "au_seed2", projectId: p2.id, at: p2.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: p2.id, label: "Proje oluşturuldu" },
     ],
+    integrations: SEED_INTEGRATIONS,
+    chatChannels: [
+      { id: "ch_isy", provider: "teams", teamName: "Müşteriler", channelName: "İş Yatırım", webUrl: "https://teams.microsoft.com/l/channel/demo-isy" },
+      { id: "ch_gar", provider: "teams", teamName: "Müşteriler", channelName: "Garanti Teknoloji", webUrl: "https://teams.microsoft.com/l/channel/demo-gar" },
+      { id: "ch_new", provider: "teams", teamName: "Müşteriler", channelName: "Yeni Prospect", webUrl: "https://teams.microsoft.com/l/channel/demo-new" },
+      { id: "ch_gen", provider: "teams", teamName: "Genel", channelName: "Duyurular", webUrl: "https://teams.microsoft.com/l/channel/demo-gen" },
+    ],
+    insights,
+    unmatchedEmails,
   };
 }
