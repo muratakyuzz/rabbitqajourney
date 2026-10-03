@@ -46,18 +46,20 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const mainNav = [
-  { title: "Müşteri projeleri", url: "/app/projects", icon: Building2 },
-  { title: "Bana atananlar", url: "/app/my-work", icon: ListChecks },
+  { title: "Müşteri projeleri", url: "/app/projects", icon: Building2, roles: null },
+  { title: "Bana atananlar", url: "/app/my-work", icon: ListChecks, roles: null },
+  { title: "Yönetim raporu", url: "/app/reports", icon: BarChart3, roles: ["manager", "admin"] },
+  { title: "Sistem ayarları", url: "/app/admin", icon: Settings, roles: ["admin"] },
 ];
 
 function SidebarNav() {
   const { user } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const items = mainNav;
+  const items = mainNav.filter((i) => !i.roles || (user && i.roles.includes(user.role)));
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border/70 bg-sidebar">
+    <Sidebar collapsible="icon" className="print:hidden border-r border-sidebar-border/70 bg-sidebar">
       <div className="flex items-center gap-2.5 px-4 py-5 border-b border-sidebar-border/70">
         <div className="flex items-center justify-center h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-sidebar-primary/30 bg-sidebar-primary/10 shadow-[0_0_0_1px_hsl(var(--sidebar-primary)/0.12)]">
           <img src="/brand/vector.png" alt="RabbitQA logo" className="h-full w-full object-contain" />
@@ -123,7 +125,7 @@ function Topbar() {
   const navigate = useNavigate();
 
   return (
-    <header className="h-14 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/75 flex items-center justify-between px-4 shrink-0">
+    <header className="print:hidden h-14 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/75 flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-2">
         <SidebarTrigger className="text-muted-foreground" />
       </div>
@@ -183,7 +185,7 @@ export function AppShell() {
         <SidebarNav />
         <div className="flex-1 flex flex-col min-w-0">
           <Topbar />
-          <main className="flex-1 p-6 overflow-auto bg-background">
+          <main className="flex-1 p-6 print:p-0 overflow-auto bg-background">
             <div className="animate-fade-in">
               <Outlet />
             </div>

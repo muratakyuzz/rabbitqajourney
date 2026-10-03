@@ -1,4 +1,4 @@
-import type { Ball, DiscoveryQuestion, Phase, Project, RqState, Salesperson, Step, User } from "./types";
+import type { Ball, DiscoveryQuestion, Phase, PhaseTpl, Project, RqState, Salesperson, Step, StepTpl, User } from "./types";
 
 export const SEED_USERS: User[] = [
   { id: "u_deniz", name: "Deniz Uzun", email: "deniz.uzun@virgosol.com", role: "csm" },
@@ -28,8 +28,6 @@ export const SEED_QUESTIONS: DiscoveryQuestion[] = [
   { id: "q_kpi", group: "Diğer", text: "KPI", required: false },
 ];
 
-interface StepTpl { title: string; ball: Ball; required: boolean; ownerRole?: "manager"; key?: string }
-interface PhaseTpl { code: string; name: string; steps: StepTpl[] }
 
 export const PHASE_TEMPLATE: PhaseTpl[] = [
   { code: "00", name: "Satış Devri", steps: [
@@ -104,11 +102,11 @@ export function ownerFor(ball: Ball, csmId: string | null, users: User[], ownerR
 }
 
 /** Copies the phase/step template into a new project (template changes never affect existing projects). */
-export function buildFromTemplate(project: Project, users: User[], planEnds: Record<string, string | null> = {}) {
+export function buildFromTemplate(project: Project, users: User[], planEnds: Record<string, string | null> = {}, template: PhaseTpl[] = PHASE_TEMPLATE) {
   const phases: Phase[] = [];
   const steps: Step[] = [];
   let prevEnd: string | null = project.startDate;
-  PHASE_TEMPLATE.forEach((pt, i) => {
+  template.forEach((pt, i) => {
     const end = planEnds[pt.code] ?? null;
     const phase: Phase = {
       id: uid("ph"), projectId: project.id, code: pt.code, name: pt.name, order: i,
@@ -214,7 +212,8 @@ export function createSeed(): RqState {
   }));
   steps.push(...trainingSteps);
   return {
-    version: 3,
+    version: 4,
+    template: PHASE_TEMPLATE,
     users,
     salespeople: SEED_SALESPEOPLE,
     modules: SEED_MODULES,

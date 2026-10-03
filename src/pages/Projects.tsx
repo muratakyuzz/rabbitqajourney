@@ -17,7 +17,6 @@ import { useAuth } from "@/lib/auth-context";
 import { activePhase, personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
 import { visibleProjects, isAllSeeing } from "@/lib/rabbitqa/perm";
 import { fmtDate, HEALTH_LABEL, todayISO } from "@/lib/rabbitqa/labels";
-import { PHASE_TEMPLATE } from "@/lib/rabbitqa/seed";
 import { toast } from "sonner";
 
 export default function Projects() {
@@ -75,7 +74,7 @@ export default function Projects() {
           <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tüm aşamalar</SelectItem>
-            {PHASE_TEMPLATE.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} — {p.name}</SelectItem>)}
+            {state.template.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} — {p.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </Card>

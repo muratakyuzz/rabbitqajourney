@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -83,7 +83,10 @@ export default function ProjectDetail() {
             <h1 className="text-2xl font-bold tracking-tight">{project.customerName}</h1>
             <p className="text-sm text-muted-foreground">{project.name}</p>
           </div>
-          <HealthCard project={project} canEdit={manage} />
+          <div className="flex items-start gap-2">
+            <Button asChild variant="outline" size="sm"><Link to={`/app/projects/${project.id}/report`}><FileText className="h-4 w-4 mr-1" />Haftalık rapor</Link></Button>
+            <HealthCard project={project} canEdit={manage} />
+          </div>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-4">
           <Stat label="CSM" value={personName(state, project.csmId)} />
