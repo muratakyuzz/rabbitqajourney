@@ -12,6 +12,7 @@ import { fmtDate, todayISO } from "@/lib/rabbitqa/labels";
 export default function ManagementReport() {
   const { user } = useAuth();
   const { state } = useRq();
+  const alertViews = useAlertViews();
   if (!isAllSeeing(user)) return <Navigate to="/app/projects" replace />;
   const today = todayISO();
   const projects = state.projects;
@@ -42,7 +43,7 @@ export default function ManagementReport() {
         <Kpi label="Yeşil" value={count("green")} />
         <Kpi label="Sarı" value={count("yellow")} />
         <Kpi label="Kırmızı" value={count("red")} />
-        <Kpi label="Kritik uyarı" value={critical.length} />
+        <Kpi label="Kırmızı uyarı" value={critical.length} />
         <Kpi label="Geciken aşama" value={latePhases.length} />
       </div>
 
