@@ -2,19 +2,19 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useAuth } from "@/lib/auth-context";
 import { ADAPTATION_STEPS, buildFromTemplate, createSeed, uid } from "./seed";
 import type {
-  Action, AdaptationSession, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RqState, Step, TrainingSession,
+  Action, AdaptationSession, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RiskDecision, RqState, Step, SupportTicket, TrainingSession,
 } from "./types";
 import { todayISO } from "./labels";
 import { applyInstallType, applyLlmChoice, setStepByKey } from "./rules";
 
-const KEY = "rabbitqa-demo-state-v2";
+const KEY = "rabbitqa-demo-state-v3";
 
 function load(): RqState {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as RqState;
-      if (s.version === 2) return s;
+      if (s.version === 3) return s;
     }
   } catch { /* ignore */ }
   return createSeed();
@@ -22,9 +22,10 @@ function load(): RqState {
 
 const str = (v: unknown) => (v === null || v === undefined ? "" : Array.isArray(v) ? v.join(", ") : typeof v === "object" ? JSON.stringify(v) : String(v));
 
-type Coll = "projects" | "phases" | "steps" | "actions" | "meetings" | "contacts" | "commitments" | "kpis" | "trainings" | "adaptations" | "credentials" | "documents";
+type Coll = "projects" | "phases" | "steps" | "actions" | "meetings" | "contacts" | "commitments" | "kpis" | "trainings" | "adaptations" | "credentials" | "documents" | "alerts" | "tickets" | "risks";
 const ENTITY: Record<Coll, string> = {
   projects: "project", phases: "phase", steps: "step", actions: "action", meetings: "meeting", contacts: "contact", commitments: "commitment", kpis: "kpi", trainings: "training", adaptations: "adaptation", credentials: "credential", documents: "document",
+  alerts: "alert", tickets: "ticket", risks: "risk",
 };
 
 interface Ctx {
@@ -53,6 +54,13 @@ interface Ctx {
   addCredential: (c: Omit<Credential, "id">) => void;
   logCredentialView: (id: string) => void;
   addDocument: (d: Omit<DocumentRec, "id" | "addedAt">) => void;
+  addAlert: (a: Omit<Alert, "id" | "createdAt" | "status" | "resolvedAt" | "resolvedBy" | "source">) => void;
+  resolveAlert: (id: string) => void;
+  addTicket: (t: Omit<SupportTicket, "id" | "openedAt" | "resolvedAt">) => void;
+  updateTicket: (id: string, patch: Partial<SupportTicket>, reason?: string) => void;
+  addRisk: (r: Omit<RiskDecision, "id" | "createdAt">) => void;
+  updateRisk: (id: string, patch: Partial<RiskDecision>, reason?: string) => void;
+  approveGoLive: (projectId: string, reason: string) => string | null;
   reset: () => void;
 }
 
@@ -131,7 +139,16 @@ export function RqProvider({ children }: { children: ReactNode }) {
       });
       return project.id;
     },
-    updateProject: (id, p, reason) => patch<Project>("projects", id, p, reason),
+    updateProject: (id, p, reason) => patch<Project>("projects", id, p, reason, (base, old, next) => {
+      if (next.health === "red" && old.health !== "red") {
+        const alert: Alert = {
+          id: uid("al"), projectId: id, title: "Proje sağlığı kırmızıya düştü", detail: next.healthReason || "Gerekçe girilmedi.",
+          severity: "critical", status: "open", source: "rule", createdAt: new Date().toISOString(), resolvedAt: null, resolvedBy: null,
+        };
+        return { alerts: [...base.alerts, alert], audit: [...base.audit, mkAudit({ projectId: id, kind: "create", entity: "alert", entityId: alert.id, label: alert.title, reason: "Otomatik kural: sağlık kırmızı" })] };
+      }
+      return {};
+    }),
     updatePhase: (id, p, reason) => patch<Phase>("phases", id, p, reason),
     completePhase: (id) => {
       const ph = state.phases.find((x) => x.id === id);
@@ -155,6 +172,9 @@ export function RqProvider({ children }: { children: ReactNode }) {
       if (m.type === "devops_handover") {
         setState((s) => setStepByKey(s, m.projectId, "devops_handover", { status: "done", ball: "devops", ballSince: new Date().toISOString() }, mkAudit, "Otomatik kural: DevOps devir toplantısı kaydedildi, top DevOps'a geçti"));
       }
+      if (m.type === "go_no_go") {
+        setState((s) => setStepByKey(s, m.projectId, "gonogo", { status: "done" }, mkAudit, "Otomatik kural: Go/No-Go toplantısı kaydedildi"));
+      }
       actions.forEach((a) =>
         add<Action>("actions", { ...a, id: uid("a"), projectId: m.projectId, source: "meeting", meetingId: meeting.id, createdAt: new Date().toISOString() }),
       );
@@ -162,7 +182,13 @@ export function RqProvider({ children }: { children: ReactNode }) {
     addContact: (c) => add<Contact>("contacts", { ...c, id: uid("c") }),
     updateContact: (id, p) => patch<Contact>("contacts", id, p),
     addCommitment: (c) => add<Commitment>("commitments", { ...c, id: uid("cm") }),
-    updateCommitment: (id, p, reason) => patch<Commitment>("commitments", id, p, reason),
+    updateCommitment: (id, p, reason) => patch<Commitment>("commitments", id, p, reason, (base) => {
+      const c = base.commitments.find((x) => x.id === id);
+      if (!c) return {};
+      const open = base.commitments.filter((x) => x.projectId === c.projectId && x.status === "open");
+      if (!open.length) return setStepByKey(base, c.projectId, "commit_check", { status: "done" }, mkAudit, "Otomatik kural: açık taahhüt kalmadı");
+      return {};
+    }),
     addTeam: (projectId, team) => {
       setState((s) => {
         const project = s.projects.find((p) => p.id === projectId);
@@ -246,6 +272,49 @@ export function RqProvider({ children }: { children: ReactNode }) {
       add<DocumentRec>("documents", { ...d, id: uid("d"), addedAt: new Date().toISOString() }, `Doküman eklendi — ${d.name}`);
       const key = d.type === "offer" ? "offer" : d.type === "contract" ? "contract" : d.type === "req_doc" ? "reqdoc" : null;
       if (key) setState((s) => setStepByKey(s, d.projectId, key, { status: "done" }, mkAudit, `Otomatik kural: ${d.name} yüklendi`));
+    },
+    addAlert: (a) => add<Alert>("alerts", { ...a, id: uid("al"), status: "open", source: "manual", createdAt: new Date().toISOString(), resolvedAt: null, resolvedBy: null }, `Uyarı eklendi — ${a.title}`),
+    resolveAlert: (id) => patch<Alert>("alerts", id, { status: "resolved", resolvedAt: new Date().toISOString(), resolvedBy: userId }),
+    addTicket: (t) => {
+      add<SupportTicket>("tickets", { ...t, id: uid("tk"), openedAt: new Date().toISOString(), resolvedAt: null }, `Destek kaydı açıldı — ${t.title}`);
+      setState((s) => setStepByKey(s, t.projectId, "support_track", { status: "in_progress" }, mkAudit, "Otomatik kural: destek kaydı açıldı"));
+      if (t.priority === "high") {
+        setState((s) => ({
+          ...s,
+          alerts: [...s.alerts, { id: uid("al"), projectId: t.projectId, title: `Yüksek öncelikli destek kaydı: ${t.title}`, detail: t.description, severity: "warning" as const, status: "open" as const, source: "rule" as const, createdAt: new Date().toISOString(), resolvedAt: null, resolvedBy: null }],
+          audit: [...s.audit, mkAudit({ projectId: t.projectId, kind: "create", entity: "alert", entityId: "auto", label: `Yüksek öncelikli destek kaydı uyarısı — ${t.title}`, reason: "Otomatik kural: yüksek öncelikli ticket" })],
+        }));
+      }
+    },
+    updateTicket: (id, p, reason) => {
+      const old = state.tickets.find((t) => t.id === id);
+      const changes = { ...p };
+      if (old && (p.status === "resolved" || p.status === "closed") && !old.resolvedAt) changes.resolvedAt = new Date().toISOString();
+      patch<SupportTicket>("tickets", id, changes, reason);
+    },
+    addRisk: (r) => add<RiskDecision>("risks", { ...r, id: uid("r"), createdAt: new Date().toISOString() }, `${r.kind === "risk" ? "Risk" : "Karar"} eklendi — ${r.title}`),
+    updateRisk: (id, p, reason) => patch<RiskDecision>("risks", id, p, reason),
+    approveGoLive: (projectId, reason) => {
+      const gonogo = state.steps.find((s) => s.projectId === projectId && s.key === "gonogo");
+      if (!gonogo || gonogo.status !== "done") return "Önce Go/No-Go toplantısını kaydedin";
+      const openCommits = state.commitments.filter((c) => c.projectId === projectId && c.status === "open");
+      if (openCommits.length) return `${openCommits.length} açık taahhüt var — önce kapatın veya karşılanamadı olarak işaretleyin`;
+      const phase = state.phases.find((p) => p.projectId === projectId && p.code === "07");
+      setState((s) => {
+        let next = setStepByKey(s, projectId, "customer_approval", { status: "done" }, mkAudit, reason);
+        if (phase) {
+          const open = next.steps.filter((x) => x.phaseId === phase.id && x.required && x.status !== "done" && x.status !== "out_of_scope");
+          if (!open.length) {
+            next = {
+              ...next,
+              phases: next.phases.map((p) => (p.id === phase.id ? { ...p, status: "done" as const, actualEnd: todayISO(), actualStart: p.actualStart ?? todayISO(), approvedBy: userId, approvedAt: new Date().toISOString() } : p)),
+              audit: [...next.audit, mkAudit({ projectId, kind: "update", entity: "phase", entityId: phase.id, label: phase.name, field: "status", oldValue: phase.status, newValue: "done", reason: "Müşteri onayı ile Go-Live tamamlandı" })],
+            };
+          }
+        }
+        return next;
+      });
+      return null;
     },
     reset: () => setState(createSeed()),
   }), [state, userId, patch, add, mkAudit]);

@@ -72,13 +72,13 @@ export const PHASE_TEMPLATE: PhaseTpl[] = [
   { code: "05", name: "Uyarlama", steps: [] },
   { code: "06", name: "Uygulama", steps: [
     { title: "CS check-in toplantıları", ball: "csm", required: false },
-    { title: "Destek kayıtlarının takibi", ball: "care", required: false },
+    { key: "support_track", title: "Destek kayıtlarının takibi", ball: "care", required: false },
     { title: "KPI ölçümleri", ball: "csm", required: false },
   ]},
   { code: "07", name: "Go-Live", steps: [
-    { title: "Go/No-Go toplantısı", ball: "csm", required: true },
-    { title: "Açık taahhütlerin kontrolü", ball: "csm", required: true },
-    { title: "Müşteri onayı", ball: "customer", required: true },
+    { key: "gonogo", title: "Go/No-Go toplantısı", ball: "csm", required: true },
+    { key: "commit_check", title: "Açık taahhütlerin kontrolü", ball: "csm", required: true },
+    { key: "customer_approval", title: "Müşteri onayı", ball: "customer", required: true },
   ]},
   { code: "08", name: "Süreklilik", steps: [
     { title: "Periyodik check-in toplantıları", ball: "csm", required: false },
@@ -214,7 +214,7 @@ export function createSeed(): RqState {
   }));
   steps.push(...trainingSteps);
   return {
-    version: 2,
+    version: 3,
     users,
     salespeople: SEED_SALESPEOPLE,
     modules: SEED_MODULES,
@@ -243,6 +243,18 @@ export function createSeed(): RqState {
     documents: [
       { id: "d_1", projectId: pid, type: "offer", name: "IsYatirim_Teklif.pdf", linkType: "project", linkId: null, addedAt: "2026-08-22T10:00:00.000Z" },
       { id: "d_2", projectId: pid, type: "contract", name: "IsYatirim_Sozlesme.pdf", linkType: "project", linkId: null, addedAt: "2026-08-25T10:00:00.000Z" },
+    ],
+    alerts: [
+      { id: "al_1", projectId: pid, title: "Uygulama aşaması gecikti", detail: "Plan bitiş 25.09.2026 idi, aşama hâlâ açık.", severity: "warning", status: "open", source: "rule", createdAt: "2026-09-26T08:00:00.000Z", resolvedAt: null, resolvedBy: null },
+      { id: "al_2", projectId: pid, title: "Go-Live tarihi yaklaşıyor", detail: "Hedef Go-Live: 02.10.2026. Go/No-Go toplantısı planlanmadı.", severity: "critical", status: "open", source: "rule", createdAt: "2026-09-28T08:00:00.000Z", resolvedAt: null, resolvedBy: null },
+    ],
+    tickets: [
+      { id: "tk_1", projectId: pid, title: "TestPilot koşumunda zaman aşımı", description: "Trade Master regresyon setinde uzun süren senaryolar zaman aşımına uğruyor.", module: "TestPilot", priority: "high", status: "in_progress", ownerId: "u_gencay", openedAt: "2026-09-22T10:00:00.000Z", resolvedAt: null },
+      { id: "tk_2", projectId: pid, title: "DataCrate içe aktarma hatası", description: "Excel şablonunda Türkçe karakterli başlıklar hata veriyor.", module: "DataCrate", priority: "medium", status: "resolved", ownerId: "u_gencay", openedAt: "2026-09-19T14:00:00.000Z", resolvedAt: "2026-09-21T09:30:00.000Z" },
+    ],
+    risks: [
+      { id: "r_1", projectId: pid, kind: "risk", title: "Dedicated test ekibi yok", description: "Müşteride dedicated test ekibi bulunmuyor; senaryo bakımı PO'lara kalabilir.", impact: "medium", status: "open", ownerId: "u_deniz", due: "2026-10-15", createdAt: "2026-09-05T09:00:00.000Z" },
+      { id: "r_2", projectId: pid, kind: "decision", title: "On-prem kurulum kararı", description: "Kick-off'ta kurulum tipi On-prem olarak belirlendi; VPN ve sunucu müşteride.", impact: "high", status: "accepted", ownerId: "u_deniz", due: null, createdAt: "2026-08-28T12:00:00.000Z" },
     ],
     audit: [
       { id: "au_seed", projectId: project.id, at: project.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: project.id, label: "Proje oluşturuldu" },

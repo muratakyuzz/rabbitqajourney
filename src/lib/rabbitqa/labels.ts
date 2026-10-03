@@ -43,7 +43,15 @@ export const MEETING_TYPE_LABEL: Record<MeetingType, string> = {
 export const ENTITY_LABEL: Record<string, string> = {
   project: "Proje", phase: "Aşama", step: "Adım", action: "Aksiyon", meeting: "Toplantı", contact: "Kişi", commitment: "Taahhüt",
   kpi: "KPI", training: "Eğitim", adaptation: "Uyarlama", credential: "Erişim bilgisi", document: "Doküman",
+  alert: "Uyarı", ticket: "Destek kaydı", risk: "Risk/Karar",
 };
+export const ALERT_SEVERITY_LABEL = { info: "Bilgi", warning: "Uyarı", critical: "Kritik" } as const;
+export const ALERT_STATUS_LABEL = { open: "Açık", resolved: "Çözüldü" } as const;
+export const TICKET_STATUS_LABEL = {
+  open: "Açık", in_progress: "İşleniyor", waiting_customer: "Müşteri bekleniyor", resolved: "Çözüldü", closed: "Kapatıldı",
+} as const;
+export const RISK_KIND_LABEL = { risk: "Risk", decision: "Karar" } as const;
+export const RISK_STATUS_LABEL = { open: "Açık", mitigated: "Azaltıldı", accepted: "Kabul edildi", realized: "Gerçekleşti" } as const;
 
 export function fmtDate(d: string | null | undefined) {
   if (!d) return "—";

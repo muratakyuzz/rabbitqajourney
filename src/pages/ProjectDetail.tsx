@@ -16,6 +16,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/EmptyState";
 import { AccessTab, AdaptationTab, DocumentsTab, KickoffTab, KpiSection, TeamRow, TrainingTab } from "./project/Phase2Tabs";
+import { AlertsTab, GoLiveTab, RisksTab, TicketsTab } from "./project/Phase3Tabs";
 import {
   ActionStatusBadge, HealthBadge, PhaseStatusBadge, Pill, PriorityBadge, StepStatusBadge, isOverdue,
 } from "@/components/rq/Badges";
@@ -107,6 +108,10 @@ export default function ProjectDetail() {
           <TabsTrigger value="training">Eğitim</TabsTrigger>
           <TabsTrigger value="adaptation">Uyarlama</TabsTrigger>
           <TabsTrigger value="documents">Dokümanlar</TabsTrigger>
+          <TabsTrigger value="alerts">Uyarılar</TabsTrigger>
+          <TabsTrigger value="tickets">Destek kayıtları</TabsTrigger>
+          <TabsTrigger value="risks">Riskler ve kararlar</TabsTrigger>
+          <TabsTrigger value="golive">Go-Live</TabsTrigger>
           <TabsTrigger value="contacts">Müşteri kişileri</TabsTrigger>
           <TabsTrigger value="history">Müşteri geçmişi</TabsTrigger>
         </TabsList>
@@ -120,6 +125,10 @@ export default function ProjectDetail() {
         <TabsContent value="training"><TrainingTab project={project} /></TabsContent>
         <TabsContent value="adaptation"><AdaptationTab project={project} /></TabsContent>
         <TabsContent value="documents"><DocumentsTab project={project} /></TabsContent>
+        <TabsContent value="alerts"><AlertsTab project={project} /></TabsContent>
+        <TabsContent value="tickets"><TicketsTab project={project} /></TabsContent>
+        <TabsContent value="risks"><RisksTab project={project} /></TabsContent>
+        <TabsContent value="golive"><GoLiveTab project={project} /></TabsContent>
         <TabsContent value="contacts"><ContactsTab project={project} /></TabsContent>
         <TabsContent value="history"><HistoryTab project={project} /></TabsContent>
       </Tabs>
