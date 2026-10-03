@@ -1,3 +1,5 @@
+import { addBusinessDays, isBusinessDay } from "./business-days";
+import { advanceAll } from "./flow";
 import type { Action, AiInsight, Ball, IntegrationConfig, ProjectIntegrations, UnmatchedEmail, DiscoveryQuestion, Phase, PhaseTpl, Project, RqState, Salesperson, Step, StepTpl, User } from "./types";
 
 export const SEED_USERS: User[] = [
@@ -29,58 +31,61 @@ export const SEED_QUESTIONS: DiscoveryQuestion[] = [
 ];
 
 
+const S = (title: string, ball: Ball, required: boolean, dep: "B" | "Ö", durationDays: number, extra: Partial<StepTpl> = {}): StepTpl =>
+  ({ title, ball, required, dependency: dep === "B" ? "independent" : "previous", durationDays, ...extra });
+
 export const PHASE_TEMPLATE: PhaseTpl[] = [
-  { code: "00", name: "Satış Devri", steps: [
-    { title: "CSM ataması", ball: "csm", required: true, ownerRole: "manager" },
-    { title: "Satışçı ve lisans modelinin girilmesi", ball: "csm", required: true },
-    { title: "Satın alınan modüllerin girilmesi", ball: "csm", required: true },
-    { title: "Taahhütlerin girilmesi", ball: "csm", required: true },
-    { title: "Internal brif toplantısı", ball: "csm", required: true },
-    { key: "offer", title: "Teklif dokümanının yüklenmesi", ball: "csm", required: true },
-    { key: "contract", title: "Müşteri sözleşmesinin yüklenmesi", ball: "csm", required: true },
+  { code: "00", name: "Satış Devri", dependency: "previous", steps: [
+    S("CSM ataması", "csm", true, "Ö", 1, { ownerRole: "manager" }),
+    S("Satışçı ve lisans modelinin girilmesi", "csm", true, "Ö", 1),
+    S("Satın alınan modüllerin girilmesi", "csm", true, "B", 2),
+    S("Taahhütlerin girilmesi", "csm", true, "B", 2),
+    S("Internal brif toplantısı", "csm", true, "Ö", 2),
+    S("Teklif dokümanının yüklenmesi", "csm", true, "B", 2, { key: "offer" }),
+    S("Müşteri sözleşmesinin yüklenmesi", "csm", true, "B", 2, { key: "contract" }),
   ]},
-  { code: "01", name: "Kick-off", steps: [
-    { title: "Kick-off toplantısı", ball: "csm", required: true },
-    { key: "presentation", title: "Onboarding sunumunun paylaşılması", ball: "csm", required: false },
-    { key: "install_type", title: "Kurulum tipi seçimi", ball: "csm", required: true },
-    { key: "reqdoc", title: "Kurulum gereksinim dokümanının paylaşılması", ball: "csm", required: true },
-    { key: "llm", title: "LLM tercihinin girilmesi", ball: "csm", required: true },
+  { code: "01", name: "Kick-off", dependency: "previous", steps: [
+    S("Kick-off toplantısı", "csm", true, "Ö", 3),
+    S("Kurulum tipi seçimi", "csm", true, "Ö", 1, { key: "install_type" }),
+    S("Kurulum gereksinim dokümanının paylaşılması", "csm", true, "Ö", 2, { key: "reqdoc" }),
+    S("LLM tercihinin girilmesi", "csm", true, "B", 3, { key: "llm" }),
+    S("Onboarding sunumunun paylaşılması", "csm", false, "B", 2, { key: "presentation" }),
   ]},
-  { code: "02", name: "Keşif", steps: [
-    { title: "Keşif toplantısı", ball: "csm", required: true },
-    { title: "Keşif formunun doldurulması", ball: "csm", required: true },
-    { title: "Takım listesinin tanımlanması", ball: "csm", required: true },
-    { title: "KPI tanımı", ball: "csm", required: false },
+  { code: "02", name: "Keşif", dependency: "previous", steps: [
+    S("Keşif toplantısı", "csm", true, "Ö", 3),
+    S("Keşif formunun doldurulması", "csm", true, "Ö", 3),
+    S("Takım listesinin tanımlanması", "csm", true, "Ö", 2),
+    S("KPI tanımı", "csm", false, "B", 5),
   ]},
-  { code: "03", name: "Kurulum", steps: [
-    { key: "vpn_req", title: "VPN erişiminin talep edilmesi", ball: "customer", required: true },
-    { key: "vpn_info", title: "VPN bilgilerinin alınması ve kaydedilmesi", ball: "csm", required: true },
-    { key: "servers", title: "Sunucuların oluşturulup teslim edilmesi", ball: "customer", required: true },
-    { key: "devops_handover", title: "Müşterinin DevOps ekibine devir toplantısı", ball: "customer", required: true },
-    { title: "Ürün kurulumu", ball: "devops", required: true },
-    { key: "model_install", title: "Model kurulumu", ball: "devops", required: false },
-    { title: "İlk platform testleri", ball: "care", required: true },
-    { title: "Örnek proje ile platforma veri doldurulması", ball: "care", required: true },
-    { title: "Müşteri hesaplarının açılması ve paylaşılması", ball: "care", required: true },
+  { code: "03", name: "Kurulum", dependency: "previous", steps: [
+    S("VPN erişiminin talep edilmesi", "customer", true, "Ö", 3, { key: "vpn_req" }),
+    S("VPN bilgilerinin alınması ve kaydedilmesi", "csm", true, "Ö", 2, { key: "vpn_info" }),
+    S("Sunucuların oluşturulup teslim edilmesi", "customer", true, "Ö", 5, { key: "servers" }),
+    S("Müşterinin DevOps ekibine devir toplantısı", "customer", true, "Ö", 2, { key: "devops_handover" }),
+    S("Ürün kurulumu", "devops", true, "Ö", 3),
+    S("Model kurulumu", "devops", false, "Ö", 3, { key: "model_install" }),
+    S("İlk platform testleri", "care", true, "Ö", 2),
+    S("Örnek proje ile platforma veri doldurulması", "care", true, "Ö", 2),
+    S("Müşteri hesaplarının açılması ve paylaşılması", "care", true, "Ö", 1),
   ]},
-  { code: "04", name: "Eğitim", steps: [
-    { title: "Eğitim session'larının planlanması", ball: "csm", required: true },
-    { title: "Eğitim session'larının yapılması", ball: "csm", required: true },
+  { code: "04", name: "Eğitim", dependency: "previous", steps: [
+    S("Eğitim session'larının planlanması", "csm", true, "Ö", 3),
+    S("Eğitim session'larının yapılması", "csm", true, "Ö", 10),
   ]},
-  { code: "05", name: "Uyarlama", steps: [] },
-  { code: "06", name: "Uygulama", steps: [
-    { title: "CS check-in toplantıları", ball: "csm", required: false },
-    { key: "support_track", title: "Destek kayıtlarının takibi", ball: "care", required: false },
-    { title: "KPI ölçümleri", ball: "csm", required: false },
+  { code: "05", name: "Uyarlama", dependency: "previous", steps: [] },
+  { code: "06", name: "Uygulama", dependency: "previous", steps: [
+    S("CS check-in toplantıları", "csm", false, "B", 10),
+    S("Destek kayıtlarının takibi", "care", false, "B", 10, { key: "support_track" }),
+    S("KPI ölçümleri", "csm", false, "B", 10),
   ]},
-  { code: "07", name: "Go-Live", steps: [
-    { key: "gonogo", title: "Go/No-Go toplantısı", ball: "csm", required: true },
-    { key: "commit_check", title: "Açık taahhütlerin kontrolü", ball: "csm", required: true },
-    { key: "customer_approval", title: "Müşteri onayı", ball: "customer", required: true },
+  { code: "07", name: "Go-Live", dependency: "previous", steps: [
+    S("Go/No-Go toplantısı", "csm", true, "Ö", 3, { key: "gonogo" }),
+    S("Açık taahhütlerin kontrolü", "csm", true, "Ö", 1, { key: "commit_check" }),
+    S("Müşteri onayı", "customer", true, "Ö", 3, { key: "customer_approval" }),
   ]},
-  { code: "08", name: "Süreklilik", steps: [
-    { title: "Periyodik check-in toplantıları", ball: "csm", required: false },
-    { title: "Kullanım ve KPI takibi", ball: "csm", required: false },
+  { code: "08", name: "Süreklilik", dependency: "previous", steps: [
+    S("Periyodik check-in toplantıları", "csm", false, "B", 20),
+    S("Kullanım ve KPI takibi", "csm", false, "B", 20),
   ]},
 ];
 
@@ -109,6 +114,21 @@ export const ADAPTATION_STEPS = [
   "AI'ın eğitilmesi",
   "İlk örneklerin birlikte yapılması",
 ];
+/** Takım başına uyarlama adımları: ilk adım bağımsız, diğerleri sıralı. */
+export const ADAPTATION_FLOW: { dependency: "previous" | "independent"; durationDays: number }[] = [
+  { dependency: "independent", durationDays: 2 }, { dependency: "previous", durationDays: 2 }, { dependency: "previous", durationDays: 3 },
+  { dependency: "previous", durationDays: 3 }, { dependency: "previous", durationDays: 3 },
+];
+
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function prevBusinessDay(iso: string) {
+  let d = new Date(iso + "T00:00:00Z");
+  do { d = new Date(d.getTime() - 86400000); } while (!isBusinessDay(d.toISOString().slice(0, 10)));
+  return d.toISOString().slice(0, 10);
+}
 
 export const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
 
@@ -128,19 +148,20 @@ export function buildFromTemplate(project: Project, users: User[], planEnds: Rec
     const end = planEnds[pt.code] ?? null;
     const phase: Phase = {
       id: uid("ph"), projectId: project.id, code: pt.code, name: pt.name, order: i,
-      status: "not_started", planStart: prevEnd, planEnd: end, baselineEnd: end,
-      actualStart: null, actualEnd: null, approvedBy: null, approvedAt: null,
+      status: "locked", planStart: prevEnd, planEnd: end, baselineEnd: end,
+      actualStart: null, actualEnd: null, approvedBy: null, approvedAt: null, dependency: pt.dependency ?? "previous", activatedAt: null,
     };
     if (end) prevEnd = end;
     phases.push(phase);
     const tpl = pt.code === "05"
-      ? project.teams.flatMap((t) => ADAPTATION_STEPS.map((s) => ({ title: `${t} — ${s}`, ball: "csm" as Ball, required: true })))
+      ? project.teams.flatMap((t) => ADAPTATION_STEPS.map((s, k): StepTpl => ({ title: `${t} — ${s}`, ball: "csm", required: true, ...ADAPTATION_FLOW[k] })))
       : pt.steps;
     tpl.forEach((st, j) => {
       steps.push({
         id: uid("st"), projectId: project.id, phaseId: phase.id, title: st.title, required: st.required,
         ownerId: ownerFor(st.ball, project.csmId, users, (st as StepTpl).ownerRole), ball: st.ball,
-        ballSince: project.createdAt, due: end, status: "pending", order: j, key: (st as StepTpl).key,
+        ballSince: project.createdAt, due: null, status: "locked", order: j, key: (st as StepTpl).key,
+        dependency: st.dependency ?? "previous", durationDays: st.durationDays ?? 2, activatedAt: null,
       });
     });
   });
@@ -194,19 +215,24 @@ export function createSeed(): RqState {
   phases[0].planStart = "2026-08-21";
   const doneCodes = ["00", "01", "02", "03", "04", "05"];
   phases.forEach((ph) => {
+    const ps = steps.filter((s) => s.phaseId === ph.id);
     if (doneCodes.includes(ph.code)) {
       ph.status = "done";
       ph.actualStart = ph.planStart;
       ph.actualEnd = ph.planEnd;
+      ph.activatedAt = (ph.planStart ?? "2026-08-21") + "T09:00:00.000Z";
       ph.approvedBy = "u_deniz";
       ph.approvedAt = (ph.planEnd ?? "2026-08-28") + "T16:00:00.000Z";
-      steps.filter((s) => s.phaseId === ph.id).forEach((s) => {
+      ps.forEach((s) => {
         s.status = s.title === "Model kurulumu" ? "out_of_scope" : "done";
+        s.activatedAt = ph.activatedAt;
+        s.due = ph.planEnd;
       });
     } else if (ph.code === "06") {
       ph.status = "late";
-      ph.actualStart = "2026-09-19";
-      const ps = steps.filter((s) => s.phaseId === ph.id);
+      ph.actualStart = "2026-09-18";
+      ph.activatedAt = "2026-09-18T09:00:00.000Z";
+      ps.forEach((s) => { s.status = "pending"; s.activatedAt = ph.activatedAt; s.ballSince = ph.activatedAt!; s.due = addBusinessDays("2026-09-18", s.durationDays); });
       ps[0].status = "in_progress";
     }
   });
@@ -231,6 +257,7 @@ export function createSeed(): RqState {
   const trainingSteps: Step[] = ["2026-09-08", "2026-09-10"].map((d, i) => ({
     id: uid("st"), projectId: pid, phaseId: phases.find((p) => p.code === "04")!.id, title: `Katılımcı girişi — ${d.split("-").reverse().join(".")} session'ı`,
     required: false, ownerId: "u_deniz", ball: "csm", ballSince: project.createdAt, due: d, status: "done", order: 10 + i,
+    dependency: "independent", durationDays: 2, activatedAt: d + "T09:00:00.000Z",
   }));
   steps.push(...trainingSteps);
 
@@ -246,7 +273,35 @@ export function createSeed(): RqState {
     },
   };
   const b2 = buildFromTemplate(p2, users, { "00": "2026-09-22", "01": "2026-10-02", "02": "2026-10-09", "03": "2026-10-20", "04": "2026-10-27", "05": "2026-11-05", "06": "2026-11-13", "07": "2026-11-20", "08": "2026-12-20" });
-  b2.phases.forEach((ph) => { if (ph.code === "00") { ph.status = "done"; ph.actualStart = "2026-09-18"; ph.actualEnd = "2026-09-22"; b2.steps.filter((x) => x.phaseId === ph.id).forEach((x) => { x.status = "done"; }); } if (ph.code === "01") { ph.status = "in_progress"; ph.actualStart = "2026-09-23"; } });
+  {
+    const today = localToday();
+    const ago5 = addBusinessDays(today, 0) > today ? today : today; // bugün
+    void ago5;
+    const back = (n: number) => { let d = today; for (let k = 0; k < n; k++) d = prevBusinessDay(d); return d; };
+    b2.phases.forEach((ph) => {
+      const ps = b2.steps.filter((x) => x.phaseId === ph.id);
+      if (["00", "01", "02"].includes(ph.code)) {
+        ph.status = "done"; ph.actualStart = ph.planStart ?? "2026-09-18"; ph.actualEnd = ph.planEnd; ph.approvedBy = "u_deniz";
+        ph.approvedAt = (ph.planEnd ?? "2026-09-22") + "T16:00:00.000Z"; ph.activatedAt = ph.actualStart + "T09:00:00.000Z";
+        ps.forEach((x) => { x.status = "done"; x.activatedAt = ph.activatedAt; x.due = ph.planEnd; });
+      }
+      if (ph.code === "03") {
+        const start = back(9);
+        ph.status = "in_progress"; ph.actualStart = start; ph.activatedAt = start + "T09:00:00.000Z";
+        const at = (d: string) => d + "T09:00:00.000Z";
+        const vpnReq = ps.find((x) => x.key === "vpn_req")!;
+        Object.assign(vpnReq, { status: "done", activatedAt: at(start), due: addBusinessDays(start, 3) });
+        const vpnInfo = ps.find((x) => x.key === "vpn_info")!;
+        Object.assign(vpnInfo, { status: "pending", activatedAt: new Date().toISOString(), ballSince: new Date().toISOString(), due: addBusinessDays(today, 2) });
+        const servers = ps.find((x) => x.key === "servers")!;
+        Object.assign(servers, { dependency: "independent", status: "pending", activatedAt: at(start), ballSince: at(start), due: addBusinessDays(start, 5) });
+        const model = ps.find((x) => x.key === "model_install");
+        if (model) model.status = "out_of_scope";
+      }
+      if (ph.code === "06") ph.dependency = "independent";
+    });
+    p2.installType = "onprem"; p2.llmChoice = "rabbitqa"; p2.presentationShared = true; p2.reqDocShared = true; p2.reqDocSharedAt = "2026-09-25";
+  }
   phases.push(...b2.phases);
   steps.push(...b2.steps);
   contacts.push({ id: "c_3", projectId: p2.id, name: "Burak Aydın", title: "QA Lead", email: "burak.aydin@garantibbva.com.tr", phone: "", role: "tech" as const });
@@ -306,7 +361,7 @@ export function createSeed(): RqState {
   ];
 
   return {
-    version: 5,
+    version: 6,
     template: PHASE_TEMPLATE,
     users,
     salespeople: SEED_SALESPEOPLE,
