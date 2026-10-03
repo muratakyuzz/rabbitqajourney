@@ -599,6 +599,16 @@ export function useRq() {
   return c;
 }
 
+/** Hesaplanan + elle eklenen uyarılar (bugüne göre). */
+export function useAlertViews(): AlertView[] {
+  const { state } = useRq();
+  return useMemo(() => allAlerts(state, todayISO()), [state]);
+}
+export function useComputedAlerts() {
+  const { state } = useRq();
+  return useMemo(() => computeAlerts(state, todayISO()), [state]);
+}
+
 export function projectProgress(state: RqState, projectId: string) {
   const steps = state.steps.filter((s) => s.projectId === projectId && s.status !== "out_of_scope");
   if (!steps.length) return 0;
