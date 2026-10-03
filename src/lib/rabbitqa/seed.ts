@@ -1,6 +1,6 @@
 import { addBusinessDays, isBusinessDay } from "./business-days";
 import { advanceAll } from "./flow";
-import type { Action, AiInsight, Ball, IntegrationConfig, ProjectIntegrations, UnmatchedEmail, DiscoveryQuestion, Phase, PhaseTpl, Project, RqState, Salesperson, Step, StepTpl, User } from "./types";
+import type { AuditEntry, Action, AiInsight, Ball, IntegrationConfig, ProjectIntegrations, UnmatchedEmail, DiscoveryQuestion, Phase, PhaseTpl, Project, RqState, Salesperson, Step, StepTpl, User } from "./types";
 
 export const SEED_USERS: User[] = [
   { id: "u_deniz", name: "Deniz Uzun", email: "deniz.uzun@virgosol.com", role: "csm" },
@@ -275,8 +275,6 @@ export function createSeed(): RqState {
   const b2 = buildFromTemplate(p2, users, { "00": "2026-09-22", "01": "2026-10-02", "02": "2026-10-09", "03": "2026-10-20", "04": "2026-10-27", "05": "2026-11-05", "06": "2026-11-13", "07": "2026-11-20", "08": "2026-12-20" });
   {
     const today = localToday();
-    const ago5 = addBusinessDays(today, 0) > today ? today : today; // bugün
-    void ago5;
     const back = (n: number) => { let d = today; for (let k = 0; k < n; k++) d = prevBusinessDay(d); return d; };
     b2.phases.forEach((ph) => {
       const ps = b2.steps.filter((x) => x.phaseId === ph.id);
@@ -360,7 +358,7 @@ export function createSeed(): RqState {
     { id: "ue_3", from: "ezel.saritepe@gmail.com", to: ["cs@rabbitqa.com"], cc: [], subject: "Kişisel adresimden yazıyorum", at: ago(18), excerpt: "Trade Master senaryolarını 08.10 tarihine kadar göndereceğiz.", direction: "in", status: "open", assignedProjectId: null },
   ];
 
-  return {
+  const seedState: RqState = {
     version: 6,
     template: PHASE_TEMPLATE,
     users,
@@ -418,4 +416,6 @@ export function createSeed(): RqState {
     insights,
     unmatchedEmails,
   };
+  const sysAudit = (e: Omit<AuditEntry, "id" | "at" | "userId">): AuditEntry => ({ ...e, id: uid("au"), at: new Date().toISOString(), userId: "system" });
+  return advanceAll(seedState, sysAudit);
 }
