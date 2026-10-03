@@ -70,7 +70,7 @@ docs/                        PRODUCT_SPEC, AUDIT, API_CONTRACT, INVARIANTS, RBAC
 ```
 
 ## 4. Değişmez kurallar
-Tam liste ve doğrulama yöntemleri: **`docs/INVARIANTS.md`**. Yetki matrisi: **`docs/RBAC.md`**. İhlal = PR reddi.
+Tam liste ve doğrulama yöntemleri: **`docs/INVARIANTS.md`**. Yetki matrisi: **`docs/RBAC.md`**. İhlal = gate reddi.
 En sık unutulanlar:
 - Her yazma işlemi `core/audit` üzerinden ve aynı transaction içinde audit kaydı üretir.
 - Her endpoint `authorize()` çağırır; yetki yalnızca UI'da gizlemekle sağlanmaz.
@@ -81,11 +81,11 @@ En sık unutulanlar:
 
 ## 5. Çalışma akışı (detay: `docs/WORKFLOW.md`)
 1. Her görevin planı vardır: `docs/plans/<FAZ>-<NO>-<slug>.md` (planner üretir, Murat onaylar).
-2. **Yalnızca plandaki kapsam** uygulanır. Kapsam dışı fikirler PR'da "Öneriler" altına yazılır.
+2. **Yalnızca plandaki kapsam** uygulanır. Kapsam dışı fikirler değişiklik notunda (`docs/changes/<branch>.md`) "Öneriler" altına yazılır.
 3. Branch: `feat/<faz>-<no>-<slug>`, `fix/…`, `chore/…`. `main`'e doğrudan push yok. Uzak depo: yalnızca GitHub.
 4. Conventional Commits (`feat:`, `fix:`, `test:`, `chore:`, `docs:`).
-5. PR açmadan önce: `npm run lint && npm run typecheck && npm test && npm run build`. E2E etkileniyorsa `npm run e2e`.
-6. PR şablonu eksiksiz doldurulur.
+5. Push etmeden önce: `npm run lint && npm run typecheck && npm test && npm run build`. E2E etkileniyorsa `npm run e2e`.
+6. Değişiklik notu (`docs/changes/_TEMPLATE.md`) eksiksiz doldurulur. **PR açılmaz:** branch push edilir, `/gate` branch'i inceler, main'e squash merge'ü Murat terminalden yapar.
 7. Merge koşulları: CI yeşil (**parity job dahil**) + `reviewer` ve `qa-verifier` APPROVE (+ tetiklenirse `rules-reviewer`).
 
 ## 6. Tamamlanma tanımı
@@ -99,8 +99,8 @@ En sık unutulanlar:
 
 ## 7. Ajanlara not
 - Bu repoda tek araç Claude Code'dur, ama iki rolle çalışılır (`docs/WORKFLOW.md` → "İki rol"). Rol `.claude/role` dosyasından okunur; yalnızca Murat değiştirir:
-  - **Uygulama rolü** (`echo builder > .claude/role`): planı uygular, test yazar, commit/push eder, PR açar (`/build`, `/fix`). Kendi işini onaylamaz, `/gate` çalıştırmaz, merge etmez.
+  - **Uygulama rolü** (`echo builder > .claude/role`): planı uygular, test yazar, değişiklik notunu yazar, branch'e commit/push eder (`/build`, `/fix`). Kendi işini onaylamaz, `/gate` çalıştırmaz, merge etmez.
   - **Denetim rolü** (varsayılan, `rm .claude/role`): plan üretir ve inceler (`/plan`, `/gate`, `/phase-close`); uygulama koduna yazamaz (`guard.mjs`).
 - Yazan ve denetleyen aynı sohbet olamaz: `/gate` her zaman denetim rolünde, uygulama sohbetini görmemiş yeni bir sohbette (`/clear`) çalışır.
-- Emin olmadığın iş kuralında tahmin etme; PR'da "Açık sorular"a yaz, güvenli varsayımı belirt.
+- Emin olmadığın iş kuralında tahmin etme; değişiklik notunda "Açık sorular"a yaz, güvenli varsayımı belirt.
 - Gate bulgusunu düzeltirken bulgu ID'sini commit mesajına ekle: `fix: enforce reason on status change [REV-03]`.

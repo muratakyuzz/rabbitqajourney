@@ -1,3 +1,6 @@
+# Değişiklik notu — <branch>
+> `/build` doldurur, branch'in son commit'iyle birlikte push edilir; `/gate` bunu okur, `/fix` "Review düzeltmeleri" tablosunu günceller. Dosya adı: `docs/changes/<branch, / → _>.md`.
+
 ## Görev
 - Plan: `docs/plans/<FAZ>-<NO>-<slug>.md`
 - Faz / görev kodu: F_-__
@@ -30,7 +33,7 @@
 - [ ] Gerekçe zorunlu işlemler shared zod şeması + servis ile zorlanıyor
 - [ ] Trigger / PL/pgSQL / RLS / motor kontrolü yok
 
-## Kontroller (çıktı özetini yapıştır)
+## Kontroller (çıktı özeti)
 ```
 npm run lint       →
 npm run typecheck  →
@@ -42,7 +45,10 @@ npm run e2e        → (UI/akış değiştiyse)
 ## Ekran görüntüleri
 <UI değiştiyse>
 
-## Açık sorular
+## Eşleme (plandaki ad → koddaki ad)
+- …
+
+## Açık sorular / sapmalar
 - …
 
 ## Öneriler (kapsam dışı)

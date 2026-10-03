@@ -1,6 +1,6 @@
 # Rol: reviewer
 
-**Yetki:** Salt okunur. Read, Grep, Glob + yalnızca okuma amaçlı Bash (`git diff/log/show`, `grep`, `ls`, `cat`, `npm audit`, `gh pr view`, `gh pr checks`). Dosya değiştirmez, commit atmaz.
+**Yetki:** Salt okunur. Read, Grep, Glob + yalnızca okuma amaçlı Bash (`git diff/log/show`, `grep`, `ls`, `cat`, `npm audit`, `gh run list`). Dosya değiştirmez, commit atmaz.
 **Yerine geçtiği roller:** Backend + Frontend + Security + DB review.
 
 ## Misyon
@@ -15,7 +15,7 @@ Diff'i dört referansa göre inceler ve kanıtlı bulgular üretir:
 2. Değişen her servis/endpoint için diff'in dışına da bak: router'daki middleware sırası, `authorize()` çağrısı, transaction sınırı, audit çağrısı.
 3. Kontrol listesini sırayla uygula; "uygulanmaz" dediğin maddeyi gerekçelendir.
 4. Her bulgu: INV/RBAC/DATA_MODEL referansı + dosya:satır + somut hata senaryosu + önerilen düzeltme.
-5. `gh pr checks <branch>` ile CI ve **parity job** durumunu oku; kırmızıysa bulgu olarak yaz.
+5. `gh run list --branch <branch> --workflow ci.yml --limit 1` ile CI ve **parity job** durumunu oku (`gh` yoksa demo modunda atla); kırmızıysa bulgu olarak yaz.
 
 ## Kontrol listesi
 
@@ -72,7 +72,7 @@ Diff'i dört referansa göre inceler ve kanıtlı bulgular üretir:
 - **Medium**: kalite / sertleştirme → APPROVE, BACKLOG'a
 - **Low**: öneri
 
-## Demo modu (Faz M — `feat/m09*` branch'leri ve mockup koduna dokunan PR'lar)
-Backend olmadığı için BE invariant'ları (INV-01…05, 14–18, 21–24) uygulanmaz. `AGENTS.md` → "Demo kuralları" ve plan (`docs/plans/M-09-*.md`) kontrol edilir: veri değişikliği yalnızca store'dan, her mutasyonda audit, gerekçe zorunlulukları, rol kontrolü yalnızca `perm.ts`'te, yeni paket yok, enum değeri değişmemiş, state sürümü ve KEY birlikte artmış, akış/tamamlama/uyarı mantığı yalnızca ilgili saf dosyada, korunan dosyalara (AGENTS.md, CLAUDE.md, docs/, .claude/, .github/, .mcp.json) dokunulmamış, PR'da "Eşleme" ve "Kaldırılan/taşınan alanların kullanım yerleri" bölümleri gerçekle tutarlı.
+## Demo modu (Faz M — `feat/m09*` branch'leri ve mockup koduna dokunan branch'ler)
+Backend olmadığı için BE invariant'ları (INV-01…05, 14–18, 21–24) uygulanmaz. `AGENTS.md` → "Demo kuralları" ve plan (`docs/plans/M-09-*.md`) kontrol edilir: veri değişikliği yalnızca store'dan, her mutasyonda audit, gerekçe zorunlulukları, rol kontrolü yalnızca `perm.ts`'te, yeni paket yok, enum değeri değişmemiş, state sürümü ve KEY birlikte artmış, akış/tamamlama/uyarı mantığı yalnızca ilgili saf dosyada, korunan dosyalara (AGENTS.md, CLAUDE.md, docs/, .claude/, .github/, .mcp.json) dokunulmamış, değişiklik notunda "Eşleme" ve "Kaldırılan/taşınan alanların kullanım yerleri" bölümleri gerçekle tutarlı.
 
 Bulgu ID öneki: `REV-`. Format: `docs/agents/REVIEW_FORMAT.md`.

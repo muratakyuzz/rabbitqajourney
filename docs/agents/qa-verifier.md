@@ -17,9 +17,9 @@ npm run typecheck
 npm test                 # Vitest: unit + pg-mem entegrasyon (web + api + shared)
 npm run build
 npm run e2e              # Playwright — plan E2E içeriyorsa veya UI değiştiyse
-gh pr checks <branch>    # CI: parity job'ı (gerçek PostgreSQL) sonucu
+gh run list --branch <branch> --workflow ci.yml --limit 1   # CI: parity job'ı (gerçek PostgreSQL) sonucu
 ```
-Parity job'ı lokalde koşulmaz (PostgreSQL yok); sonucu `gh pr checks` / `gh run view` ile okunur ve kanıt tablosuna yazılır. Parity job'ı bitmemişse sonuç `UNVERIFIED`.
+Parity job'ı lokalde koşulmaz (PostgreSQL yok); sonucu `gh run list` / `gh run view` ile okunur (`gh` yoksa demo modunda "okunamadı" yazılır, F1+ için `UNVERIFIED`) ve kanıt tablosuna yazılır. Parity job'ı bitmemişse sonuç `UNVERIFIED`.
 
 ## Kontroller
 1. **Kabul kriteri ↔ test:** plandaki her AC için test (dosya + test adı). Testi olmayan AC = High.
@@ -28,7 +28,7 @@ Parity job'ı lokalde koşulmaz (PostgreSQL yok); sonucu `gh pr checks` / `gh ru
 4. **RBAC kapsamı:** yeni endpoint için her rolün izinli/yasaklı testi var mı (`docs/RBAC.md`).
 5. **Sınırlar:** iş günü (Cuma→Pazartesi, resmi tatil, yılbaşı), eşik tam sınırda, Europe/Istanbul gece yarısı.
 6. **Determinizm:** sabit saat (`vi.setSystemTime`), sabit seed; E2E'de `waitForTimeout` yok. Şüpheli testi 3 kez koş.
-7. **Uygulama oturumunun iddiası vs gerçek:** PR'da "geçti" denen her şeyi kendin koş.
+7. **Uygulama oturumunun iddiası vs gerçek:** değişiklik notunda (`docs/changes/<branch>.md`) "geçti" denen her şeyi kendin koş.
 8. **Tarayıcıda gözle kontrol (Playwright MCP)** — UI değişen görevlerde:
    - `npm run dev` ile API (pg-mem + seed) ve web'i başlat (arka planda), ilgili rolle giriş yap.
    - Planın UI kabul kriterlerini ekranda tek tek uygula; her adımda `browser_snapshot`, kritik ekranlarda ekran görüntüsü.
@@ -43,7 +43,7 @@ Parity job'ı lokalde koşulmaz (PostgreSQL yok); sonucu `gh pr checks` / `gh ru
 | Komut | Exit | Özet (çıktıdan alıntı) |
 |---|---|---|
 | npm test | 0 | Test Files 31 passed (31) · Tests 214 passed (214) |
-| gh pr checks | — | parity: pass · app: pass · secrets: pass |
+| gh run list | — | parity: pass · app: pass · secrets: pass |
 
 ### Kabul kriteri ↔ test
 | AC | Test | Sonuç |

@@ -12,7 +12,7 @@ Sahiplik: testleri **uygulama oturumu** yazar; `qa-verifier` çalıştırır, e�
 | **L2c Sözleşme** | Vitest + `packages/shared` şemaları | lokal + CI | Her API yanıtı ilgili shared şemadan geçer; aynı test mock adaptörün çıktısına da uygulanır → mock ile API aynı şekli döndürür (INV-19) | `*.contract.test.ts` |
 | **L3 Bileşen** | Vitest + Testing Library (+ MSW) | lokal + CI | Formlar, gerekçe diyaloğu, rol bazlı görünürlük, boş/yükleniyor/hata durumları | `*.test.tsx` |
 | **L4 E2E** | Playwright | **lokal** (uygulama oturumu, Murat, qa-verifier) | Kritik akışlar, rol bazlı uçtan uca senaryolar, temel erişilebilirlik (axe) | `e2e/**/*.spec.ts` |
-| **L5 Parity** | Vitest (L2 seti) + PostgreSQL 17 | **CI**, her PR | L2 setinin **aynısı** gerçek PostgreSQL'de + `pg-only` migration'lar + eşzamanlılık testleri + kritik sorgu `EXPLAIN` ölçümü | `*.int.test.ts`, `*.pg.test.ts` |
+| **L5 Parity** | Vitest (L2 seti) + PostgreSQL 17 | **CI**, her branch push'u | L2 setinin **aynısı** gerçek PostgreSQL'de + `pg-only` migration'lar + eşzamanlılık testleri + kritik sorgu `EXPLAIN` ölçümü | `*.int.test.ts`, `*.pg.test.ts` |
 | **L5b Görsel karşılaştırma** | Playwright ekran görüntüsü | **yalnızca** M-06, F0-03, F0-04 ve modül bağlama görevlerinde, lokal | Dondurulmuş mockup referansı (`docs/reviews/M-06/baseline/`) ile ekran farkı; modül bağlanınca mock ve http modunda aynı ekran | — |
 | **L6 Keşif** | Playwright MCP | `/gate` ve `/phase-close` sırasında, qa-verifier | Testlerin görmediği UX/görsel sorunlar, konsol hataları, 4xx/5xx, dar ekran | — |
 

@@ -3,7 +3,7 @@
 // Bu repoda Claude Code iki ayrı oturumla çalışır (docs/WORKFLOW.md → "İki oturum"):
 //   - Denetim oturumu (varsayılan, `claude`): uygulama kodu, paket dosyaları, git geçmişi ve
 //     uzak veritabanı YASAK. Plan, review ve ADR yazar.
-//   - Uygulama oturumu (`CLAUDE_ROLE=builder claude`): kod/test yazar, commit/push eder, PR açar.
+//   - Uygulama rolü (.claude/role = builder): kod/test yazar, branch'e commit/push eder (PR yok).
 //     main'e push, force push, merge, plan/review dosyalarını değiştirme ve uzak DB YASAK.
 // Emniyet kemeridir, kusursuz sandbox değildir — ajan talimatları birincil kontroldür.
 
@@ -85,7 +85,7 @@ if (tool === "Bash") {
 
   if (ROLE === "builder") {
     if (/\bgit\b[^;&|]*\bpush\b[^;&|]*(--force\b|-f\b|--force-with-lease\b|\+\S)/.test(cmd)) block(`force push yasak.`);
-    if (/\bgit\b[^;&|]*\bpush\b[^;&|]*\b(main|master)\b/.test(cmd)) block(`main'e doğrudan push yasak; feature branch + PR kullan.`);
+    if (/\bgit\b[^;&|]*\bpush\b[^;&|]*\b(main|master)\b/.test(cmd)) block(`main'e doğrudan push yasak; feature branch'e push et, main'e merge'ü Murat yapar.`);
     if (/\bgit\b[^;&|]*\b(reset\s+--hard|clean\s+-[a-zA-Z]*f)/.test(cmd)) block(`geri alınamaz git komutu (reset --hard / clean -f).`);
     if (/\bgit\b[^;&|]*\btag\b/.test(cmd)) block(`etiketleri (ör. mockup-freeze) Murat atar.`);
   } else {

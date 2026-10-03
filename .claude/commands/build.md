@@ -1,5 +1,5 @@
 ---
-description: UYGULAMA oturumunda onaylı bir planı uygular — branch, kod, test, commit, push, PR (örn. /build docs/plans/M-09a-step-completion.md)
+description: UYGULAMA rolünde onaylı bir planı uygular — branch, kod, test, değişiklik notu, commit, push (örn. /build docs/plans/M-09a-step-completion.md)
 argument-hint: <plan dosyası yolu>
 ---
 
@@ -18,9 +18,9 @@ Plandaki branch adını kullan. Branch uzakta varsa `git fetch && git checkout <
 
 ### 3. Uygula
 "Uygulama görev metni"ni ve planın tamamını uygula. Kurallar:
-- Yalnızca plandaki kapsam. Kapsam dışı fikirler PR'da "Öneriler" altına.
-- Planda adlar tahminse koddaki gerçek adları kullan; farkı PR'da "Eşleme" altına yaz.
-- Karar gerektirmeyen varsayımları uygula ve PR'da "Açık sorular / sapmalar" altına yaz; iş kuralını etkileyen belirsizlikte **dur ve kullanıcıya sor**.
+- Yalnızca plandaki kapsam. Kapsam dışı fikirler değişiklik notunda "Öneriler" altına.
+- Planda adlar tahminse koddaki gerçek adları kullan; farkı değişiklik notunda "Eşleme" altına yaz.
+- Karar gerektirmeyen varsayımları uygula ve değişiklik notunda "Açık sorular / sapmalar" altına yaz; iş kuralını etkileyen belirsizlikte **dur ve kullanıcıya sor**.
 - Planda commit bölünmesi varsa ona uy; yoksa mantıksal parçalar halinde Conventional Commits.
 - Her kabul kriteri (negatifler dahil) için TEST_STRATEGY'deki doğru seviyede test yaz.
 - Plan, review, INVARIANTS/RBAC, ADR ve `.claude/` dosyalarını değiştirme (guard engeller). Plan yanlış/eksikse dur ve kullanıcıya söyle — plan denetim oturumunda düzeltilir.
@@ -30,10 +30,11 @@ Plandaki branch adını kullan. Branch uzakta varsa `git fetch && git checkout <
 Plandaki komutları çalıştır (yoksa: `npm run lint && npx tsc --noEmit && npm test && npm run build`; UI/akış değiştiyse varsa `npm run e2e`). Kırmızıysa düzelt. Lint hata sayısı main'deki sayıdan artmamalı (main'deki sayı: plan veya `docs/AUDIT.md`).
 Test çıktılarını (test-results/, playwright-report/, coverage/) commit etme.
 
-### 5. PR
-`git push -u origin <branch>`, sonra `gh pr create --base main` — gövde `.github/pull_request_template.md`'ye göre: Ne değişti · Eşleme · Kabul kriteri ↔ test tablosu · komut çıktı özeti · Açık sorular / sapmalar · Öneriler. `gh` yoksa veya giriş yapılmamışsa PR gövdesini kullanıcıya kod bloğunda ver, GitHub'da elle açmasını söyle.
+### 5. Değişiklik notu ve push (PR açılmaz)
+`docs/changes/_TEMPLATE.md`'yi `docs/changes/<branch, / → _>.md` olarak doldur: Ne değişti · Eşleme · Kabul kriteri ↔ test tablosu · komut çıktı özeti · Açık sorular / sapmalar · Öneriler. Uygulanmayan şablon bölümlerini sil. Son commit'e ekle (`docs: change note`), sonra `git push -u origin <branch>`.
+**PR açma** — bu projede PR kullanılmaz; `/gate` branch'i inceler, merge'ü Murat terminalden yapar.
 
 ### 6. Bitir
-Kullanıcıya: PR bağlantısı, commit listesi, komut sonuçları, açık sorular. Son satır:
+Kullanıcıya: commit listesi, komut sonuçları, açık sorular (değişiklik notunun kısa özeti). Son satır:
 "Şimdi terminalde `rm .claude/role` çalıştırın, Claude Code'da `/clear` yazın ve `/gate <branch>` çalıştırın."
 Kendi işini onaylama, `/gate` çalıştırma, merge etme.

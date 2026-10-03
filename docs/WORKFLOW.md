@@ -4,7 +4,7 @@
 | Kim | Yetki | Ne yapar | Ne yapmaz |
 |---|---|---|---|
 | **Murat** | — | Görev seçer, planı ve veri modelini onaylar, açık soruları cevaplar, oturumları başlatır, merge eder, test ortamına çıkar | — |
-| **Uygulama rolü** (`echo builder > .claude/role`) | Kod + test + commit/push + PR | `AGENTS.md`'yi okur, planı uygular (`/build`), test yazar, PR açar, gate bulgularını düzeltir (`/fix`) | Plan dışı kapsam eklemez; plan ve review dosyalarını değiştirmez; `main`'e push etmez, merge etmez, `/gate` çalıştırmaz |
+| **Uygulama rolü** (`echo builder > .claude/role`) | Kod + test + değişiklik notu + branch'e push (PR yok) | `AGENTS.md`'yi okur, planı uygular (`/build`), test yazar, değişiklik notunu yazar, branch'e push eder, gate bulgularını düzeltir (`/fix`) | Plan dışı kapsam eklemez; plan ve review dosyalarını değiştirmez; `main`'e push etmez, merge etmez, `/gate` çalıştırmaz |
 | `planner` | Read/Grep/Glob | Plan, kabul kriterleri, Uygulama görev metni; F1-00'da `DATA_MODEL.md`; faz kapanışında GO/NO-GO | Dosya yazmaz, komut çalıştırmaz |
 | `reviewer` | Salt okunur | Diff'i INVARIANTS + RBAC + DATA_MODEL + güvenlik + API/web kalitesine göre inceler; CI/parity sonucunu okur | Kod değiştirmez |
 | `qa-verifier` | Test çalıştırır + tarayıcı | Vitest/Playwright koşar, AC ↔ test eşler, parity sonucunu okur, UI'yı Playwright MCP ile gezer; **çıktısız PASS vermez** | Kaynak koda ve teste yazamaz |
@@ -35,7 +35,7 @@ Claude Code (Antigravity eklentisi veya terminal) iki rolle kullanılır. Rol `.
 |---|---|---|---|
 | Lokal geliştirme | pg-mem (+ seed, isteğe bağlı snapshot) | Murat, uygulama oturumu | `npm run dev` |
 | Otomatik testler (lokal + CI `app`) | pg-mem | uygulama oturumu, qa-verifier, CI | `npm test` |
-| CI `parity` | PostgreSQL 17 (geçici container) | CI | her PR'da otomatik |
+| CI `parity` | PostgreSQL 17 (geçici container) | CI | her branch push'unda otomatik |
 | Test ortamı | PostgreSQL 17 (kendi sunucumuz) | Murat, ekip | `main` → Docker imajları → deploy (F9-06 runbook) |
 
 ## Faz M — mockup'ın tamamlanması (demo)
@@ -46,11 +46,11 @@ Lovable ile yapılan mockup turları bitti; Lovable artık kullanılmaz. Kalan M
 
 ## Tek görevin döngüsü
 ```
- /plan F3-02 ──▶ Murat onaylar ──▶ uygulama oturumu uygular ──▶ CI (app + parity + secrets) ──▶ /gate <branch> ──▶ Merge
-  (planner)     (açık soruları     (PR açar)                                          reviewer          (Murat)
-                  cevaplar)            ▲                                               qa-verifier
-                                       │                                               [rules-reviewer]
-                                       └──────────────── düzeltme direktifi ──────────────┘
+ /plan F3-02 ──▶ Murat onaylar ──▶ /build ──▶ CI (branch push'u) ──▶ /gate <branch> ──▶ squash merge
+  (denetim)     (açık soruları   (uygulama;                         (denetim, yeni     (Murat, terminal)
+                  cevaplar)       branch'e push)                     sohbet)
+                                     ▲                                   │
+                                     └──────── /fix ◀── düzeltme direktifi ┘
 ```
 
 ### 0. (Bir kez) Veri modeli — F1-00
@@ -76,10 +76,10 @@ $ echo builder > .claude/role      # terminal
 > /clear                            # Claude Code
 > /build docs/plans/F3-02-<slug>.md
 ```
-Uygulama oturumu branch açar, planı uygular, lokal testleri koşar, push eder ve PR açar. Soru sorarsa cevapla.
+Uygulama rolü branch açar, planı uygular, lokal testleri koşar, `docs/changes/<branch>.md` değişiklik notunu yazar ve branch'i push eder. **PR açılmaz.** Soru sorarsa cevapla.
 
-### 4. CI'ı bekle
-PR açılınca `app`, `parity`, `secrets` koşar. Parity bitmeden `/gate` sonucu "DOĞRULANAMADI" olur.
+### 4. CI'ı bekle (F1'den itibaren)
+Branch push edilince GitHub Actions'ta `app`, `parity`, `secrets` koşar. `/gate` sonucu `gh` ile okur (`brew install gh && gh auth login` — F1'den önce kurulmalı). Parity bitmeden `/gate` sonucu "DOĞRULANAMADI" olur. Faz M'de (demo) CI beklenmez.
 
 ### 5. Gate (denetim rolü)
 ```
@@ -89,13 +89,21 @@ $ rm .claude/role                   # terminal
 ```
 | Genel karar | Ne yaparsın |
 |---|---|
-| MERGE'E HAZIR | Merge |
+| MERGE'E HAZIR | `/gate`'in verdiği merge komutlarını terminalde çalıştır (6. adım) |
 | DÜZELTME GEREKLİ | `echo builder > .claude/role` → `/clear` → `/fix <branch>`; sonra `rm .claude/role` → `/clear` → tekrar `/gate` |
 | BLOKE | Aynı; gerekirse `/plan` ile planı revize et |
 | DOĞRULANAMADI | Parity bitmemiş veya bir komut koşamamış — CI'ı bekle / ortamı düzelt, tekrar `/gate` |
 
-### 6. Merge
-Squash merge. `docs/reviews/` ve `docs/PHASES.md` değişikliklerini commit et.
+### 6. Merge (terminal, PR yok)
+```bash
+git add docs/reviews && git commit -m "docs(review): gate <branch>"; git push
+git checkout main && git pull
+git merge --squash <branch>
+git commit -m "feat(...): <görev>"
+git push
+git branch -D <branch> && git push origin --delete <branch>
+```
+Ardından `docs/PHASES.md`'de görevi ✅ yap ve commit'le.
 
 ### Faz sonu
 ```
@@ -118,17 +126,17 @@ Ardından docs/plans/<PLAN-DOSYASI>.md planını uygula.
 
 Kurallar:
 - Branch: feat/<faz>-<no>-<slug> (main'den)
-- Yalnızca plandaki kapsam. Kapsam dışı fikirleri PR'da "Öneriler" altına yaz.
+- Yalnızca plandaki kapsam. Kapsam dışı fikirleri değişiklik notunda "Öneriler" altına yaz.
 - Şema değişikliği: önce docs/DATA_MODEL.md'yi güncelle, sonra migrations/ altında yeni numaralı .sql.
   Migration pg-mem ve PostgreSQL'de çalışmalı; trigger/PL/pgSQL/RLS/extension yok. PostgreSQL'e özgü olan migrations/pg-only/ altına.
 - Her yazma işlemi core/audit ile aynı transaction'da; her endpoint authorize() çağırır.
 - Plandaki her kabul kriteri (negatifler dahil) için TEST_STRATEGY'deki doğru seviyede test yaz;
-  PR'da "Kabul kriteri ↔ test" tablosunu dosya + test adıyla doldur.
-- Bitirmeden önce çalıştır ve çıktı özetini PR'a yapıştır:
+  Değişiklik notunda "Kabul kriteri ↔ test" tablosunu dosya + test adıyla doldur.
+- Bitirmeden önce çalıştır ve çıktı özetini değişiklik notuna yaz:
   npm run lint && npm run typecheck && npm test && npm run build
   (UI veya akış değiştiyse: npm run e2e)
 - Test çıktılarını (test-results/, playwright-report/, coverage/) commit etme.
-- .github/pull_request_template.md'yi eksiksiz doldurarak PR aç.
+- docs/changes/_TEMPLATE.md'yi docs/changes/<branch>.md olarak doldur, commit'le, branch'i push et. PR açma.
 - Emin olmadığın iş kuralını tahmin etme; "Açık sorular"a yaz.
 ```
 
@@ -138,21 +146,21 @@ Branch: <branch>. docs/reviews/<branch>/SUMMARY.md dosyasındaki "Düzeltme dire
 - Critical ve High zorunlu; Medium'ları da yap, Low'ları yalnızca küçükse.
 - Her bulguyu ayrı commit'te düzelt, mesajına bulgu ID'sini ekle: fix: ... [REV-01]
 - "MISSING" kabul kriterleri için test yaz. Parity kırmızıysa CI logunu oku ve düzelt (pg-mem'e özel çözüm yazma).
-- Katılmadığın bulguyu düzeltme; PR'a gerekçeli yorum yaz.
-- Testleri çalıştır, PR'daki "Review düzeltmeleri" tablosunu güncelle, push et.
+- Katılmadığın bulguyu düzeltme; değişiklik notundaki tabloya gerekçesini yaz.
+- Testleri çalıştır, değişiklik notundaki "Review düzeltmeleri" tablosunu güncelle, push et.
 ```
 
 ### C) Hata / küçük iş (plansız, ≤ 50 satır)
 ```
 AGENTS.md ve docs/INVARIANTS.md'yi oku. Hata: <açıklama, adımlar, beklenen/gerçekleşen>.
-Branch: fix/<slug>. Önce hatayı yeniden üreten bir test yaz (kırmızı), sonra düzelt (yeşil). PR aç.
+Branch: fix/<slug>. Önce hatayı yeniden üreten bir test yaz (kırmızı), sonra düzelt (yeşil). Değişiklik notu yaz, push et; ardından `/gate`.
 ```
 
 ---
 
 ## Altın kurallar
 1. Plansız kod yok (şablon C hariç). DATA_MODEL'siz şema yok.
-2. `reviewer` ve `qa-verifier` hiçbir PR'da atlanmaz; parity kırmızıyken merge yok.
+2. `reviewer` ve `qa-verifier` hiçbir branch'te atlanmaz; parity kırmızıyken merge yok.
 3. Çıktısız PASS yok; referanssız bulgu yok.
 4. Denetim oturumu kod yazmaz; uygulama oturumu kendi kodunu onaylamaz ve merge etmez.
 5. Faz geçişi = `/phase-close` GO.

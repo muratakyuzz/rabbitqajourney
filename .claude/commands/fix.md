@@ -1,5 +1,5 @@
 ---
-description: UYGULAMA oturumunda /gate düzeltme direktifini uygular ve push eder (örn. /fix feat/m09a-step-completion)
+description: UYGULAMA rolünde /gate düzeltme direktifini uygular ve push eder (örn. /fix feat/m09a-step-completion)
 argument-hint: <branch>
 ---
 
@@ -15,12 +15,12 @@ Branch: **$ARGUMENTS**
 `git checkout $ARGUMENTS && git pull`.
 - Critical ve High zorunlu; Medium'ları da yap; Low'ları yalnızca küçükse.
 - Her bulguyu ayrı commit'te düzelt, mesajına bulgu ID'si: `fix: ... [REV-01]`.
-- "MISSING" kabul kriterleri için test yaz. Parity kırmızıysa CI logunu oku (`gh run view --log-failed`) ve düzelt; pg-mem'e özel çözüm yazma.
-- Katılmadığın bulguyu düzeltme; gerekçeyi PR yorumu olarak yaz (`gh pr comment`).
+- "MISSING" kabul kriterleri için test yaz. Parity kırmızıysa CI logunu oku (`gh run view --log-failed`; `gh` yoksa kullanıcıdan GitHub Actions logunu iste) ve düzelt; pg-mem'e özel çözüm yazma.
+- Katılmadığın bulguyu düzeltme; gerekçeyi değişiklik notundaki "Review düzeltmeleri" tablosuna "Düzeltilmedi — <gerekçe>" olarak yaz.
 - Review dosyalarını değiştirme.
 
 ### 3. Doğrula ve push
-Lint / tsc / test / build (planın komutları). PR açıklamasındaki "Review düzeltmeleri" tablosunu güncelle (`gh pr edit --body-file`), push et.
+Lint / tsc / test / build (planın komutları). `docs/changes/<branch, / → _>.md` → "Review düzeltmeleri" tablosunu güncelle (bulgu ID · durum · commit), commit'le, push et.
 
 ### 4. Bitir
 Kullanıcıya düzeltilen / düzeltilmeyen (gerekçeli) bulgu listesi. Son satır:
