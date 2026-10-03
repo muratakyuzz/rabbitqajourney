@@ -31,18 +31,19 @@ export function applyInstallType(s: RqState, projectId: string, type: InstallTyp
     const st = next.steps.find((x) => x.projectId === projectId && x.key === key);
     if (!st || st.status === "done") continue;
     if (type === "saas") next = setStepByKey(next, projectId, key, { status: "out_of_scope" }, mk, r);
-    else if (st.status === "out_of_scope") next = setStepByKey(next, projectId, key, { status: "pending" }, mk, r);
+    else if (st.status === "out_of_scope") next = setStepByKey(next, projectId, key, { status: "locked", due: null, activatedAt: null }, mk, r);
   }
   const saas = next.steps.find((x) => x.projectId === projectId && x.key === "saas_env");
   if (type === "saas") {
     if (saas) {
-      if (saas.status === "out_of_scope") next = setStepByKey(next, projectId, "saas_env", { status: "pending" }, mk, r);
+      if (saas.status === "out_of_scope") next = setStepByKey(next, projectId, "saas_env", { status: "locked", due: null, activatedAt: null }, mk, r);
     } else {
       const phase = next.phases.find((p) => p.projectId === projectId && p.code === "03");
       if (phase) {
         const step: Step = {
           id: uid("st"), projectId, phaseId: phase.id, title: "SaaS ortamının hazırlanması", required: true, ownerId: devopsId(next), ball: "devops",
-          ballSince: new Date().toISOString(), due: phase.planEnd, status: "pending", order: -1, key: "saas_env",
+          ballSince: new Date().toISOString(), due: null, status: "locked", order: -1, key: "saas_env",
+          dependency: "previous", durationDays: 3, activatedAt: null,
         };
         next = { ...next, steps: [...next.steps, step], audit: [...next.audit, mk({ projectId, kind: "create", entity: "step", entityId: step.id, label: `${step.title} — adım açıldı`, reason: r })] };
       }
@@ -95,7 +96,7 @@ export function applyLlmChoice(s: RqState, projectId: string, choice: LlmChoice,
   let next: RqState = { ...s, actions, audit: [...s.audit, ...audit] };
   const model = next.steps.find((x) => x.projectId === projectId && x.key === "model_install");
   if (model && model.status !== "done") {
-    if (choice === "gpu" && model.status === "out_of_scope") next = setStepByKey(next, projectId, "model_install", { status: "pending", required: true }, mk, r);
+    if (choice === "gpu" && model.status === "out_of_scope") next = setStepByKey(next, projectId, "model_install", { status: "locked", required: true, due: null, activatedAt: null }, mk, r);
     if (choice !== "gpu" && model.status !== "out_of_scope") next = setStepByKey(next, projectId, "model_install", { status: "out_of_scope" }, mk, r);
   }
   return next;
