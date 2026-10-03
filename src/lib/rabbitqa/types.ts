@@ -1,7 +1,8 @@
 export type Role = "csm" | "devops" | "care" | "manager" | "admin";
 export type Ball = "customer" | "csm" | "devops" | "care";
-export type StepStatus = "pending" | "in_progress" | "done" | "out_of_scope";
-export type PhaseStatus = "not_started" | "in_progress" | "at_risk" | "late" | "done" | "out_of_scope";
+export type StepStatus = "pending" | "in_progress" | "done" | "out_of_scope" | "locked";
+export type Dependency = "previous" | "independent";
+export type PhaseStatus = "not_started" | "in_progress" | "at_risk" | "late" | "done" | "out_of_scope" | "locked";
 export type Health = "green" | "yellow" | "red";
 export type ActionStatus = "open" | "in_progress" | "done" | "cancelled";
 export type Priority = "low" | "medium" | "high";
@@ -81,6 +82,8 @@ export interface Phase {
   actualEnd: string | null;
   approvedBy: string | null;
   approvedAt: string | null;
+  dependency: Dependency;
+  activatedAt: string | null;
 }
 
 export interface Step {
@@ -96,6 +99,9 @@ export interface Step {
   status: StepStatus;
   order: number;
   key?: string;
+  dependency: Dependency;
+  durationDays: number;
+  activatedAt: string | null;
 }
 
 export interface Action {
@@ -259,8 +265,8 @@ export interface RiskDecision {
   createdAt: string;
 }
 
-export interface StepTpl { title: string; ball: Ball; required: boolean; ownerRole?: "manager"; key?: string }
-export interface PhaseTpl { code: string; name: string; steps: StepTpl[] }
+export interface StepTpl { title: string; ball: Ball; required: boolean; ownerRole?: "manager"; key?: string; dependency: Dependency; durationDays: number }
+export interface PhaseTpl { code: string; name: string; dependency: Dependency; steps: StepTpl[] }
 
 export interface RqState {
   version: number;
