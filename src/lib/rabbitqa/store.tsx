@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { advanceAll, projectPlan } from "./flow";
+import { allAlerts, computeAlerts, type AlertView } from "./alerts";
+import { setActiveHolidays } from "./business-days";
 import { fmtDate } from "./labels";
 import { useAuth } from "@/lib/auth-context";
 import { ADAPTATION_FLOW, ADAPTATION_STEPS, DEFAULT_PROJECT_INTEGRATIONS, buildFromTemplate, createSeed, uid } from "./seed";
@@ -13,14 +15,14 @@ import type {
 import { todayISO } from "./labels";
 import { applyInstallType, applyLlmChoice, setStepByKey } from "./rules";
 
-const KEY = "rabbitqa-demo-state-v6";
+const KEY = "rabbitqa-demo-state-v7";
 
 function load(): RqState {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as RqState;
-      if (s.version === 6) return s;
+      if (s.version === 7) return s;
     }
   } catch { /* ignore */ }
   return createSeed();
@@ -62,12 +64,14 @@ interface Ctx {
   addDocument: (d: Omit<DocumentRec, "id" | "addedAt">) => void;
   addAlert: (a: Omit<Alert, "id" | "createdAt" | "status" | "resolvedAt" | "resolvedBy" | "source">) => void;
   resolveAlert: (id: string) => void;
+  snoozeAlert: (key: string, until: string, reason: string) => string | null;
+  closeAlert: (key: string, reason: string) => string | null;
   addTicket: (t: Omit<SupportTicket, "id" | "openedAt" | "resolvedAt">) => void;
   updateTicket: (id: string, patch: Partial<SupportTicket>, reason?: string) => void;
   addRisk: (r: Omit<RiskDecision, "id" | "createdAt">) => void;
   updateRisk: (id: string, patch: Partial<RiskDecision>, reason?: string) => void;
   approveGoLive: (projectId: string, reason: string) => string | null;
-  setConfig: <K extends "modules" | "questions" | "template" | "integrations">(key: K, value: RqState[K], label: string) => void;
+  setConfig: <K extends "modules" | "questions" | "template" | "integrations" | "salespeople" | "alertThresholds" | "holidays">(key: K, value: RqState[K], label: string) => void;
   testConnection: (kind: "teams" | "email", override?: IntegrationConfig) => Promise<{ ok: boolean; message: string; channels?: ChatChannel[] }>;
   disconnect: (kind: "teams" | "email") => void;
   logSecretView: (field: string) => void;
@@ -87,7 +91,7 @@ const RqContext = createContext<Ctx | null>(null);
 export function RqProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const userId = user?.id ?? "system";
-  const [state, setRaw] = useState<RqState>(load);
+  const [state, setRaw] = useState<RqState>(() => { const s = load(); setActiveHolidays(s.holidays); return s; });
   const mkRef = useRef<(e: Omit<AuditEntry, "id" | "at" | "userId">) => AuditEntry>(() => { throw new Error("mk"); });
   const flowMsgs = useRef<string[]>([]);
 
@@ -96,6 +100,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
     setRaw((s) => {
       const n = typeof u === "function" ? u(s) : u;
       if (n === s) return s;
+      if (n.holidays !== s.holidays) setActiveHolidays(n.holidays);
       const next = advanceAll(n, mkRef.current);
       flowMsgs.current = flowMessages(s, next);
       return next;
@@ -363,6 +368,30 @@ export function RqProvider({ children }: { children: ReactNode }) {
       if (key) setState((s) => setStepByKey(s, d.projectId, key, { status: "done" }, mkAudit, `Otomatik kural: ${d.name} yüklendi`));
     },
     addAlert: (a) => add<Alert>("alerts", { ...a, id: uid("al"), status: "open", source: "manual", createdAt: new Date().toISOString(), resolvedAt: null, resolvedBy: null }, `Uyarı eklendi — ${a.title}`),
+    snoozeAlert: (key, until, reason) => {
+      if (!reason.trim()) return "Gerekçe zorunlu";
+      if (!until || until <= todayISO()) return "Erteleme tarihi bugünden sonra olmalı";
+      const v = allAlerts(state, todayISO()).find((a) => a.key === key);
+      if (!v) return "Uyarı bulunamadı";
+      setState((s) => ({
+        ...s,
+        alertStates: [...s.alertStates.filter((x) => x.key !== key), { key, status: "snoozed", snoozedUntil: until, reason: reason.trim(), by: userId, at: new Date().toISOString() }],
+        audit: [...s.audit, mkAudit({ projectId: v.projectId, kind: "update", entity: "alert", entityId: key, label: `Uyarı ertelendi — ${v.title}`, field: "status", oldValue: v.status, newValue: `snoozed (${until.split("-").reverse().join(".")})`, reason: reason.trim() })],
+      }));
+      return null;
+    },
+    closeAlert: (key, reason) => {
+      if (!reason.trim()) return "Gerekçe zorunlu";
+      const v = allAlerts(state, todayISO()).find((a) => a.key === key);
+      if (!v) return "Uyarı bulunamadı";
+      setState((s) => ({
+        ...s,
+        alerts: v.manual ? s.alerts.map((a) => (a.id === v.entityId ? { ...a, status: "resolved" as const, resolvedAt: new Date().toISOString(), resolvedBy: userId } : a)) : s.alerts,
+        alertStates: [...s.alertStates.filter((x) => x.key !== key), { key, status: "closed", snoozedUntil: null, reason: reason.trim(), by: userId, at: new Date().toISOString() }],
+        audit: [...s.audit, mkAudit({ projectId: v.projectId, kind: "update", entity: "alert", entityId: key, label: `Uyarı kapatıldı — ${v.title}`, field: "status", oldValue: v.status, newValue: "closed", reason: reason.trim() })],
+      }));
+      return null;
+    },
     resolveAlert: (id) => patch<Alert>("alerts", id, { status: "resolved", resolvedAt: new Date().toISOString(), resolvedBy: userId }),
     addTicket: (t) => {
       add<SupportTicket>("tickets", { ...t, id: uid("tk"), openedAt: new Date().toISOString(), resolvedAt: null }, `Destek kaydı açıldı — ${t.title}`);
