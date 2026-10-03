@@ -1,39 +1,51 @@
-# Geliştirme Akışı — Claude denetiminde Codex ile
+# Geliştirme Akışı — Claude Code: uygulama oturumu + denetim oturumu
 
 ## Kim ne yapar?
 | Kim | Yetki | Ne yapar | Ne yapmaz |
 |---|---|---|---|
-| **Murat** | — | Görev seçer, planı ve veri modelini onaylar, açık soruları cevaplar, Codex'e direktif verir, merge eder, test ortamına çıkar | — |
-| **Codex** | Tam (repo) | `AGENTS.md`'yi okur, planı uygular, test yazar, PR açar, bulguları düzeltir | Plan dışı kapsam eklemez |
-| `planner` | Read/Grep/Glob | Plan, kabul kriterleri, Codex görev metni; F1-00'da `DATA_MODEL.md`; faz kapanışında GO/NO-GO | Dosya yazmaz, komut çalıştırmaz |
+| **Murat** | — | Görev seçer, planı ve veri modelini onaylar, açık soruları cevaplar, oturumları başlatır, merge eder, test ortamına çıkar | — |
+| **Uygulama oturumu** (`CLAUDE_ROLE=builder claude`) | Kod + test + commit/push + PR | `AGENTS.md`'yi okur, planı uygular (`/build`), test yazar, PR açar, gate bulgularını düzeltir (`/fix`) | Plan dışı kapsam eklemez; plan ve review dosyalarını değiştirmez; `main`'e push etmez, merge etmez, `/gate` çalıştırmaz |
+| `planner` | Read/Grep/Glob | Plan, kabul kriterleri, Uygulama görev metni; F1-00'da `DATA_MODEL.md`; faz kapanışında GO/NO-GO | Dosya yazmaz, komut çalıştırmaz |
 | `reviewer` | Salt okunur | Diff'i INVARIANTS + RBAC + DATA_MODEL + güvenlik + API/web kalitesine göre inceler; CI/parity sonucunu okur | Kod değiştirmez |
 | `qa-verifier` | Test çalıştırır + tarayıcı | Vitest/Playwright koşar, AC ↔ test eşler, parity sonucunu okur, UI'yı Playwright MCP ile gezer; **çıktısız PASS vermez** | Kaynak koda ve teste yazamaz |
 | `rules-reviewer` | Salt okunur | Kurallar, audit, iş günü/uyarılar, erişim bilgisi, rapor görünürlüğü, transaction/kilit için karar tablosu | Kod değiştirmez |
 
 Neden bu yapı:
-- **Yazan ≠ denetleyen:** Codex yazar, Claude denetler.
+- **Yazan ≠ denetleyen:** aynı araç (Claude Code), ama iki ayrı oturum. Uygulama oturumu yazar; `/gate` uygulamanın bağlamını hiç görmemiş, yeni açılmış bir denetim oturumunda çalışır ve kodu yalnızca diff + testler + tarayıcı üzerinden değerlendirir.
 - **Persona değil işlev:** tek `reviewer` tek kontrol listesiyle (INVARIANTS + RBAC + DATA_MODEL) tutarlı ve ucuz.
 - **Kanıt zorunlu:** "testler geçti" ancak `qa-verifier`'ın komut çıktısıyla kabul edilir.
 - **pg-mem güvenli kullanılır:** lokal hız pg-mem'den, doğruluk CI'daki parity job'ından (ADR-0002).
-- **Teknik sınır:** `.claude/hooks/guard.mjs` Claude'un uygulama koduna, paket dosyalarına, git geçmişine ve uzak veritabanına dokunmasını engeller.
+- **Teknik sınır:** `.claude/hooks/guard.mjs` denetim oturumunun uygulama koduna, paket dosyalarına, git geçmişine ve uzak veritabanına dokunmasını; uygulama oturumunun `main`'e/force push etmesini, merge etmesini, plan/review dosyalarını değiştirmesini ve uzak veritabanına bağlanmasını engeller.
+
+## İki oturum
+Antigravity'de iki terminal sekmesi açık tutulur, ikisi de repo kökünde:
+
+| Sekme | Başlatma | Kullanım |
+|---|---|---|
+| **Uygulama** | `CLAUDE_ROLE=builder claude` | `/build <plan dosyası>` → kod, test, commit, PR · `/fix <branch>` → gate düzeltmeleri |
+| **Denetim** | `claude` | `/plan <görev>` · `/gate <branch>` · `/phase-close <faz>` |
+
+- Her `/gate` öncesi denetim sekmesinde `/clear` (veya oturumu kapatıp yeniden `claude`) — denetçi önceki konuşmaları taşımaz.
+- Uygulama sekmesinde her yeni görev için `/clear`.
+- İki oturum aynı klasördedir; `/gate` branch'i `.verify/` altındaki ayrı bir worktree'de incelediği için uygulama oturumunun çalışma ağacına dokunmaz.
 
 ## Ortamlar
 | Ortam | Veritabanı | Kim kullanır | Nasıl |
 |---|---|---|---|
-| Lokal geliştirme | pg-mem (+ seed, isteğe bağlı snapshot) | Murat, Codex | `npm run dev` |
-| Otomatik testler (lokal + CI `app`) | pg-mem | Codex, qa-verifier, CI | `npm test` |
+| Lokal geliştirme | pg-mem (+ seed, isteğe bağlı snapshot) | Murat, uygulama oturumu | `npm run dev` |
+| Otomatik testler (lokal + CI `app`) | pg-mem | uygulama oturumu, qa-verifier, CI | `npm test` |
 | CI `parity` | PostgreSQL 17 (geçici container) | CI | her PR'da otomatik |
 | Test ortamı | PostgreSQL 17 (kendi sunucumuz) | Murat, ekip | `main` → Docker imajları → deploy (F9-06 runbook) |
 
 ## Faz M — mockup'ın tamamlanması (demo)
 Lovable ile yapılan mockup turları bitti; Lovable artık kullanılmaz. Kalan M-09a/b/c ve M-06 aşağıdaki döngünün aynısıyla yapılır; farkları:
-- Plan hazır: `docs/plans/M-09-step-completion-workspaces.md` (§0 Bağlam + görev metni Codex'e verilir; `/plan` gerekmez).
+- Plan hazır: `docs/plans/M-09-step-completion-workspaces.md` (alt görev planları `/plan M-09a` vb. ile üretilir, uygulama sekmesinde `/build` ile uygulanır).
 - `/gate feat/m09…` reviewer ve qa-verifier'ı **demo modunda** çalıştırır (`AGENTS.md` → Demo kuralları; parity yok).
 - M-09c merge edildikten sonra `/phase-close M` → görsel referans + `mockup-freeze` etiketi → F0 başlar.
 
 ## Tek görevin döngüsü
 ```
- /plan F3-02 ──▶ Murat onaylar ──▶ Codex uygular ──▶ CI (app + parity + secrets) ──▶ /gate <branch> ──▶ Merge
+ /plan F3-02 ──▶ Murat onaylar ──▶ uygulama oturumu uygular ──▶ CI (app + parity + secrets) ──▶ /gate <branch> ──▶ Merge
   (planner)     (açık soruları     (PR açar)                                          reviewer          (Murat)
                   cevaplar)            ▲                                               qa-verifier
                                        │                                               [rules-reviewer]
@@ -51,14 +63,18 @@ Lovable ile yapılan mockup turları bitti; Lovable artık kullanılmaz. Kalan M
 claude
 > /plan F3-02
 ```
-Plan `docs/plans/F3-02-<slug>.md`'ye kaydedilir; açık sorular ve Codex görev metni gösterilir.
+Plan `docs/plans/F3-02-<slug>.md`'ye kaydedilir; açık sorular ve Uygulama görev metni gösterilir.
 
 ### 2. Onayla
 Açık soruları cevapla, sonra: `git add docs && git commit -m "docs: plan F3-02" && git push`
-(Hook Claude'un commit atmasını engeller — commit'i sen atarsın.)
+(Denetim oturumu commit atamaz — commit'i sen atarsın ya da `/build` plan dosyasını branch'in ilk commit'ine ekler.)
 
-### 3. Codex uygular
-Planın "Codex görev metni"ni Codex'e yapıştır (şablon A). Codex branch açar, uygular, lokal testleri koşar, PR açar.
+### 3. Uygula (uygulama sekmesi)
+```
+CLAUDE_ROLE=builder claude
+> /build docs/plans/F3-02-<slug>.md
+```
+Uygulama oturumu branch açar, planı uygular, lokal testleri koşar, push eder ve PR açar. Soru sorarsa cevapla.
 
 ### 4. CI'ı bekle
 PR açılınca `app`, `parity`, `secrets` koşar. Parity bitmeden `/gate` sonucu "DOĞRULANAMADI" olur.
@@ -70,7 +86,7 @@ PR açılınca `app`, `parity`, `secrets` koşar. Parity bitmeden `/gate` sonucu
 | Genel karar | Ne yaparsın |
 |---|---|
 | MERGE'E HAZIR | Merge |
-| DÜZELTME GEREKLİ | Direktifi Codex'e ver (şablon B), sonra tekrar `/gate` |
+| DÜZELTME GEREKLİ | Uygulama sekmesinde `/fix <branch>`, sonra denetim sekmesinde `/clear` + tekrar `/gate` |
 | BLOKE | Aynı; gerekirse `/plan` ile planı revize et |
 | DOĞRULANAMADI | Parity bitmemiş veya bir komut koşamamış — CI'ı bekle / ortamı düzelt, tekrar `/gate` |
 
@@ -88,7 +104,8 @@ GO olmadan sonraki faza geçilmez.
 
 ---
 
-## Codex'e verilecek metin şablonları
+## Uygulama oturumu metin şablonları
+`/build` ve `/fix` komutları A ve B'yi otomatik uygular. Komut kullanmadan elle vermek gerekirse:
 
 ### A) Yeni görev
 ```
@@ -113,7 +130,7 @@ Kurallar:
 
 ### B) Gate düzeltmesi
 ```
-Branch: <branch>. docs/reviews/<branch>/SUMMARY.md dosyasındaki "Codex düzeltme direktifi"ni uygula.
+Branch: <branch>. docs/reviews/<branch>/SUMMARY.md dosyasındaki "Düzeltme direktifi"ni uygula.
 - Critical ve High zorunlu; Medium'ları da yap, Low'ları yalnızca küçükse.
 - Her bulguyu ayrı commit'te düzelt, mesajına bulgu ID'sini ekle: fix: ... [REV-01]
 - "MISSING" kabul kriterleri için test yaz. Parity kırmızıysa CI logunu oku ve düzelt (pg-mem'e özel çözüm yazma).
@@ -133,5 +150,5 @@ Branch: fix/<slug>. Önce hatayı yeniden üreten bir test yaz (kırmızı), son
 1. Plansız kod yok (şablon C hariç). DATA_MODEL'siz şema yok.
 2. `reviewer` ve `qa-verifier` hiçbir PR'da atlanmaz; parity kırmızıyken merge yok.
 3. Çıktısız PASS yok; referanssız bulgu yok.
-4. Claude kod yazmaz, Codex kendi kodunu onaylamaz.
+4. Denetim oturumu kod yazmaz; uygulama oturumu kendi kodunu onaylamaz ve merge etmez.
 5. Faz geçişi = `/phase-close` GO.

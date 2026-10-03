@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // Claude Code PreToolUse guard — RabbitQA Onboarding Tracker
-// Claude bu repoda DENETÇİDİR: uygulama kodunu Codex yazar.
-// Bu hook; ana oturum ve tüm subagent'lar için uygulama kodunu, paket dosyalarını
-// ve git geçmişini değiştiren araç çağrılarını engeller.
+// Bu repoda Claude Code iki ayrı oturumla çalışır (docs/WORKFLOW.md → "İki oturum"):
+//   - Denetim oturumu (varsayılan, `claude`): uygulama kodu, paket dosyaları, git geçmişi ve
+//     uzak veritabanı YASAK. Plan, review ve ADR yazar.
+//   - Uygulama oturumu (`CLAUDE_ROLE=builder claude`): kod/test yazar, commit/push eder, PR açar.
+//     main'e push, force push, merge, plan/review dosyalarını değiştirme ve uzak DB YASAK.
 // Emniyet kemeridir, kusursuz sandbox değildir — ajan talimatları birincil kontroldür.
-// Bilinçli istisna için: CLAUDE_ALLOW_APP_WRITES=1 claude
 
 import path from "node:path";
 
-if (process.env.CLAUDE_ALLOW_APP_WRITES === "1") process.exit(0);
+const ROLE = process.env.CLAUDE_ROLE === "builder" ? "builder" : "auditor";
 
 let raw = "";
 for await (const chunk of process.stdin) raw += chunk;
@@ -19,7 +20,8 @@ const tool = input.tool_name ?? "";
 const ti = input.tool_input ?? {};
 const root = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd();
 
-const PROTECTED = [
+// Denetim oturumunun yazamadığı yollar
+const APP_PATHS = [
   // uygulama kodu ve testler
   /^apps\//, /^packages\//, /^migrations\//, /^e2e\//,
   // mockup'ın mevcut tek paket yapısı (F0-03 monorepo'ya taşıyana kadar)
@@ -32,6 +34,15 @@ const PROTECTED = [
   /^\.env/, /^\.mcp\.json$/,
 ];
 
+// Uygulama oturumunun yazamadığı yollar (denetim çıktıları, kurallar, kit)
+const AUDIT_PATHS = [
+  /^docs\/plans\//, /^docs\/reviews\//, /^docs\/INVARIANTS\.md$/, /^docs\/RBAC\.md$/,
+  /^docs\/agents\//, /^docs\/adr\//, /^AGENTS\.md$/, /^CLAUDE\.md$/, /^\.claude\//,
+  /^\.env/, /^\.github\/workflows\//,
+];
+
+const PROTECTED = ROLE === "builder" ? AUDIT_PATHS : APP_PATHS;
+
 function rel(p) {
   if (!p) return "";
   const abs = path.isAbsolute(p) ? p : path.join(input.cwd || root, p);
@@ -42,11 +53,10 @@ function rel(p) {
 const isProtected = (p) => { const r = rel(p); return !r.startsWith("..") && PROTECTED.some((re) => re.test(r)); };
 
 function block(msg) {
-  process.stderr.write(
-    `ENGELLENDİ (guard.mjs): ${msg}\n` +
-    `Claude bu repoda denetçi rolündedir; uygulama kodunu Codex yazar. ` +
-    `Bulguyu rapora yaz ve düzeltmeyi Codex direktifine ekle.\n`
-  );
+  const hint = ROLE === "builder"
+    ? `Bu UYGULAMA oturumu. Plan/review/kural dosyaları denetim oturumunda değişir; main'e push ve merge'ü Murat yapar.`
+    : `Bu DENETİM oturumu; uygulama kodunu uygulama oturumu yazar (CLAUDE_ROLE=builder claude). Bulguyu rapora ve düzeltme direktifine yaz.`;
+  process.stderr.write(`ENGELLENDİ (guard.mjs, rol: ${ROLE}): ${msg}\n${hint}\n`);
   process.exit(2);
 }
 
@@ -61,14 +71,24 @@ if (/^(Write|Edit|MultiEdit|NotebookEdit)$/.test(tool)) {
 if (tool === "Bash") {
   const cmd = String(ti.command || "");
 
-  const GIT_WRITE = /\bgit\b(?:\s+-C\s+\S+)?\s+(commit|push|merge|rebase|reset|cherry-pick|revert|stash|checkout|switch|restore|clean|am|apply|tag|branch\s+-[dDmM])\b/;
-  if (GIT_WRITE.test(cmd)) block(`git geçmişini/çalışma ağacını değiştiren komut: "${cmd.match(GIT_WRITE)[0]}". Branch incelemek için /gate'in worktree yöntemini kullan.`);
-
-  const PKG = /\b(npm|pnpm|yarn|bun)\s+(i|install|add|remove|rm|uninstall|update|up|upgrade)\b/;
-  if (PKG.test(cmd)) block(`paket bağımlılıklarını değiştiren komut. Yalnızca "npm ci" serbest.`);
-
+  // Her iki rolde de yasak
   const REMOTE_DB = /\b(psql|pg_dump|pg_restore)\b[^|;&]*(-h|--host|postgres(ql)?:\/\/)/;
   if (REMOTE_DB.test(cmd)) block(`uzak PostgreSQL'e bağlanan komut. Test/canlı veritabanına Claude erişmez.`);
+  if (/\bgh\s+pr\s+merge\b/.test(cmd) || /\bgit\b[^;&|]*\bmerge\b[^;&|]*\b(origin\/)?main\b[^;&|]*&&[^;&|]*\bpush\b/.test(cmd))
+    block(`merge yalnızca Murat tarafından, gate sonrası yapılır.`);
+
+  if (ROLE === "builder") {
+    if (/\bgit\b[^;&|]*\bpush\b[^;&|]*(--force\b|-f\b|--force-with-lease\b|\+\S)/.test(cmd)) block(`force push yasak.`);
+    if (/\bgit\b[^;&|]*\bpush\b[^;&|]*\b(main|master)\b/.test(cmd)) block(`main'e doğrudan push yasak; feature branch + PR kullan.`);
+    if (/\bgit\b[^;&|]*\b(reset\s+--hard|clean\s+-[a-zA-Z]*f)/.test(cmd)) block(`geri alınamaz git komutu (reset --hard / clean -f).`);
+    if (/\bgit\b[^;&|]*\btag\b/.test(cmd)) block(`etiketleri (ör. mockup-freeze) Murat atar.`);
+  } else {
+    const GIT_WRITE = /\bgit\b(?:\s+-C\s+\S+)?\s+(commit|push|merge|rebase|reset|cherry-pick|revert|stash|checkout|switch|restore|clean|am|apply|tag|branch\s+-[dDmM])\b/;
+    if (GIT_WRITE.test(cmd)) block(`git geçmişini/çalışma ağacını değiştiren komut: "${cmd.match(GIT_WRITE)[0]}". Branch incelemek için /gate'in worktree yöntemini kullan.`);
+
+    const PKG = /\b(npm|pnpm|yarn|bun)\s+(i|install|add|remove|rm|uninstall|update|up|upgrade)\b/;
+    if (PKG.test(cmd)) block(`paket bağımlılıklarını değiştiren komut. Yalnızca "npm ci" serbest.`);
+  }
 
   // Yönlendirme hedefleri
   for (const m of cmd.matchAll(/(?:^|[^0-9&<>])>{1,2}\|?\s*(['"]?)([^\s'";&|<>]+)\1/g)) {

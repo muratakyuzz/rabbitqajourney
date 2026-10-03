@@ -11,7 +11,7 @@ Ajanlar dosya yazmaz; çıktıyı **yanıt olarak** döndürür. Ana oturum (`/g
 |---|---|---|---|---|---|
 | REV-01 | Critical | INV-16, RBAC | apps/api/src/modules/credentials/credentials.routes.ts:18 | `GET /projects/:id/credentials/:cid/reveal` `authorize()` çağırmıyor; Customer Care VPN şifresini okuyabilir | Route'a `authorize('credential:reveal')` ekle; care için 403 testi yaz |
 
-### Codex düzeltme direktifi
+### Düzeltme direktifi
 (Numaralı, kopyala-yapıştır hazır; her madde bulgu ID'si + dosya + beklenen davranış + eklenecek test.)
 
 ### Açık sorular / öneriler (engelleyici değil)
@@ -28,4 +28,4 @@ Ajanlar dosya yazmaz; çıktıyı **yanıt olarak** döndürür. Ana oturum (`/g
 ## Kanıt kuralı
 - `reviewer` / `rules-reviewer`: her bulgu dosya:satır içerir; referanssız bulgu geçersiz.
 - `qa-verifier`: her PASS komut çıktısı içerir; çıktısız PASS geçersiz.
-- Ajanlar kod yazmaz; düzeltmeyi Codex yapar.
+- Ajanlar kod yazmaz; düzeltmeyi uygulama oturumu yapar.

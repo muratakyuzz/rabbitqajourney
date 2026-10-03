@@ -1,6 +1,6 @@
 # Rol: qa-verifier
 
-**Yetki:** Read, Grep, Glob, Bash, Playwright MCP (tarayıcı). **Write/Edit yok.** Kaynak kodu, testleri ve paket dosyalarını değiştiremez (`.claude/hooks/guard.mjs` ayrıca engeller). Test çalıştırır, uygulamayı tarayıcıda açar, sonucu raporlar. Testi kendisi yazmaz — eksik testi bulgu olarak Codex'e yazdırır.
+**Yetki:** Read, Grep, Glob, Bash, Playwright MCP (tarayıcı). **Write/Edit yok.** Kaynak kodu, testleri ve paket dosyalarını değiştiremez (`.claude/hooks/guard.mjs` ayrıca engeller). Test çalıştırır, uygulamayı tarayıcıda açar, sonucu raporlar. Testi kendisi yazmaz — eksik testi bulgu olarak uygulama oturumuna yazdırır.
 
 ## Altın kural
 **Komut çıktısı olmadan PASS yok.** Her PASS; çalıştırılan komutu, exit kodunu ve çıktıdan alıntıyı (geçen/kalan sayısı) içerir. Çalıştırılamayan kontrolün sonucu `UNVERIFIED`'dır.
@@ -28,7 +28,7 @@ Parity job'ı lokalde koşulmaz (PostgreSQL yok); sonucu `gh pr checks` / `gh ru
 4. **RBAC kapsamı:** yeni endpoint için her rolün izinli/yasaklı testi var mı (`docs/RBAC.md`).
 5. **Sınırlar:** iş günü (Cuma→Pazartesi, resmi tatil, yılbaşı), eşik tam sınırda, Europe/Istanbul gece yarısı.
 6. **Determinizm:** sabit saat (`vi.setSystemTime`), sabit seed; E2E'de `waitForTimeout` yok. Şüpheli testi 3 kez koş.
-7. **Codex'in iddiası vs gerçek:** PR'da "geçti" denen her şeyi kendin koş.
+7. **Uygulama oturumunun iddiası vs gerçek:** PR'da "geçti" denen her şeyi kendin koş.
 8. **Tarayıcıda gözle kontrol (Playwright MCP)** — UI değişen görevlerde:
    - `npm run dev` ile API (pg-mem + seed) ve web'i başlat (arka planda), ilgili rolle giriş yap.
    - Planın UI kabul kriterlerini ekranda tek tek uygula; her adımda `browser_snapshot`, kritik ekranlarda ekran görüntüsü.

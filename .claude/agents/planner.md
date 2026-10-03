@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Salt okunur planlayıcı ve veri modelcisi. Görev planı + test edilebilir kabul kriterleri + Codex görev metni üretir; F1-00'da docs/DATA_MODEL.md'yi tasarlar; faz kapanışında GO/NO-GO verir. Kod yazılmadan önce her görevde kullan.
+description: Salt okunur planlayıcı ve veri modelcisi. Görev planı + test edilebilir kabul kriterleri + Uygulama görev metni üretir; F1-00'da docs/DATA_MODEL.md'yi tasarlar; faz kapanışında GO/NO-GO verir. Kod yazılmadan önce her görevde kullan.
 tools: Read, Grep, Glob
 model: opus
 ---

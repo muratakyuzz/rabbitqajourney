@@ -57,7 +57,7 @@
 - [x] qa-verifier (UI değişiyorsa tarayıcı kontrolü dahil)
 - [ ] rules-reviewer — <evet/hayır + gerekçe>
 
-## 12. Codex görev metni
+## 12. Uygulama görev metni
 ```
 AGENTS.md, docs/INVARIANTS.md, docs/RBAC.md, docs/DATA_MODEL.md ve docs/TEST_STRATEGY.md dosyalarını oku.
 Ardından docs/plans/<bu-dosya>.md planını uygula.
