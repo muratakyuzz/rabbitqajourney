@@ -846,7 +846,7 @@ function HistoryTab({ project }: { project: Project }) {
                     {e.a.field && (
                       <span className="text-muted-foreground"> · {FIELD_LABEL[e.a.field] ?? e.a.field}: {valueText(e.a.field, e.a.oldValue)} → <span className="text-foreground">{valueText(e.a.field, e.a.newValue)}</span></span>
                     )}
-                    {e.a.kind === "create" && !["project", "training", "credential", "document", "adaptation"].includes(e.a.entity) && <span className="text-muted-foreground"> · oluşturuldu</span>}
+                    {e.a.kind === "create" && !e.a.label.includes("açıldı") && !["project", "training", "credential", "document", "adaptation"].includes(e.a.entity) && <span className="text-muted-foreground"> · oluşturuldu</span>}
                     {e.a.reason && <p className="text-xs text-muted-foreground italic">Gerekçe: {e.a.reason}</p>}
                   </div>
                 )}
