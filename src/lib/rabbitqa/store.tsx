@@ -2,19 +2,19 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useAuth } from "@/lib/auth-context";
 import { ADAPTATION_STEPS, buildFromTemplate, createSeed, uid } from "./seed";
 import type {
-  Action, AdaptationSession, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RqState, Step, TrainingSession,
+  Action, AdaptationSession, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RiskDecision, RqState, Step, SupportTicket, TrainingSession,
 } from "./types";
 import { todayISO } from "./labels";
 import { applyInstallType, applyLlmChoice, setStepByKey } from "./rules";
 
-const KEY = "rabbitqa-demo-state-v2";
+const KEY = "rabbitqa-demo-state-v3";
 
 function load(): RqState {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as RqState;
-      if (s.version === 2) return s;
+      if (s.version === 3) return s;
     }
   } catch { /* ignore */ }
   return createSeed();
@@ -22,9 +22,10 @@ function load(): RqState {
 
 const str = (v: unknown) => (v === null || v === undefined ? "" : Array.isArray(v) ? v.join(", ") : typeof v === "object" ? JSON.stringify(v) : String(v));
 
-type Coll = "projects" | "phases" | "steps" | "actions" | "meetings" | "contacts" | "commitments" | "kpis" | "trainings" | "adaptations" | "credentials" | "documents";
+type Coll = "projects" | "phases" | "steps" | "actions" | "meetings" | "contacts" | "commitments" | "kpis" | "trainings" | "adaptations" | "credentials" | "documents" | "alerts" | "tickets" | "risks";
 const ENTITY: Record<Coll, string> = {
   projects: "project", phases: "phase", steps: "step", actions: "action", meetings: "meeting", contacts: "contact", commitments: "commitment", kpis: "kpi", trainings: "training", adaptations: "adaptation", credentials: "credential", documents: "document",
+  alerts: "alert", tickets: "ticket", risks: "risk",
 };
 
 interface Ctx {
@@ -53,6 +54,13 @@ interface Ctx {
   addCredential: (c: Omit<Credential, "id">) => void;
   logCredentialView: (id: string) => void;
   addDocument: (d: Omit<DocumentRec, "id" | "addedAt">) => void;
+  addAlert: (a: Omit<Alert, "id" | "createdAt" | "status" | "resolvedAt" | "resolvedBy" | "source">) => void;
+  resolveAlert: (id: string) => void;
+  addTicket: (t: Omit<SupportTicket, "id" | "openedAt" | "resolvedAt">) => void;
+  updateTicket: (id: string, patch: Partial<SupportTicket>, reason?: string) => void;
+  addRisk: (r: Omit<RiskDecision, "id" | "createdAt">) => void;
+  updateRisk: (id: string, patch: Partial<RiskDecision>, reason?: string) => void;
+  approveGoLive: (projectId: string, reason: string) => string | null;
   reset: () => void;
 }
 
