@@ -2,14 +2,14 @@
 
 Bu repodaki tüm kurallar `AGENTS.md` dosyasındadır — önce onu oku. (@AGENTS.md)
 
-Claude Code bu projede **iki ayrı oturumla** çalışır; rol, oturumu başlatırken verilen ortam değişkeniyle belirlenir:
+Claude Code bu projede **iki rolle** çalışır. Rol `.claude/role` dosyasından (git'e girmez) veya `CLAUDE_ROLE` ortam değişkeninden okunur; rolü yalnızca Murat terminalden değiştirir. Rol değişince Claude Code'da **yeni sohbet** (`/clear`) açılır.
 
-| Oturum | Başlatma | Ne yapar | Komutlar |
+| Rol | Terminalde | Ne yapar | Komutlar |
 |---|---|---|---|
-| **Denetim** (varsayılan) | `claude` | Plan üretir, veri modelini tasarlar, inceler, doğrular. Uygulama koduna, paket dosyalarına, git geçmişine yazamaz. | `/plan`, `/gate`, `/phase-close` |
-| **Uygulama** | `CLAUDE_ROLE=builder claude` | Onaylı planı uygular, test yazar, commit/push eder, PR açar, gate bulgularını düzeltir. `main`'e push, force push, merge ve uzak DB yasak; `docs/reviews/` ve `docs/plans/` salt okunur. | `/build`, `/fix` |
+| **Denetim** (varsayılan) | `rm .claude/role` | Plan üretir, veri modelini tasarlar, inceler, doğrular. Uygulama koduna, paket dosyalarına, git geçmişine yazamaz. | `/plan`, `/gate`, `/phase-close` |
+| **Uygulama** | `echo builder > .claude/role` | Onaylı planı uygular, test yazar, commit/push eder, PR açar, gate bulgularını düzeltir. `main`'e push, force push, merge ve uzak DB yasak; `docs/reviews/` ve `docs/plans/` salt okunur. | `/build`, `/fix` |
 
-`.claude/hooks/guard.mjs` bu sınırları zorlar. `/gate` her zaman **yeni açılmış** bir denetim oturumunda çalıştırılır (yazan ≠ denetleyen).
+`.claude/hooks/guard.mjs` bu sınırları zorlar. `/gate` her zaman denetim rolünde ve **yeni bir sohbette** çalıştırılır (yazan ≠ denetleyen).
 
 | Ajan | Yetki | Ne zaman |
 |---|---|---|
@@ -21,4 +21,4 @@ Claude Code bu projede **iki ayrı oturumla** çalışır; rol, oturumu başlat�
 Komutlar — denetim: `/plan <görev>`, `/gate <branch>`, `/phase-close <faz>` (Faz M dahil) · uygulama: `/build <plan>`, `/fix <branch>`
 Referanslar: `docs/AUDIT.md`, `docs/API_CONTRACT.md`, `docs/INVARIANTS.md`, `docs/RBAC.md`, `docs/DATA_MODEL.md`, `docs/TEST_STRATEGY.md`, `docs/WORKFLOW.md`, `docs/PHASES.md`, `docs/adr/` (0001 stack, 0002 pg-mem, 0003 AI/entegrasyon)
 
-Denetim oturumu yalnızca `docs/plans/`, `docs/reviews/`, `docs/adr/`, `docs/DATA_MODEL.md`, `docs/AUDIT.md` ve `docs/PHASES.md` dosyalarını yazar.
+Denetim rolü yalnızca `docs/plans/`, `docs/reviews/`, `docs/adr/`, `docs/DATA_MODEL.md`, `docs/AUDIT.md` ve `docs/PHASES.md` dosyalarını yazar.

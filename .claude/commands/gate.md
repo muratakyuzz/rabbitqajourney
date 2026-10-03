@@ -6,7 +6,7 @@ argument-hint: <branch>
 Hedef branch: **$ARGUMENTS**
 
 ### 0. Rol kontrolü
-`echo "${CLAUDE_ROLE:-auditor}"` → `builder` ise **dur**: "/gate uygulama oturumunda çalışmaz. Denetim sekmesinde (`claude`) `/clear` yazıp tekrar deneyin." (yazan ≠ denetleyen)
+`echo "${CLAUDE_ROLE:-$(cat .claude/role 2>/dev/null || echo auditor)}"` → `builder` ise **dur**: "/gate uygulama rolünde çalışmaz. Terminalde `rm .claude/role` çalıştırın, Claude Code'da `/clear` yazıp tekrar deneyin." (yazan ≠ denetleyen)
 
 ### 1. Hazırlık
 ```bash

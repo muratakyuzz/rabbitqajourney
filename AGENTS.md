@@ -98,9 +98,9 @@ En sık unutulanlar:
 - [ ] Gerekiyorsa ADR veya docs güncellendi
 
 ## 7. Ajanlara not
-- Bu repoda tek araç Claude Code'dur, ama iki ayrı oturumla çalışılır (`docs/WORKFLOW.md` → "İki oturum"):
-  - **Uygulama oturumu** (`CLAUDE_ROLE=builder claude`): planı uygular, test yazar, commit/push eder, PR açar (`/build`, `/fix`). Kendi işini onaylamaz, `/gate` çalıştırmaz, merge etmez.
-  - **Denetim oturumu** (`claude`): plan üretir ve inceler (`/plan`, `/gate`, `/phase-close`); uygulama koduna yazamaz (`guard.mjs`).
-- Yazan ve denetleyen aynı oturum olamaz: `/gate` her zaman uygulama oturumunun bağlamını görmemiş, yeni açılmış bir denetim oturumunda çalışır.
+- Bu repoda tek araç Claude Code'dur, ama iki rolle çalışılır (`docs/WORKFLOW.md` → "İki rol"). Rol `.claude/role` dosyasından okunur; yalnızca Murat değiştirir:
+  - **Uygulama rolü** (`echo builder > .claude/role`): planı uygular, test yazar, commit/push eder, PR açar (`/build`, `/fix`). Kendi işini onaylamaz, `/gate` çalıştırmaz, merge etmez.
+  - **Denetim rolü** (varsayılan, `rm .claude/role`): plan üretir ve inceler (`/plan`, `/gate`, `/phase-close`); uygulama koduna yazamaz (`guard.mjs`).
+- Yazan ve denetleyen aynı sohbet olamaz: `/gate` her zaman denetim rolünde, uygulama sohbetini görmemiş yeni bir sohbette (`/clear`) çalışır.
 - Emin olmadığın iş kuralında tahmin etme; PR'da "Açık sorular"a yaz, güvenli varsayımı belirt.
 - Gate bulgusunu düzeltirken bulgu ID'sini commit mesajına ekle: `fix: enforce reason on status change [REV-03]`.

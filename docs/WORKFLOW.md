@@ -4,7 +4,7 @@
 | Kim | Yetki | Ne yapar | Ne yapmaz |
 |---|---|---|---|
 | **Murat** | — | Görev seçer, planı ve veri modelini onaylar, açık soruları cevaplar, oturumları başlatır, merge eder, test ortamına çıkar | — |
-| **Uygulama oturumu** (`CLAUDE_ROLE=builder claude`) | Kod + test + commit/push + PR | `AGENTS.md`'yi okur, planı uygular (`/build`), test yazar, PR açar, gate bulgularını düzeltir (`/fix`) | Plan dışı kapsam eklemez; plan ve review dosyalarını değiştirmez; `main`'e push etmez, merge etmez, `/gate` çalıştırmaz |
+| **Uygulama rolü** (`echo builder > .claude/role`) | Kod + test + commit/push + PR | `AGENTS.md`'yi okur, planı uygular (`/build`), test yazar, PR açar, gate bulgularını düzeltir (`/fix`) | Plan dışı kapsam eklemez; plan ve review dosyalarını değiştirmez; `main`'e push etmez, merge etmez, `/gate` çalıştırmaz |
 | `planner` | Read/Grep/Glob | Plan, kabul kriterleri, Uygulama görev metni; F1-00'da `DATA_MODEL.md`; faz kapanışında GO/NO-GO | Dosya yazmaz, komut çalıştırmaz |
 | `reviewer` | Salt okunur | Diff'i INVARIANTS + RBAC + DATA_MODEL + güvenlik + API/web kalitesine göre inceler; CI/parity sonucunu okur | Kod değiştirmez |
 | `qa-verifier` | Test çalıştırır + tarayıcı | Vitest/Playwright koşar, AC ↔ test eşler, parity sonucunu okur, UI'yı Playwright MCP ile gezer; **çıktısız PASS vermez** | Kaynak koda ve teste yazamaz |
@@ -17,17 +17,18 @@ Neden bu yapı:
 - **pg-mem güvenli kullanılır:** lokal hız pg-mem'den, doğruluk CI'daki parity job'ından (ADR-0002).
 - **Teknik sınır:** `.claude/hooks/guard.mjs` denetim oturumunun uygulama koduna, paket dosyalarına, git geçmişine ve uzak veritabanına dokunmasını; uygulama oturumunun `main`'e/force push etmesini, merge etmesini, plan/review dosyalarını değiştirmesini ve uzak veritabanına bağlanmasını engeller.
 
-## İki oturum
-Antigravity'de iki terminal sekmesi açık tutulur, ikisi de repo kökünde:
+## İki rol
+Claude Code (Antigravity eklentisi veya terminal) iki rolle kullanılır. Rol `.claude/role` dosyasından okunur (git'e girmez); dosya yoksa rol **denetim**dir. Rolü yalnızca Murat, Antigravity terminalinden değiştirir:
 
-| Sekme | Başlatma | Kullanım |
-|---|---|---|
-| **Uygulama** | `CLAUDE_ROLE=builder claude` | `/build <plan dosyası>` → kod, test, commit, PR · `/fix <branch>` → gate düzeltmeleri |
-| **Denetim** | `claude` | `/plan <görev>` · `/gate <branch>` · `/phase-close <faz>` |
+| Rol | Terminalde | Claude Code'da | Komutlar |
+|---|---|---|---|
+| **Uygulama** | `echo builder > .claude/role` | `/clear` (yeni sohbet) | `/build <plan dosyası>` · `/fix <branch>` |
+| **Denetim** | `rm .claude/role` | `/clear` (yeni sohbet) | `/plan <görev>` · `/gate <branch>` · `/phase-close <faz>` |
 
-- Her `/gate` öncesi denetim sekmesinde `/clear` (veya oturumu kapatıp yeniden `claude`) — denetçi önceki konuşmaları taşımaz.
-- Uygulama sekmesinde her yeni görev için `/clear`.
-- İki oturum aynı klasördedir; `/gate` branch'i `.verify/` altındaki ayrı bir worktree'de incelediği için uygulama oturumunun çalışma ağacına dokunmaz.
+- Rol değişince **her zaman yeni sohbet** açılır; denetçi uygulama sohbetinin bağlamını taşımaz (yazan ≠ denetleyen).
+- `guard.mjs` rolü her araç çağrısında okur; denetim rolü kod yazamaz, uygulama rolü plan/review/kural dosyalarına yazamaz, main'e push ve merge edemez. Claude rol dosyasını kendisi değiştiremez.
+- Terminal kullanan için alternatif: `CLAUDE_ROLE=builder claude` (ortam değişkeni dosyadan önceliklidir).
+- `/gate` branch'i `.verify/` altındaki ayrı bir worktree'de incelediği için çalışma klasörüne dokunmaz.
 
 ## Ortamlar
 | Ortam | Veritabanı | Kim kullanır | Nasıl |
@@ -39,7 +40,7 @@ Antigravity'de iki terminal sekmesi açık tutulur, ikisi de repo kökünde:
 
 ## Faz M — mockup'ın tamamlanması (demo)
 Lovable ile yapılan mockup turları bitti; Lovable artık kullanılmaz. Kalan M-09a/b/c ve M-06 aşağıdaki döngünün aynısıyla yapılır; farkları:
-- Plan hazır: `docs/plans/M-09-step-completion-workspaces.md` (alt görev planları `/plan M-09a` vb. ile üretilir, uygulama sekmesinde `/build` ile uygulanır).
+- Plan hazır: `docs/plans/M-09-step-completion-workspaces.md` (alt görev planları `/plan M-09a` vb. ile üretilir, uygulama rolünde `/build` ile uygulanır).
 - `/gate feat/m09…` reviewer ve qa-verifier'ı **demo modunda** çalıştırır (`AGENTS.md` → Demo kuralları; parity yok).
 - M-09c merge edildikten sonra `/phase-close M` → görsel referans + `mockup-freeze` etiketi → F0 başlar.
 
@@ -69,9 +70,10 @@ Plan `docs/plans/F3-02-<slug>.md`'ye kaydedilir; açık sorular ve Uygulama gör
 Açık soruları cevapla, sonra: `git add docs && git commit -m "docs: plan F3-02" && git push`
 (Denetim oturumu commit atamaz — commit'i sen atarsın ya da `/build` plan dosyasını branch'in ilk commit'ine ekler.)
 
-### 3. Uygula (uygulama sekmesi)
+### 3. Uygula (uygulama rolü)
 ```
-CLAUDE_ROLE=builder claude
+$ echo builder > .claude/role      # terminal
+> /clear                            # Claude Code
 > /build docs/plans/F3-02-<slug>.md
 ```
 Uygulama oturumu branch açar, planı uygular, lokal testleri koşar, push eder ve PR açar. Soru sorarsa cevapla.
@@ -79,14 +81,16 @@ Uygulama oturumu branch açar, planı uygular, lokal testleri koşar, push eder 
 ### 4. CI'ı bekle
 PR açılınca `app`, `parity`, `secrets` koşar. Parity bitmeden `/gate` sonucu "DOĞRULANAMADI" olur.
 
-### 5. Gate
+### 5. Gate (denetim rolü)
 ```
+$ rm .claude/role                   # terminal
+> /clear                            # Claude Code
 > /gate feat/f3-02-phase-completion
 ```
 | Genel karar | Ne yaparsın |
 |---|---|
 | MERGE'E HAZIR | Merge |
-| DÜZELTME GEREKLİ | Uygulama sekmesinde `/fix <branch>`, sonra denetim sekmesinde `/clear` + tekrar `/gate` |
+| DÜZELTME GEREKLİ | `echo builder > .claude/role` → `/clear` → `/fix <branch>`; sonra `rm .claude/role` → `/clear` → tekrar `/gate` |
 | BLOKE | Aynı; gerekirse `/plan` ile planı revize et |
 | DOĞRULANAMADI | Parity bitmemiş veya bir komut koşamamış — CI'ı bekle / ortamı düzelt, tekrar `/gate` |
 

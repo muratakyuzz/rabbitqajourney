@@ -39,3 +39,6 @@ coverage/
 .verify/
 .data/
 .idea/
+
+# Claude Code rol bayrağı (yerel, docs/WORKFLOW.md → "İki rol")
+.claude/role

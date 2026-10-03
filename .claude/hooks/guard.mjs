@@ -8,8 +8,7 @@
 // Emniyet kemeridir, kusursuz sandbox değildir — ajan talimatları birincil kontroldür.
 
 import path from "node:path";
-
-const ROLE = process.env.CLAUDE_ROLE === "builder" ? "builder" : "auditor";
+import fs from "node:fs";
 
 let raw = "";
 for await (const chunk of process.stdin) raw += chunk;
@@ -19,6 +18,12 @@ try { input = JSON.parse(raw); } catch { process.exit(0); }
 const tool = input.tool_name ?? "";
 const ti = input.tool_input ?? {};
 const root = process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd();
+
+// Rol: CLAUDE_ROLE ortam değişkeni (terminal) veya .claude/role dosyası (IDE eklentisi).
+// Dosyayı yalnızca Murat terminalden değiştirir: `echo builder > .claude/role` / `rm .claude/role`.
+let fileRole = "";
+try { fileRole = fs.readFileSync(path.join(root, ".claude", "role"), "utf8").trim(); } catch {}
+const ROLE = (process.env.CLAUDE_ROLE || fileRole) === "builder" ? "builder" : "auditor";
 
 // Denetim oturumunun yazamadığı yollar
 const APP_PATHS = [
@@ -32,6 +37,7 @@ const APP_PATHS = [
   /^package(-lock)?\.json$/, /^bun\.lockb?$/, /^pnpm-lock\.yaml$/, /^yarn\.lock$/,
   /^tsconfig[^/]*\.json$/, /^(vite|vitest|playwright|tailwind|postcss|eslint)\.config\.[cm]?[jt]s$/,
   /^\.env/, /^\.mcp\.json$/,
+  /^\.claude\/role$/, // rolü yalnızca Murat değiştirir
 ];
 
 // Uygulama oturumunun yazamadığı yollar (denetim çıktıları, kurallar, kit)
@@ -54,8 +60,8 @@ const isProtected = (p) => { const r = rel(p); return !r.startsWith("..") && PRO
 
 function block(msg) {
   const hint = ROLE === "builder"
-    ? `Bu UYGULAMA oturumu. Plan/review/kural dosyaları denetim oturumunda değişir; main'e push ve merge'ü Murat yapar.`
-    : `Bu DENETİM oturumu; uygulama kodunu uygulama oturumu yazar (CLAUDE_ROLE=builder claude). Bulguyu rapora ve düzeltme direktifine yaz.`;
+    ? `Bu UYGULAMA oturumu (rol: .claude/role veya CLAUDE_ROLE). Plan/review/kural dosyaları denetim oturumunda değişir; main'e push ve merge'ü Murat yapar.`
+    : `Bu DENETİM oturumu; uygulama kodunu uygulama oturumu yazar (terminalde "echo builder > .claude/role", sonra yeni sohbet). Bulguyu rapora ve düzeltme direktifine yaz.`;
   process.stderr.write(`ENGELLENDİ (guard.mjs, rol: ${ROLE}): ${msg}\n${hint}\n`);
   process.exit(2);
 }

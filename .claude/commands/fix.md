@@ -6,10 +6,10 @@ argument-hint: <branch>
 Branch: **$ARGUMENTS**
 
 ### 0. Rol kontrolü
-`echo "${CLAUDE_ROLE:-auditor}"` → `builder` değilse dur; kullanıcıya `CLAUDE_ROLE=builder claude` ile yeni sekme açmasını söyle.
+`echo "${CLAUDE_ROLE:-$(cat .claude/role 2>/dev/null || echo auditor)}"` → `builder` değilse dur; kullanıcıya terminalde `echo builder > .claude/role` çalıştırıp yeni sohbet (`/clear`) açmasını söyle.
 
 ### 1. Direktifi bul
-`docs/reviews/<branch adı, / → _>/SUMMARY.md` → "Düzeltme direktifi" bölümü; ayrıntı için aynı klasördeki `reviewer.md`, `qa-verifier.md`, `rules-reviewer.md`. Dosya yoksa dur: "Önce denetim sekmesinde `/gate $ARGUMENTS` çalıştırın."
+`docs/reviews/<branch adı, / → _>/SUMMARY.md` → "Düzeltme direktifi" bölümü; ayrıntı için aynı klasördeki `reviewer.md`, `qa-verifier.md`, `rules-reviewer.md`. Dosya yoksa dur: "Önce denetim rolünde `/gate $ARGUMENTS` çalıştırın."
 
 ### 2. Uygula
 `git checkout $ARGUMENTS && git pull`.
@@ -24,4 +24,4 @@ Lint / tsc / test / build (planın komutları). PR açıklamasındaki "Review d�
 
 ### 4. Bitir
 Kullanıcıya düzeltilen / düzeltilmeyen (gerekçeli) bulgu listesi. Son satır:
-"Şimdi **denetim** sekmesinde `/clear` yazıp `/gate $ARGUMENTS` çalıştırın."
+"Şimdi terminalde `rm .claude/role` çalıştırın, Claude Code'da `/clear` yazın ve `/gate $ARGUMENTS` çalıştırın."

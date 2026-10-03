@@ -6,8 +6,8 @@ argument-hint: <plan dosyası yolu>
 Plan: **$ARGUMENTS**
 
 ### 0. Rol kontrolü
-`echo "${CLAUDE_ROLE:-auditor}"` çalıştır. Çıktı `builder` değilse **dur** ve kullanıcıya şunu söyle:
-"Bu komut uygulama oturumunda çalışır. Yeni bir terminal sekmesinde `CLAUDE_ROLE=builder claude` ile başlatıp `/build $ARGUMENTS` yazın."
+`echo "${CLAUDE_ROLE:-$(cat .claude/role 2>/dev/null || echo auditor)}"` çalıştır. Çıktı `builder` değilse **dur** ve kullanıcıya şunu söyle:
+"Bu komut uygulama rolünde çalışır. Terminalde `echo builder > .claude/role` çalıştırın, Claude Code'da yeni sohbet açın (`/clear`) ve `/build $ARGUMENTS` yazın."
 
 ### 1. Oku
 `AGENTS.md`, `docs/INVARIANTS.md`, `docs/RBAC.md`, `docs/TEST_STRATEGY.md`, plan dosyasının **tamamı** (kapsam, kabul kriterleri, kararlar, açık sorular, "Uygulama görev metni" bölümü — eski planlarda başlığı "Codex görev metni"dir, aynı şeydir). Faz M planıysa `AGENTS.md` → "Demo kuralları". F1 ve sonrasıysa `docs/DATA_MODEL.md` ve `docs/API_CONTRACT.md`.
@@ -35,5 +35,5 @@ Test çıktılarını (test-results/, playwright-report/, coverage/) commit etme
 
 ### 6. Bitir
 Kullanıcıya: PR bağlantısı, commit listesi, komut sonuçları, açık sorular. Son satır:
-"Şimdi **denetim** sekmesinde `/clear` yazıp `/gate <branch>` çalıştırın."
+"Şimdi terminalde `rm .claude/role` çalıştırın, Claude Code'da `/clear` yazın ve `/gate <branch>` çalıştırın."
 Kendi işini onaylama, `/gate` çalıştırma, merge etme.
