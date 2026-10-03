@@ -14,8 +14,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/EmptyState";
 import { HealthBadge } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
-import { activePhase, activePhaseCount, personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
-import { visibleProjects, isAllSeeing } from "@/lib/rabbitqa/perm";
+import { activePhase, activePhaseCount, personName, projectProgress, useAlertViews, useRq } from "@/lib/rabbitqa/store";
+import { visibleProjects, isAllSeeing, canCreateProject, isCsmUser } from "@/lib/rabbitqa/perm";
+import { Pill } from "@/components/rq/Badges";
 import { fmtDate, HEALTH_LABEL, todayISO } from "@/lib/rabbitqa/labels";
 import { toast } from "sonner";
 
@@ -28,6 +29,7 @@ export default function Projects() {
   const [health, setHealth] = useState("all");
   const [phase, setPhase] = useState("all");
   const [open, setOpen] = useState(false);
+  const alertViews = useAlertViews();
 
   const csms = state.users.filter((u) => u.role === "csm");
   const rows = useMemo(() => {
@@ -41,7 +43,7 @@ export default function Projects() {
       );
   }, [state, user, q, csm, health, phase]);
 
-  const canCreate = user?.role === "csm" || isAllSeeing(user);
+  const canCreate = canCreateProject(user);
 
   return (
     <div className="space-y-6">
@@ -91,6 +93,7 @@ export default function Projects() {
                 <TableHead>Aktif aşama</TableHead>
                 <TableHead className="w-44">İlerleme</TableHead>
                 <TableHead>Sağlık</TableHead>
+                <TableHead>Açık uyarı</TableHead>
                 <TableHead>Go-Live</TableHead>
               </TableRow>
             </TableHeader>
@@ -110,6 +113,12 @@ export default function Projects() {
                     </div>
                   </TableCell>
                   <TableCell><HealthBadge health={p.health} /></TableCell>
+                  <TableCell>{(() => {
+                    const open = alertViews.filter((a) => a.projectId === p.id && a.status === "open");
+                    if (!open.length) return <span className="text-xs text-muted-foreground">—</span>;
+                    const red = open.some((a) => a.level === "red");
+                    return <Link to={`/app/projects/${p.id}?tab=alerts`} onClick={(e) => e.stopPropagation()}><Pill tone={red ? "danger" : "warning"}>{open.length}</Pill></Link>;
+                  })()}</TableCell>
                   <TableCell>{fmtDate(p.goLiveDate)}</TableCell>
                 </TableRow>
               ))}
@@ -121,7 +130,7 @@ export default function Projects() {
       <NewProjectDialog
         open={open}
         onOpenChange={setOpen}
-        defaultCsm={user?.role === "csm" ? user.id : null}
+        defaultCsm={isCsmUser(user) && user ? user.id : null}
         canAssignCsm={isAllSeeing(user)}
         onCreate={(input) => {
           const id = createProject(input);
@@ -186,7 +195,7 @@ function NewProjectDialog({
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Seçilmedi</SelectItem>
-                  {state.salespeople.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  {state.salespeople.filter((s) => s.active !== false).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

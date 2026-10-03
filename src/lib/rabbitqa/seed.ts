@@ -1,4 +1,5 @@
-import { addBusinessDays, isBusinessDay } from "./business-days";
+import { TR_HOLIDAY_DEFS, addBusinessDays, isBusinessDay } from "./business-days";
+import { DEFAULT_THRESHOLDS, weekStartOf } from "./alerts";
 import { advanceAll } from "./flow";
 import type { AuditEntry, Action, AiInsight, Ball, IntegrationConfig, ProjectIntegrations, UnmatchedEmail, DiscoveryQuestion, Phase, PhaseTpl, Project, RqState, Salesperson, Step, StepTpl, User } from "./types";
 
@@ -16,8 +17,9 @@ export const SEED_MODULES = [
 ];
 
 export const SEED_SALESPEOPLE: Salesperson[] = [
-  { id: "s_1", name: "Örnek Satışçı 1" },
-  { id: "s_2", name: "Örnek Satışçı 2" },
+  { id: "s_1", name: "Örnek Satışçı 1", active: true },
+  { id: "s_2", name: "Örnek Satışçı 2", active: true },
+  { id: "s_3", name: "Örnek Satışçı 3 (ayrıldı)", active: false },
 ];
 
 export const SEED_QUESTIONS: DiscoveryQuestion[] = [
@@ -229,7 +231,7 @@ export function createSeed(): RqState {
         s.due = ph.planEnd;
       });
     } else if (ph.code === "06") {
-      ph.status = "late";
+      ph.status = "in_progress";
       ph.actualStart = "2026-09-18";
       ph.activatedAt = "2026-09-18T09:00:00.000Z";
       ps.forEach((s) => { s.status = "pending"; s.activatedAt = ph.activatedAt; s.ballSince = ph.activatedAt!; s.due = addBusinessDays("2026-09-18", s.durationDays); });
@@ -285,12 +287,13 @@ export function createSeed(): RqState {
       }
       if (ph.code === "03") {
         const start = back(9);
+        ph.planEnd = addBusinessDays(today, 2);
         ph.status = "in_progress"; ph.actualStart = start; ph.activatedAt = start + "T09:00:00.000Z";
         const at = (d: string) => d + "T09:00:00.000Z";
         const vpnReq = ps.find((x) => x.key === "vpn_req")!;
         Object.assign(vpnReq, { status: "done", activatedAt: at(start), due: addBusinessDays(start, 3) });
         const vpnInfo = ps.find((x) => x.key === "vpn_info")!;
-        Object.assign(vpnInfo, { status: "pending", activatedAt: new Date().toISOString(), ballSince: new Date().toISOString(), due: addBusinessDays(today, 2) });
+        Object.assign(vpnInfo, { status: "pending", activatedAt: new Date().toISOString(), ballSince: new Date().toISOString(), due: addBusinessDays(today, 1) });
         const servers = ps.find((x) => x.key === "servers")!;
         Object.assign(servers, { dependency: "independent", status: "pending", activatedAt: at(start), ballSince: at(start), due: addBusinessDays(start, 5) });
         const model = ps.find((x) => x.key === "model_install");
@@ -298,10 +301,36 @@ export function createSeed(): RqState {
       }
       if (ph.code === "06") ph.dependency = "independent";
     });
-    p2.installType = "onprem"; p2.llmChoice = "rabbitqa"; p2.presentationShared = true; p2.reqDocShared = true; p2.reqDocSharedAt = "2026-09-25";
+    p2.installType = "onprem"; p2.llmChoice = "rabbitqa"; p2.presentationShared = true; p2.reqDocShared = false; p2.reqDocSharedAt = null;
   }
   phases.push(...b2.phases);
   steps.push(...b2.steps);
+  meetings.push({ id: "m_3", projectId: p2.id, type: "kickoff" as const, date: "2026-09-24", internalIds: ["u_deniz"], contactIds: ["c_3"], notes: "Kick-off yapıldı.", decisions: "Kurulum tipi On-prem." });
+
+  // Üçüncü örnek proje — keşif aşamasında, uzun süredir hareketsiz
+  const p3: Project = {
+    id: "p_akbank", customerName: "Akbank Teknoloji", name: "RabbitQA Customer Onboarding", csmId: "u_deniz", salespersonId: "s_3",
+    licenseModel: "Yıllık abonelik", purchasedModules: ["TestPilot"], desiredModules: ["TestPilot"],
+    startDate: "2026-09-01", goLiveDate: "2026-12-15", health: "yellow", healthReason: "Müşteriden dönüş alınamıyor.", teams: [], discoveryAnswers: {}, teamInfo: {},
+    installType: null, llmChoice: null, presentationShared: true, reqDocShared: false, reqDocSharedAt: null, createdAt: "2026-09-01T09:00:00.000Z",
+    integrations: { chat: { provider: "teams", channelId: null, active: false, since: null }, email: { active: false, extraDomains: [], since: null } },
+  };
+  const b3 = buildFromTemplate(p3, users, { "00": "2026-09-03", "01": "2026-09-08", "02": "2026-09-15" });
+  b3.phases.forEach((ph) => {
+    const ps = b3.steps.filter((x) => x.phaseId === ph.id);
+    if (["00", "01"].includes(ph.code)) {
+      ph.status = "done"; ph.actualStart = ph.planStart; ph.actualEnd = ph.planEnd; ph.approvedBy = "u_deniz";
+      ph.approvedAt = ph.planEnd + "T16:00:00.000Z"; ph.activatedAt = ph.planStart + "T09:00:00.000Z";
+      ps.forEach((x) => { x.status = "done"; x.activatedAt = ph.activatedAt; x.due = ph.planEnd; });
+    }
+    if (ph.code === "02") {
+      ph.status = "in_progress"; ph.actualStart = "2026-09-08"; ph.activatedAt = "2026-09-08T09:00:00.000Z";
+      ps.forEach((x) => { x.status = "pending"; x.activatedAt = ph.activatedAt; x.ballSince = ph.activatedAt!; x.due = "2026-09-15"; });
+    }
+  });
+  phases.push(...b3.phases);
+  steps.push(...b3.steps);
+
   contacts.push({ id: "c_3", projectId: p2.id, name: "Burak Aydın", title: "QA Lead", email: "burak.aydin@garantibbva.com.tr", phone: "", role: "tech" as const });
 
   const step = (title: string) => steps.find((x) => x.projectId === pid && x.title.toLowerCase().includes(title.toLowerCase()) && x.status !== "done");
@@ -352,6 +381,8 @@ export function createSeed(): RqState {
   ];
   actions.push({ id: "a_ai1", projectId: pid, title: "Trade Master test kullanıcılarının açılması", ownerId: "c_2", ball: "customer" as const, due: "2026-10-01", priority: "medium" as const, status: "done" as const, source: "teams" as const, meetingId: null, createdAt: ago(110), insightId: "ai_h1" });
 
+  const todayS = localToday();
+  const plusDays = (n: number) => { const d = new Date(todayS + "T00:00:00Z"); return new Date(d.getTime() + n * 86400000).toISOString().slice(0, 10); };
   const unmatchedEmails: UnmatchedEmail[] = [
     { id: "ue_1", from: "ali.kaya@yenifirma.com", to: ["cs@rabbitqa.com"], cc: [], subject: "RabbitQA demo talebi", at: ago(6), excerpt: "Merhaba, ekibimiz için RabbitQA demosu planlamak istiyoruz.", direction: "in", status: "open", assignedProjectId: null },
     { id: "ue_2", from: "proje.ofisi@ortakholding.com", to: ["cs@rabbitqa.com", "sevcan.vural@isyatirim.com.tr", "burak.aydin@garantibbva.com.tr"], cc: [], subject: "Ortak eğitim takvimi", at: ago(12), excerpt: "İki şirket için ortak eğitim takvimini paylaşıyoruz, tamamlandı bilgisini bekliyoruz.", direction: "in", status: "open", assignedProjectId: null },
@@ -359,13 +390,13 @@ export function createSeed(): RqState {
   ];
 
   const seedState: RqState = {
-    version: 6,
+    version: 7,
     template: PHASE_TEMPLATE,
     users,
     salespeople: SEED_SALESPEOPLE,
     modules: SEED_MODULES,
     questions: SEED_QUESTIONS,
-    projects: [project, p2],
+    projects: [project, p2, p3],
     phases,
     steps,
     actions,
@@ -374,6 +405,7 @@ export function createSeed(): RqState {
     commitments,
     kpis: [
       { id: "k_1", projectId: pid, name: "Yüklenen regresyon senaryosu oranı", unit: "%", baseline: 0, target: 100, targetDate: "2026-10-02", measurements: [{ date: "2026-09-18", value: 25 }, { date: "2026-09-25", value: 40 }] },
+      { id: "k_2", projectId: p2.id, name: "Otomasyon kapsama oranı", unit: "%", baseline: 10, target: null, targetDate: null, measurements: [] },
     ],
     trainings: [
       { id: "t_1", projectId: pid, date: "2026-09-08", trainerId: "u_deniz", attendees: "Herkese Borsa ekibi (İş analistleri, PO'lar)", modules: ["TestPilot", "CaseWriter"], recordingUrl: "", notes: "", status: "done" },
@@ -384,14 +416,13 @@ export function createSeed(): RqState {
       { id: "ad_2", projectId: pid, team: "Trade Master", date: "2026-09-17", participants: "Ezel Sarıtepe", notes: "" },
     ],
     credentials: [
-      { id: "cr_1", projectId: pid, type: "VPN", provider: "FortiClient", username: "virgosol.rabbitqa", password: "Demo-Sifre-123", validUntil: "2026-10-06", note: "Örnek kayıt" },
+      { id: "cr_1", projectId: pid, type: "VPN", provider: "FortiClient", username: "virgosol.rabbitqa", password: "Demo-Sifre-123", validUntil: plusDays(5), note: "Örnek kayıt" },
     ],
     documents: [
       { id: "d_1", projectId: pid, type: "offer", name: "IsYatirim_Teklif.pdf", linkType: "project", linkId: null, addedAt: "2026-08-22T10:00:00.000Z" },
       { id: "d_2", projectId: pid, type: "contract", name: "IsYatirim_Sozlesme.pdf", linkType: "project", linkId: null, addedAt: "2026-08-25T10:00:00.000Z" },
     ],
     alerts: [
-      { id: "al_1", projectId: pid, title: "Uygulama aşaması gecikti", detail: "Plan bitiş 25.09.2026 idi, aşama hâlâ açık.", severity: "warning", status: "open", source: "rule", createdAt: "2026-09-26T08:00:00.000Z", resolvedAt: null, resolvedBy: null },
       { id: "al_2", projectId: pid, title: "Go-Live tarihi yaklaşıyor", detail: "Hedef Go-Live: 02.10.2026. Go/No-Go toplantısı planlanmadı.", severity: "critical", status: "open", source: "rule", createdAt: "2026-09-28T08:00:00.000Z", resolvedAt: null, resolvedBy: null },
     ],
     tickets: [
@@ -405,6 +436,8 @@ export function createSeed(): RqState {
     audit: [
       { id: "au_seed", projectId: project.id, at: project.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: project.id, label: "Proje oluşturuldu" },
       { id: "au_seed2", projectId: p2.id, at: p2.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: p2.id, label: "Proje oluşturuldu" },
+      { id: "au_seed3", projectId: p3.id, at: p3.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: p3.id, label: "Proje oluşturuldu" },
+      { id: "au_seed4", projectId: pid, at: "2026-10-01T10:00:00.000Z", userId: "u_deniz", kind: "update", entity: "alert", entityId: "item_late:a_2", label: "Uyarı kapatıldı — Aksiyon gecikti: Go/No-Go toplantısının planlanması", field: "status", oldValue: "open", newValue: "closed", reason: "Toplantı müşteriyle telefonda planlandı, takvim daveti bekleniyor." },
     ],
     integrations: SEED_INTEGRATIONS,
     chatChannels: [
@@ -415,6 +448,13 @@ export function createSeed(): RqState {
     ],
     insights,
     unmatchedEmails,
+    holidays: TR_HOLIDAY_DEFS.map((h) => ({ ...h })),
+    alertThresholds: { ...DEFAULT_THRESHOLDS },
+    alertStates: [
+      { key: "item_late:a_2", status: "closed", snoozedUntil: null, reason: "Toplantı müşteriyle telefonda planlandı, takvim daveti bekleniyor.", by: "u_deniz", at: "2026-10-01T10:00:00.000Z" },
+      { key: `report_not_sent:p_akbank:${weekStartOf(todayS)}`, status: "snoozed", snoozedUntil: plusDays(7), reason: "Müşteri bu hafta tatilde, rapor gelecek hafta birlikte gönderilecek.", by: "u_deniz", at: new Date().toISOString() },
+    ],
+    reportsSent: [],
   };
   const sysAudit = (e: Omit<AuditEntry, "id" | "at" | "userId">): AuditEntry => ({ ...e, id: uid("au"), at: new Date().toISOString(), userId: "system" });
   return advanceAll(seedState, sysAudit);

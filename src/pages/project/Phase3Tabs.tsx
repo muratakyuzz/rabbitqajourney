@@ -12,77 +12,110 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState } from "@/components/EmptyState";
 import { Pill, PriorityBadge } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
-import { personName, useRq } from "@/lib/rabbitqa/store";
-import { canManageProject } from "@/lib/rabbitqa/perm";
+import { personName, useAlertViews, useRq } from "@/lib/rabbitqa/store";
+import { AlertActionDialog } from "@/components/rq/AlertActionDialog";
+import type { AlertView } from "@/lib/rabbitqa/alerts";
+import { canHandleAlert, canManageProject, canManageTickets } from "@/lib/rabbitqa/perm";
 import {
-  ALERT_SEVERITY_LABEL, COMMIT_STATUS_LABEL, PRIORITY_LABEL, RISK_KIND_LABEL, RISK_STATUS_LABEL,
+  ALERT_LEVEL_LABEL, ALERT_STATE_LABEL, ALERT_TYPE_LABEL, COMMIT_STATUS_LABEL, PRIORITY_LABEL, RISK_KIND_LABEL, RISK_STATUS_LABEL,
   TICKET_STATUS_LABEL, fmtDate, fmtDateTime,
 } from "@/lib/rabbitqa/labels";
 import type {
   Alert, AlertSeverity, Priority, Project, RiskDecision, RiskKind, RiskStatus, SupportTicket, TicketStatus,
 } from "@/lib/rabbitqa/types";
 
-const sevTone: Record<AlertSeverity, "muted" | "info" | "warning" | "danger"> = { info: "info", warning: "warning", critical: "danger" };
-
 /* ── Uyarılar ───────────────────────────────────────────── */
 export function AlertsTab({ project }: { project: Project }) {
-  const { state, addAlert, resolveAlert } = useRq();
+  const { state, addAlert } = useRq();
   const { user } = useAuth();
+  const all = useAlertViews();
   const manage = canManageProject(user, project);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [detail, setDetail] = useState("");
   const [severity, setSeverity] = useState<AlertSeverity>("warning");
-  const alerts = state.alerts.filter((a) => a.projectId === project.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const [fLevel, setFLevel] = useState("all");
+  const [fType, setFType] = useState("all");
+  const [fStatus, setFStatus] = useState("open");
+  const [act, setAct] = useState<{ a: AlertView; mode: "snooze" | "close" } | null>(null);
+  const alerts = all
+    .filter((a) => a.projectId === project.id)
+    .filter((a) => (fLevel === "all" || a.level === fLevel) && (fType === "all" || a.type === fType) && (fStatus === "all" || a.status === fStatus))
+    .sort((a, b) => (a.level === b.level ? a.title.localeCompare(b.title, "tr") : a.level === "red" ? -1 : 1));
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
+      <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base">Uyarılar</CardTitle>
-        {manage && <Button size="sm" onClick={() => setOpen(true)}><BellPlus className="h-4 w-4 mr-1" />Uyarı ekle</Button>}
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={fLevel} onValueChange={setFLevel}>
+            <SelectTrigger className="w-32" aria-label="Seviye"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="all">Tüm seviyeler</SelectItem>{Object.entries(ALERT_LEVEL_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={fType} onValueChange={setFType}>
+            <SelectTrigger className="w-52" aria-label="Tip"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="all">Tüm tipler</SelectItem>{Object.entries(ALERT_TYPE_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={fStatus} onValueChange={setFStatus}>
+            <SelectTrigger className="w-36" aria-label="Durum"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="all">Tüm durumlar</SelectItem>{Object.entries(ALERT_STATE_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+          </Select>
+          {manage && <Button size="sm" onClick={() => setOpen(true)}><BellPlus className="h-4 w-4 mr-1" />Uyarı ekle</Button>}
+        </div>
       </CardHeader>
       <CardContent>
-        {alerts.length === 0 ? <EmptyState title="Uyarı yok" description="Kurallar otomatik uyarı üretir; elle de ekleyebilirsiniz." /> : (
+        {alerts.length === 0 ? <EmptyState title="Uyarı yok" description="Bu filtreye uyan uyarı bulunmuyor." /> : (
           <Table>
             <TableHeader><TableRow>
-              <TableHead>Başlık</TableHead><TableHead>Önem</TableHead><TableHead>Kaynak</TableHead><TableHead>Oluşma</TableHead><TableHead>Durum</TableHead><TableHead className="w-10" />
+              <TableHead>Başlık</TableHead><TableHead>Seviye</TableHead><TableHead>Tip</TableHead><TableHead>Sorumlu</TableHead><TableHead>Durum</TableHead><TableHead className="w-44" />
             </TableRow></TableHeader>
             <TableBody>
-              {alerts.map((a) => (
-                <TableRow key={a.id} className={a.status === "resolved" ? "opacity-60" : ""}>
-                  <TableCell>
-                    <p className="font-medium">{a.title}</p>
-                    {a.detail && <p className="text-xs text-muted-foreground">{a.detail}</p>}
-                  </TableCell>
-                  <TableCell><Pill tone={sevTone[a.severity]}>{ALERT_SEVERITY_LABEL[a.severity]}</Pill></TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{a.source === "rule" ? "Otomatik kural" : "Elle"}</TableCell>
-                  <TableCell>{fmtDateTime(a.createdAt)}</TableCell>
-                  <TableCell>
-                    {a.status === "resolved"
-                      ? <span className="text-xs text-muted-foreground">Çözüldü · {personName(state, a.resolvedBy)} · {fmtDate(a.resolvedAt)}</span>
-                      : <Pill tone="warning">Açık</Pill>}
-                  </TableCell>
-                  <TableCell>
-                    {a.status === "open" && manage && (
-                      <Button size="sm" variant="outline" onClick={() => { resolveAlert(a.id); toast.success("Uyarı çözüldü olarak işaretlendi"); }}>Çözüldü</Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {alerts.map((a) => {
+                const can = canHandleAlert(user, project, a);
+                return (
+                  <TableRow key={a.key} className={a.status !== "open" ? "opacity-60" : ""}>
+                    <TableCell>
+                      <p className="font-medium">{a.title}</p>
+                      {a.detail && <p className="text-xs text-muted-foreground">{a.detail}</p>}
+                      {a.createdAt && <p className="text-xs text-muted-foreground">{fmtDateTime(a.createdAt)}</p>}
+                    </TableCell>
+                    <TableCell><Pill tone={a.level === "red" ? "danger" : "warning"}>{ALERT_LEVEL_LABEL[a.level]}</Pill></TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{ALERT_TYPE_LABEL[a.type]}</TableCell>
+                    <TableCell className="text-sm">{personName(state, a.ownerId)}</TableCell>
+                    <TableCell>
+                      {a.status === "open" ? <Pill tone="warning">Açık</Pill> : (
+                        <span className="text-xs text-muted-foreground">
+                          {ALERT_STATE_LABEL[a.status]}{a.status === "snoozed" && a.state?.snoozedUntil ? ` · ${fmtDate(a.state.snoozedUntil)}'e kadar` : ""}
+                          {a.state && <> · {personName(state, a.state.by)}<br />“{a.state.reason}”</>}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {a.status !== "closed" && can && (
+                        <div className="flex gap-1 justify-end">
+                          {a.status === "open" && <Button size="sm" variant="outline" onClick={() => setAct({ a, mode: "snooze" })}>Ertele</Button>}
+                          <Button size="sm" variant="outline" onClick={() => setAct({ a, mode: "close" })}>Kapat</Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
       </CardContent>
+      {act && <AlertActionDialog alert={act.a} mode={act.mode} onClose={() => setAct(null)} />}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Yeni uyarı</DialogTitle></DialogHeader>
           <div className="grid gap-3">
             <div className="grid gap-2"><Label>Başlık</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
             <div className="grid gap-2"><Label>Detay</Label><Textarea value={detail} onChange={(e) => setDetail(e.target.value)} /></div>
-            <div className="grid gap-2"><Label>Önem</Label>
+            <div className="grid gap-2"><Label>Seviye</Label>
               <Select value={severity} onValueChange={(v) => setSeverity(v as AlertSeverity)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{(Object.keys(ALERT_SEVERITY_LABEL) as AlertSeverity[]).map((k) => <SelectItem key={k} value={k}>{ALERT_SEVERITY_LABEL[k]}</SelectItem>)}</SelectContent>
+                <SelectContent><SelectItem value="warning">Sarı</SelectItem><SelectItem value="critical">Kırmızı</SelectItem></SelectContent>
               </Select>
             </div>
           </div>
@@ -105,7 +138,7 @@ export function AlertsTab({ project }: { project: Project }) {
 export function TicketsTab({ project }: { project: Project }) {
   const { state, addTicket } = useRq();
   const { user } = useAuth();
-  const manage = canManageProject(user, project) || user?.role === "care";
+  const manage = canManageTickets(user, project);
   const [edit, setEdit] = useState<SupportTicket | null>(null);
   const [creating, setCreating] = useState(false);
   const tickets = state.tickets.filter((t) => t.projectId === project.id).sort((a, b) => b.openedAt.localeCompare(a.openedAt));
@@ -155,7 +188,7 @@ type TicketDraft = { title: string; description: string; module: string; priorit
 
 function TicketDialog({ project, ticket, onClose, onCreate }: { project: Project; ticket: SupportTicket | null; onClose: () => void; onCreate: (d: TicketDraft) => void }) {
   const { state, updateTicket } = useRq();
-  const [d, setD] = useState<TicketDraft>(ticket ?? { title: "", description: "", module: "", priority: "medium", status: "open", ownerId: state.users.find((u) => u.role === "care")?.id ?? null });
+  const [d, setD] = useState<TicketDraft>(ticket ?? { title: "", description: "", module: "", priority: "medium", status: "open", ownerId: state.users.find((u) => u.role === "care")?.id ?? null /* varsayılan sorumlu, yetki değil */ });
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>

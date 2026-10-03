@@ -1,4 +1,4 @@
-import { addBusinessDays, businessDaysBetween } from "./business-days";
+import { addBusinessDays, businessDaysBetween, holidayDates } from "./business-days";
 import { uid } from "./seed";
 import type { Action, AuditEntry, Phase, RqState, Step } from "./types";
 
@@ -25,6 +25,7 @@ function pass(s: RqState, projectId: string, mk: MkAudit, now: Date): RqState {
   const project = s.projects.find((p) => p.id === projectId);
   if (!project) return s;
   const audit: AuditEntry[] = [];
+  const hol = holidayDates(s.holidays);
   let changed = false;
 
   // a) aşamalar
@@ -57,7 +58,7 @@ function pass(s: RqState, projectId: string, mk: MkAudit, now: Date): RqState {
       else if (prev.status === "done") reason = `Otomatik kural: akış — önceki adım tamamlandı (${prev.title})`;
     }
     if (!reason) return;
-    const due = addBusinessDays(base, st.durationDays || 1);
+    const due = addBusinessDays(base, st.durationDays || 1, hol);
     stepUpd.set(st.id, { ...st, status: "pending", activatedAt: nowIso, ballSince: nowIso, due });
     audit.push(mk({ projectId, kind: "update", entity: "step", entityId: st.id, label: st.title, field: "status", oldValue: "locked", newValue: "pending", reason }));
     audit.push(mk({ projectId, kind: "update", entity: "step", entityId: st.id, label: st.title, field: "due", oldValue: st.due ?? "", newValue: due, reason }));
@@ -84,7 +85,7 @@ function pass(s: RqState, projectId: string, mk: MkAudit, now: Date): RqState {
     else if (ready && !open) {
       const a: Action = {
         id: uid("a"), projectId, title: `Aşama onayı bekliyor: ${ph.code} ${ph.name}`, ownerId: project.csmId, ball: "csm",
-        due: addBusinessDays(today, 2), priority: "medium", status: "open", source: "rule", meetingId: null, createdAt: nowIso, ruleKey: key,
+        due: addBusinessDays(today, 2, hol), priority: "medium", status: "open", source: "rule", meetingId: null, createdAt: nowIso, ruleKey: key,
       };
       newActions.push(a);
       audit.push(mk({ projectId, kind: "create", entity: "action", entityId: a.id, label: `${a.title} — aksiyon açıldı`, reason: "Otomatik kural: akış — zorunlu adımlar tamamlandı" }));

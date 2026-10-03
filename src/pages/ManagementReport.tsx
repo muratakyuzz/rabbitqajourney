@@ -6,18 +6,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { HealthBadge, Pill } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { isAllSeeing } from "@/lib/rabbitqa/perm";
-import { activePhase, personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
+import { activePhase, personName, projectProgress, useRq , useAlertViews } from "@/lib/rabbitqa/store";
 import { fmtDate, todayISO } from "@/lib/rabbitqa/labels";
 
 export default function ManagementReport() {
   const { user } = useAuth();
   const { state } = useRq();
+  const alertViews = useAlertViews();
   if (!isAllSeeing(user)) return <Navigate to="/app/projects" replace />;
   const today = todayISO();
   const projects = state.projects;
   const count = (h: string) => projects.filter((p) => p.health === h).length;
   const latePhases = state.phases.filter((p) => p.status !== "done" && p.status !== "out_of_scope" && p.planEnd && p.planEnd < today);
-  const critical = state.alerts.filter((a) => a.status === "open" && a.severity === "critical");
+  const critical = alertViews.filter((a) => a.status === "open" && a.level === "red");
   const openRisks = state.risks.filter((r) => r.kind === "risk" && r.status === "open");
   const openTickets = state.tickets.filter((t) => t.status !== "resolved" && t.status !== "closed");
   const team = state.users.filter((u) => ["csm", "devops", "care"].includes(u.role)).map((u) => ({
@@ -42,7 +43,7 @@ export default function ManagementReport() {
         <Kpi label="Yeşil" value={count("green")} />
         <Kpi label="Sarı" value={count("yellow")} />
         <Kpi label="Kırmızı" value={count("red")} />
-        <Kpi label="Kritik uyarı" value={critical.length} />
+        <Kpi label="Kırmızı uyarı" value={critical.length} />
         <Kpi label="Geciken aşama" value={latePhases.length} />
       </div>
 
@@ -75,10 +76,10 @@ export default function ManagementReport() {
           ))}</ul> : <p className="text-sm text-muted-foreground">Geciken aşama yok.</p>}
         </Card>
         <Card className="p-4 space-y-2">
-          <h2 className="font-semibold">Kritik uyarılar</h2>
+          <h2 className="font-semibold">Kırmızı uyarılar</h2>
           {critical.length ? <ul className="text-sm space-y-1">{critical.map((a) => (
-            <li key={a.id} className="flex gap-2 items-start"><Pill tone="danger">Kritik</Pill>{state.projects.find((p) => p.id === a.projectId)?.customerName} — {a.title}</li>
-          ))}</ul> : <p className="text-sm text-muted-foreground">Açık kritik uyarı yok.</p>}
+            <li key={a.key} className="flex gap-2 items-start"><Pill tone="danger">Kırmızı</Pill>{state.projects.find((p) => p.id === a.projectId)?.customerName} — {a.title}</li>
+          ))}</ul> : <p className="text-sm text-muted-foreground">Açık kırmızı uyarı yok.</p>}
         </Card>
       </div>
 

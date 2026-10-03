@@ -12,7 +12,7 @@ import { HealthBadge, Pill } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { isAllSeeing, visibleProjects } from "@/lib/rabbitqa/perm";
 import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
-import { activePhase, personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
+import { activePhase, personName, projectProgress, useRq , useAlertViews } from "@/lib/rabbitqa/store";
 import { BALL_LABEL, MEETING_TYPE_LABEL, ROLE_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
 
 type Item = { id: string; title: string; projectId: string; due?: string | null; late?: boolean };
@@ -28,12 +28,13 @@ export default function Overview() {
   const { state } = useRq();
   const today = todayISO();
   const weekEnd = addDays(today, 7);
+  const alertViews = useAlertViews();
   const projects = visibleProjects(state, user);
   const pids = new Set(projects.map((p) => p.id));
   const pname = (id: string) => state.projects.find((p) => p.id === id)?.customerName ?? "—";
   const openStep = (s: { status: string }) => s.status === "pending" || s.status === "in_progress";
 
-  const alerts = state.alerts.filter((a) => pids.has(a.projectId) && a.status === "open");
+  const alerts = alertViews.filter((a) => pids.has(a.projectId) && a.status === "open");
   const tickets = state.tickets.filter((t) => pids.has(t.projectId) && t.status !== "resolved" && t.status !== "closed");
   const month = today.slice(0, 7);
   const goLiveMonth = projects.filter((p) => p.goLiveDate?.startsWith(month));
@@ -74,7 +75,7 @@ export default function Overview() {
   }
 
   const feed = [
-    ...alerts.map((a) => ({ id: a.id, tone: a.severity === "critical" ? "danger" : "warning", tag: a.severity === "critical" ? "Kritik" : "Uyarı", text: a.title, projectId: a.projectId })),
+    ...alerts.map((a) => ({ id: a.key, tone: a.level === "red" ? "danger" : "warning", tag: a.level === "red" ? "Kırmızı" : "Sarı", text: a.title, projectId: a.projectId })),
     ...tickets.filter((t) => t.priority === "high").map((t) => ({ id: t.id, tone: "danger", tag: "Yüksek ticket", text: t.title, projectId: t.projectId })),
     ...lateActions.map((a) => ({ id: a.id, tone: "warning", tag: "Geciken aksiyon", text: a.title, projectId: a.projectId })),
     ...openRisks.map((r) => ({ id: r.id, tone: "info", tag: "Açık risk", text: r.title, projectId: r.projectId })),
@@ -111,7 +112,7 @@ export default function Overview() {
             <Pill tone="danger">{health("red")} Kırmızı</Pill>
           </div>
         </Card>
-        <Kpi icon={AlertTriangle} label="Açık uyarı" value={alerts.length} sub={`${alerts.filter((a) => a.severity === "critical").length} kritik`} />
+        <Kpi icon={AlertTriangle} label="Açık uyarı" value={alerts.length} sub={`${alerts.filter((a) => a.level === "red").length} kırmızı`} />
         <Kpi icon={LifeBuoy} label="Açık destek kaydı" value={tickets.length} />
         <Kpi icon={Rocket} label="Bu ay Go-Live" value={goLiveMonth.length} />
       </div>

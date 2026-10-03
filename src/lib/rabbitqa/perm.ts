@@ -1,5 +1,5 @@
 import type { AuthUser } from "@/lib/auth-api";
-import type { AiInsight, Project, RqState } from "./types";
+import type { AiInsight, ComputedAlert, Project, RqState } from "./types";
 
 export const isAllSeeing = (u: AuthUser | null) => u?.role === "manager" || u?.role === "admin";
 
@@ -40,4 +40,15 @@ export function canReviewInsight(state: RqState, u: AuthUser | null, i: AiInsigh
 export function visibleInsights(state: RqState, u: AuthUser | null) {
   const ids = new Set(visibleProjects(state, u).map((p) => p.id));
   return state.insights.filter((i) => ids.has(i.projectId));
+}
+
+export const canAccessAdmin = (u: AuthUser | null) => u?.role === "admin";
+export const canSeeManagementReport = (u: AuthUser | null) => isAllSeeing(u);
+export const canCreateProject = (u: AuthUser | null) => u?.role === "csm" || isAllSeeing(u);
+export const isCsmUser = (u: AuthUser | null) => u?.role === "csm";
+export function canManageTickets(u: AuthUser | null, p: Project) {
+  return canManageProject(u, p) || u?.role === "care";
+}
+export function canHandleAlert(u: AuthUser | null, p: Project, a: Pick<ComputedAlert, "ownerId">) {
+  return canManageProject(u, p) || (!!u && a.ownerId === u.id);
 }

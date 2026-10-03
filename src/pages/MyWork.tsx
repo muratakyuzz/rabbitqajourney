@@ -8,7 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
 import { Pill, StepStatusBadge, ActionStatusBadge } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
-import { useRq } from "@/lib/rabbitqa/store";
+import { useAlertViews, useRq } from "@/lib/rabbitqa/store";
+import { ALERT_LEVEL_LABEL } from "@/lib/rabbitqa/labels";
+import { visibleProjects } from "@/lib/rabbitqa/perm";
 import { InsightCard } from "@/components/rq/InsightCard";
 import { visibleInsights } from "@/lib/rabbitqa/perm";
 import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
@@ -37,6 +39,11 @@ export default function MyWork() {
 
   const myAi = visibleInsights(state, user).filter((i) => effectiveStatus(state, i) === "pending" && (i.proposed as { ownerId?: string }).ownerId === user?.id);
 
+  const allAlerts = useAlertViews();
+  const vis = new Set(visibleProjects(state, user).map((p) => p.id));
+  const myAlerts = allAlerts.filter((a) => a.status === "open" && a.ownerId === user?.id && (vis.has(a.projectId) || a.ownerId === user?.id))
+    .sort((a, b) => (a.level === b.level ? 0 : a.level === "red" ? -1 : 1));
+
   const groups = [
     { title: "Geciken", tone: "danger" as const, list: items.filter((i) => i.due && i.due < today) },
     { title: "Bugün", tone: "warning" as const, list: items.filter((i) => i.due === today) },
@@ -47,6 +54,22 @@ export default function MyWork() {
   return (
     <div className="space-y-6">
       <PageHeader title="Bana atananlar" subtitle="Size atanmış açık adım ve aksiyonlar" />
+      <Card>
+        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2">Uyarılarım <Pill tone={myAlerts.some((a) => a.level === "red") ? "danger" : "muted"}>{myAlerts.length}</Pill></CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {myAlerts.length === 0 && <p className="text-sm text-muted-foreground">Size ait açık uyarı yok</p>}
+          {myAlerts.slice(0, 20).map((a) => (
+            <Link key={a.key} to={`/app/projects/${a.projectId}?tab=alerts`} className="flex items-start justify-between gap-2 rounded-lg border p-3 hover:bg-accent/40">
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{a.title}</p>
+                <p className="text-xs text-muted-foreground">{state.projects.find((p) => p.id === a.projectId)?.customerName} · {a.detail}</p>
+              </div>
+              <Pill tone={a.level === "red" ? "danger" : "warning"}>{ALERT_LEVEL_LABEL[a.level]}</Pill>
+            </Link>
+          ))}
+          {myAlerts.length > 20 && <p className="text-xs text-muted-foreground">+{myAlerts.length - 20} uyarı daha — proje sayfalarındaki Uyarılar sekmesine bakın.</p>}
+        </CardContent>
+      </Card>
       {myAi.length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-base">Sahibi siz olarak önerilen AI önerileri ({myAi.length})</CardTitle></CardHeader>

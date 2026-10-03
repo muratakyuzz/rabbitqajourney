@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, FileText, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +24,8 @@ import {
   ActionStatusBadge, HealthBadge, PhaseStatusBadge, Pill, PriorityBadge, StepStatusBadge, isOverdue,
 } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
-import { personName, projectProgress, useRq } from "@/lib/rabbitqa/store";
+import { personName, projectProgress, useComputedAlerts, useRq } from "@/lib/rabbitqa/store";
+import { derivePhaseStatus } from "@/lib/rabbitqa/alerts";
 import { canEditFlow, canEditItem, canManageProject, isAllSeeing } from "@/lib/rabbitqa/perm";
 import { isActivePhase, isOpenStep, previousStep } from "@/lib/rabbitqa/flow";
 import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
@@ -81,6 +82,7 @@ function AiSourceBadge({ action }: { action: Action }) {
 
 export default function ProjectDetail() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const { state } = useRq();
   const { user } = useAuth();
   const project = state.projects.find((p) => p.id === id);
@@ -121,7 +123,7 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <Tabs defaultValue="phases">
+      <Tabs key={searchParams.get("tab") ?? "phases"} defaultValue={searchParams.get("tab") ?? "phases"}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="phases">Aşamalar ve adımlar</TabsTrigger>
           <TabsTrigger value="actions">Aksiyonlar</TabsTrigger>
@@ -228,6 +230,7 @@ function PhasesTab({ project }: { project: Project }) {
   const [editPhase, setEditPhase] = useState<Phase | null>(null);
   const activeIds = phases.filter(isActivePhase).map((p) => p.id);
   const today = todayISO();
+  const computed = useComputedAlerts();
 
   return (
     <>
@@ -244,7 +247,7 @@ function PhasesTab({ project }: { project: Project }) {
                 <div className="flex flex-1 flex-wrap items-center gap-3 text-left pr-3">
                   <span className="font-mono text-xs text-muted-foreground">{ph.code}</span>
                   <span className="font-semibold">{ph.name}</span>
-                  <PhaseStatusBadge status={ph.status} />
+                  <PhaseStatusBadge status={derivePhaseStatus(ph, computed)} />
                   {locked && (
                     <span className="text-xs text-muted-foreground font-normal">
                       {ph.dependency === "independent" ? "Bağımsız" : prevPh ? `Önceki aşama (${prevPh.code} ${prevPh.name}) tamamlanınca başlar` : ""}
@@ -413,7 +416,8 @@ function StepDialog({ step, project, onClose }: { step: Step; project: Project; 
 function PhaseDialog({ phase, onClose }: { phase: Phase; onClose: () => void }) {
   const { updatePhase } = useRq();
   const locked = phase.status === "locked";
-  const [status, setStatus] = useState<PhaseStatus>(phase.status);
+  const initialStatus: PhaseStatus = phase.status === "late" || phase.status === "at_risk" ? "in_progress" : phase.status;
+  const [status, setStatus] = useState<PhaseStatus>(initialStatus);
   const [planStart, setPlanStart] = useState(phase.planStart ?? "");
   const [planEnd, setPlanEnd] = useState(phase.planEnd ?? "");
   const [actualStart, setActualStart] = useState(phase.actualStart ?? "");
@@ -421,7 +425,9 @@ function PhaseDialog({ phase, onClose }: { phase: Phase; onClose: () => void }) 
   const statusOptions = { ...PHASE_STATUS_LABEL } as Partial<Record<PhaseStatus, string>>;
   delete statusOptions.done;
   delete statusOptions.locked;
-  const needsReason = status !== phase.status || (planEnd || null) !== phase.planEnd || (planStart || null) !== phase.planStart;
+  delete statusOptions.late;
+  delete statusOptions.at_risk;
+  const needsReason = status !== initialStatus || (planEnd || null) !== phase.planEnd || (planStart || null) !== phase.planStart;
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
@@ -454,7 +460,7 @@ function PhaseDialog({ phase, onClose }: { phase: Phase; onClose: () => void }) 
           <Button onClick={() => {
             if (needsReason && !reason.trim()) return toast.error("Gerekçe zorunlu");
             const err = updatePhase(phase.id, {
-              status, planStart: planStart || null, planEnd: planEnd || null, actualStart: actualStart || null,
+              ...(status !== initialStatus ? { status } : {}), planStart: planStart || null, planEnd: planEnd || null, actualStart: actualStart || null,
               baselineEnd: phase.baselineEnd ?? (planEnd || null),
             }, reason.trim() || undefined);
             if (err) return toast.error(err);
@@ -696,7 +702,7 @@ function HandoverTab({ project }: { project: Project }) {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>Seçilmedi</SelectItem>
-                {state.salespeople.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                {state.salespeople.filter((s) => s.active !== false || s.id === project.salespersonId).map((s) => <SelectItem key={s.id} value={s.id} disabled={s.active === false}>{s.name}{s.active === false ? " (pasif)" : ""}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
