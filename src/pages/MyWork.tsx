@@ -5,6 +5,9 @@ import { EmptyState } from "@/components/EmptyState";
 import { Pill, StepStatusBadge, ActionStatusBadge } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { useRq } from "@/lib/rabbitqa/store";
+import { InsightCard } from "@/components/rq/InsightCard";
+import { visibleInsights } from "@/lib/rabbitqa/perm";
+import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
 import { BALL_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
 
 interface Item { id: string; kind: "Adım" | "Aksiyon"; title: string; due: string | null; projectId: string; badge: React.ReactNode; ball: string }
@@ -22,6 +25,8 @@ export default function MyWork() {
       .map((a) => ({ id: a.id, kind: "Aksiyon" as const, title: a.title, due: a.due, projectId: a.projectId, badge: <ActionStatusBadge status={a.status} />, ball: BALL_LABEL[a.ball] })),
   ].sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999"));
 
+  const myAi = visibleInsights(state, user).filter((i) => effectiveStatus(state, i) === "pending" && (i.proposed as { ownerId?: string }).ownerId === user?.id);
+
   const groups = [
     { title: "Geciken", tone: "danger" as const, list: items.filter((i) => i.due && i.due < today) },
     { title: "Bugün", tone: "warning" as const, list: items.filter((i) => i.due === today) },
@@ -32,6 +37,12 @@ export default function MyWork() {
   return (
     <div className="space-y-6">
       <PageHeader title="Bana atananlar" subtitle="Size atanmış açık adım ve aksiyonlar" />
+      {myAi.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Sahibi siz olarak önerilen AI önerileri ({myAi.length})</CardTitle></CardHeader>
+          <CardContent className="space-y-3">{myAi.map((i) => <InsightCard key={i.id} insight={i} />)}</CardContent>
+        </Card>
+      )}
       {items.length === 0 ? (
         <Card><EmptyState title="Açık işiniz yok" description="Size atanmış açık adım veya aksiyon bulunmuyor." /></Card>
       ) : (
