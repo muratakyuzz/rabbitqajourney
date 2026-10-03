@@ -329,7 +329,7 @@ export function AdaptationTab({ project }: { project: Project }) {
                   {steps.map((s) => (
                     <label key={s.id} className="flex items-center justify-between gap-2 text-sm">
                       <span className="flex items-center gap-2">
-                        <Checkbox checked={s.status === "done"} disabled={!manage}
+                        <Checkbox checked={s.status === "done"} disabled={!manage || s.status === "locked"}
                           onCheckedChange={(c) => updateStep(s.id, { status: c ? "done" : "pending" }, "Uyarlama kartından güncellendi")} />
                         {s.title.replace(`${team} — `, "")}
                       </span>
