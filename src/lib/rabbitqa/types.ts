@@ -257,8 +257,12 @@ export interface RiskDecision {
   createdAt: string;
 }
 
+export interface StepTpl { title: string; ball: Ball; required: boolean; ownerRole?: "manager"; key?: string }
+export interface PhaseTpl { code: string; name: string; steps: StepTpl[] }
+
 export interface RqState {
   version: number;
+  template: PhaseTpl[];
   users: User[];
   salespeople: Salesperson[];
   modules: string[];

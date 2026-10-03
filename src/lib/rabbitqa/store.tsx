@@ -7,14 +7,14 @@ import type {
 import { todayISO } from "./labels";
 import { applyInstallType, applyLlmChoice, setStepByKey } from "./rules";
 
-const KEY = "rabbitqa-demo-state-v3";
+const KEY = "rabbitqa-demo-state-v4";
 
 function load(): RqState {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as RqState;
-      if (s.version === 3) return s;
+      if (s.version === 4) return s;
     }
   } catch { /* ignore */ }
   return createSeed();
@@ -61,6 +61,7 @@ interface Ctx {
   addRisk: (r: Omit<RiskDecision, "id" | "createdAt">) => void;
   updateRisk: (id: string, patch: Partial<RiskDecision>, reason?: string) => void;
   approveGoLive: (projectId: string, reason: string) => string | null;
+  setConfig: <K extends "modules" | "questions" | "template">(key: K, value: RqState[K], label: string) => void;
   reset: () => void;
 }
 
@@ -128,7 +129,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
         installType: null, llmChoice: null, presentationShared: false, reqDocShared: false, reqDocSharedAt: null, createdAt: new Date().toISOString(),
       };
       setState((s) => {
-        const { phases, steps } = buildFromTemplate(project, s.users);
+        const { phases, steps } = buildFromTemplate(project, s.users, {}, s.template);
         return {
           ...s,
           projects: [...s.projects, project],
@@ -316,6 +317,11 @@ export function RqProvider({ children }: { children: ReactNode }) {
       });
       return null;
     },
+    setConfig: (key, val, label) => setState((s) => ({
+      ...s,
+      [key]: val,
+      audit: [...s.audit, mkAudit({ projectId: "system", kind: "update", entity: "config", entityId: key, label, field: key })],
+    })),
     reset: () => setState(createSeed()),
   }), [state, userId, patch, add, mkAudit]);
 
