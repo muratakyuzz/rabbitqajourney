@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, FileText, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, FileText, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { IntegrationsTab } from "./project/IntegrationsTab";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
+import { stepConditionResult } from "@/lib/rabbitqa/completion";
 import {
   ActionStatusBadge, HealthBadge, PhaseStatusBadge, Pill, PriorityBadge, StepStatusBadge, isOverdue,
 } from "@/components/rq/Badges";
@@ -33,11 +34,11 @@ import { canEditFlow, canEditItem, canManageProject, isAllSeeing, selectableCsms
 import { isActivePhase, isOpenStep, previousStep } from "@/lib/rabbitqa/flow";
 import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
 import {
-  ACTION_STATUS_LABEL, BALL_LABEL, COMMIT_STATUS_LABEL, CONTACT_ROLE_LABEL, ENTITY_LABEL, HEALTH_LABEL, MEETING_TYPE_LABEL,
+  ACTION_STATUS_LABEL, BALL_LABEL, COMMIT_STATUS_LABEL, COMPLETION_LABEL, CONTACT_ROLE_LABEL, ENTITY_LABEL, HEALTH_LABEL, MEETING_STATUS_LABEL, MEETING_TYPE_LABEL,
   PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, SOURCE_LABEL, fmtDate, fmtDateTime, todayISO,
 } from "@/lib/rabbitqa/labels";
 import type {
-  Action, ActionStatus, Ball, Commitment, Dependency, CommitmentStatus, ContactRole, Health, MeetingType, Phase, PhaseStatus, Priority, Project, Step, StepStatus,
+  Action, ActionStatus, Ball, Commitment, Dependency, CommitmentStatus, ContactRole, Health, MeetingStatus, MeetingType, Phase, PhaseStatus, Priority, Project, Step, StepStatus,
 } from "@/lib/rabbitqa/types";
 
 const NONE = "__none";
@@ -226,6 +227,25 @@ export function isNewlyActivated(at: string | null | undefined) {
   return businessDaysBetween(at.slice(0, 10), todayISO()) <= 1;
 }
 
+function CompletionHint({ step }: { step: Step }) {
+  const { state } = useRq();
+  const done = step.status === "done" || step.status === "out_of_scope";
+  const label = <span className="block text-xs text-muted-foreground">{COMPLETION_LABEL[step.completion]}</span>;
+  if (done) return label;
+  const tip = step.completion === "meeting"
+    ? `${step.meetingType ? MEETING_TYPE_LABEL[step.meetingType] : ""} toplantısı kaydedilince tamamlanır`
+    : (() => {
+        const r = stepConditionResult(state, step);
+        return r ? `Eksik: ${r.missing.map((m) => m.label).join(", ")}` : "";
+      })();
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild><span>{label}</span></TooltipTrigger>
+      <TooltipContent>{tip}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function PhasesTab({ project }: { project: Project }) {
   const { state, completePhase } = useRq();
   const { user } = useAuth();
@@ -322,6 +342,7 @@ function PhasesTab({ project }: { project: Project }) {
                                   <TooltipContent>{s.dependency === "independent" || !prev ? "Aşama başlayınca açılır" : `${prev.title} tamamlanınca açılır`}</TooltipContent>
                                 </Tooltip>
                               ) : <StepStatusBadge status={s.status} />}
+                              {(s.completion === "data" || s.completion === "meeting") && <CompletionHint step={s} />}
                             </TableCell>
                             <TableCell>
                               {canEditItem(user, project, s.ownerId) && (
@@ -346,10 +367,11 @@ function PhasesTab({ project }: { project: Project }) {
 }
 
 function StepDialog({ step, project, onClose }: { step: Step; project: Project; onClose: () => void }) {
-  const { updateStep } = useRq();
+  const { state, updateStep } = useRq();
   const { user } = useAuth();
   const flow = canEditFlow(user, project);
   const locked = step.status === "locked";
+  const dataOrMeeting = step.completion === "data" || step.completion === "meeting";
   const [ownerId, setOwnerId] = useState(step.ownerId);
   const [ball, setBall] = useState<Ball>(step.ball);
   const [due, setDue] = useState(step.due ?? "");
@@ -360,6 +382,12 @@ function StepDialog({ step, project, onClose }: { step: Step; project: Project; 
   const needsReason = (due || null) !== step.due || status !== step.status;
   const statusLabels = { ...STEP_STATUS_LABEL } as Partial<Record<StepStatus, string>>;
   if (!locked) delete statusLabels.locked;
+  if (dataOrMeeting) {
+    const allowed = new Set<StepStatus>([step.status, "out_of_scope"]);
+    if (step.status === "out_of_scope") allowed.add("pending");
+    (Object.keys(statusLabels) as StepStatus[]).forEach((k) => { if (!allowed.has(k)) delete statusLabels[k]; });
+  }
+  const condition = dataOrMeeting ? stepConditionResult(state, step) : null;
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
@@ -376,8 +404,24 @@ function StepDialog({ step, project, onClose }: { step: Step; project: Project; 
                   <p className="text-xs text-muted-foreground">Sırası gelince otomatik açılır; durumu elle değiştirilemez.</p>
                 </>
               ) : <EnumSelect value={status} onChange={setStatus} labels={statusLabels as Record<StepStatus, string>} />}
+              {dataOrMeeting && !locked && (
+                <p className="text-xs text-muted-foreground">Bu adım {step.completion === "data" ? "veriyle" : "toplantıyla"} tamamlanır; elle yalnızca Kapsam dışı yapılabilir.</p>
+              )}
             </div>
           </div>
+          {condition && (
+            <div className="grid gap-1.5 rounded-md border p-3">
+              <Label className="text-xs text-muted-foreground">Tamamlanma koşulu</Label>
+              <ul className="space-y-1">
+                {condition.checks.map((c) => (
+                  <li key={c.field} className="flex items-center gap-2 text-sm">
+                    {c.met ? <Check className="h-3.5 w-3.5 text-success" /> : <X className="h-3.5 w-3.5 text-destructive" />}
+                    {c.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {!locked && <div className="grid gap-2"><Label>Termin</Label><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></div>}
           {flow && (
             <div className="grid grid-cols-2 gap-3">
@@ -574,7 +618,7 @@ function ActionFields({ d, setD, projectId, showStatus }: { d: ActionDraft; setD
 
 /* ── Meetings ───────────────────────────────────────────── */
 function MeetingsTab({ project }: { project: Project }) {
-  const { state } = useRq();
+  const { state, updateMeeting } = useRq();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const meetings = state.meetings.filter((m) => m.projectId === project.id).sort((a, b) => b.date.localeCompare(a.date));
@@ -586,15 +630,25 @@ function MeetingsTab({ project }: { project: Project }) {
       {meetings.length === 0 && <Card><EmptyState title="Toplantı yok" description="İlk toplantıyı kaydedin." /></Card>}
       {meetings.map((m) => {
         const acts = state.actions.filter((a) => a.meetingId === m.id);
+        const manage = canManageProject(user, project);
         return (
           <Card key={m.id}>
             <CardContent className="p-4 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <Pill tone="info">{MEETING_TYPE_LABEL[m.type]}</Pill><VisibleIcon visible={m.isCustomerVisible} />
+                <Pill tone="info">{MEETING_TYPE_LABEL[m.type]}</Pill>
+                <Pill tone={m.status === "held" ? "success" : m.status === "cancelled" ? "muted" : "info"}>{MEETING_STATUS_LABEL[m.status]}</Pill>
+                <VisibleIcon visible={m.isCustomerVisible} />
                 <span className="text-sm font-medium">{fmtDate(m.date)}</span>
+                {m.type === "adaptation" && <span className="text-xs text-muted-foreground">Takım: {m.teamId ?? "—"}</span>}
                 <span className="text-xs text-muted-foreground ml-auto">
                   İç: {m.internalIds.map((i) => personName(state, i)).join(", ") || "—"} · Müşteri: {m.contactIds.map((i) => personName(state, i)).join(", ") || "—"}
                 </span>
+                {m.status === "planned" && manage && (
+                  <Button size="sm" variant="outline" onClick={() => {
+                    const err = updateMeeting(m.id, { status: "held" });
+                    if (err) toast.error(err); else toast.success("Toplantı Yapıldı olarak işaretlendi");
+                  }}>Yapıldı olarak işaretle</Button>
+                )}
               </div>
               {m.notes && <p className="text-sm">{m.notes}</p>}
               {m.decisions && <p className="text-sm"><span className="font-medium">Kararlar: </span>{m.decisions}</p>}
@@ -621,6 +675,9 @@ export function MeetingDialog({ project, onClose, defaultType = "checkin" }: { p
   const [docs, setDocs] = useState<string[]>([]);
   const [docName, setDocName] = useState("");
   const [date, setDate] = useState(todayISO());
+  const [statusTouched, setStatusTouched] = useState(false);
+  const [status, setStatus] = useState<MeetingStatus>("held"); // default date is today
+  const [teamId, setTeamId] = useState<string | null>(null);
   const [internalIds, setInternalIds] = useState<string[]>(project.csmId ? [project.csmId] : []);
   const [contactIds, setContactIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
@@ -628,15 +685,37 @@ export function MeetingDialog({ project, onClose, defaultType = "checkin" }: { p
   const [actions, setActions] = useState<ActionDraft[]>([]);
   const contacts = state.contacts.filter((c) => c.projectId === project.id);
   const toggle = (arr: string[], set: (v: string[]) => void, id: string, on: boolean) => set(on ? [...arr, id] : arr.filter((x) => x !== id));
+  const onDateChange = (v: string) => {
+    setDate(v);
+    if (!statusTouched) setStatus(v > todayISO() ? "planned" : "held");
+  };
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Toplantı kaydet</DialogTitle></DialogHeader>
         <div className="grid gap-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="grid gap-2"><Label>Tür</Label><EnumSelect value={type} onChange={setType} labels={MEETING_TYPE_LABEL} /></div>
-            <div className="grid gap-2"><Label>Tarih</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div className="grid gap-2"><Label>Tarih</Label><Input type="date" value={date} onChange={(e) => onDateChange(e.target.value)} /></div>
+            <div className="grid gap-2">
+              <Label>Durum</Label>
+              <EnumSelect value={status} onChange={(v) => { setStatus(v); setStatusTouched(true); }} labels={MEETING_STATUS_LABEL} />
+            </div>
           </div>
+          {type === "adaptation" && (
+            <div className="grid gap-2">
+              <Label>Takım</Label>
+              {project.teams.length === 0 ? <p className="text-xs text-muted-foreground">Önce Keşif'te takım ekleyin.</p> : (
+                <Select value={teamId ?? NONE} onValueChange={(v) => setTeamId(v === NONE ? null : v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Takım seçilmedi</SelectItem>
+                    {project.teams.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
           <div className="grid gap-2">
             <Label>İç katılımcılar</Label>
             <div className="flex flex-wrap gap-3">{selectableUsers(state).map((u) => (
@@ -677,9 +756,9 @@ export function MeetingDialog({ project, onClose, defaultType = "checkin" }: { p
           <Button variant="outline" onClick={onClose}>Vazgeç</Button>
           <Button onClick={() => {
             if (actions.some((a) => !a.title.trim())) return toast.error("Aksiyon başlıkları boş olamaz");
-            const mid = addMeeting({ projectId: project.id, type, date, internalIds, contactIds, notes, decisions, isCustomerVisible: visible }, actions);
+            const mid = addMeeting({ projectId: project.id, type, date, internalIds, contactIds, notes, decisions, isCustomerVisible: visible, status, teamId: type === "adaptation" ? teamId : null }, actions);
             docs.forEach((name) => addDocument({ projectId: project.id, type: "other", name, linkType: "meeting", linkId: mid }));
-            toast.success("Toplantı kaydedildi");
+            toast.success(status === "held" ? "Toplantı kaydedildi" : "Toplantı planlandı");
             onClose();
           }}>Kaydet</Button>
         </DialogFooter>
@@ -690,7 +769,7 @@ export function MeetingDialog({ project, onClose, defaultType = "checkin" }: { p
 
 /* ── Handover & commitments ─────────────────────────────── */
 function HandoverTab({ project }: { project: Project }) {
-  const { state, updateProject, addCommitment, updateCommitment } = useRq();
+  const { state, updateProject, addCommitment, updateCommitment, setNoCommitments } = useRq();
   const { user } = useAuth();
   const manage = canManageProject(user, project);
   const [text, setText] = useState("");
@@ -770,6 +849,15 @@ function HandoverTab({ project }: { project: Project }) {
                 setText("");
               }}>Ekle</Button>
             </div>
+          )}
+          {manage && (
+            <label className="flex items-center gap-3 text-sm border-t pt-3" title={commitments.length > 0 ? "Taahhüt varken işaretlenemez" : undefined}>
+              <Checkbox checked={project.noCommitments} disabled={commitments.length > 0} onCheckedChange={(c) => {
+                const err = setNoCommitments(project.id, !!c);
+                if (err) toast.error(err);
+              }} />
+              Taahhüt yok
+            </label>
           )}
         </CardContent>
       </Card>
@@ -943,6 +1031,7 @@ const FIELD_LABEL: Record<string, string> = {
   approvedBy: "Onaylayan", approvedAt: "Onay tarihi", ballSince: "Top el değiştirme", baselineEnd: "Baseline",
   installType: "Kurulum tipi", llmChoice: "LLM tercihi", presentationShared: "Sunum paylaşıldı", reqDocShared: "Gereksinim dokümanı paylaşıldı",
   reqDocSharedAt: "Paylaşım tarihi", teamInfo: "Takım bilgisi", measurements: "KPI ölçümleri", participants: "Katılımcılar", date: "Tarih", notes: "Notlar", required: "Zorunlu",
+  noCommitments: "Taahhüt yok", teamId: "Takım",
 };
 
 function HistoryTab({ project }: { project: Project }) {
@@ -1009,7 +1098,9 @@ function HistoryTab({ project }: { project: Project }) {
                 </div>
                 {e.m ? (
                   <p className="text-sm mt-1">
-                    <span className="font-medium">{MEETING_TYPE_LABEL[e.m.type]} toplantısı</span> — Katılımcılar: {[...e.m.internalIds, ...e.m.contactIds].map((x) => personName(state, x)).join(", ")}
+                    <span className="font-medium">{MEETING_TYPE_LABEL[e.m.type]} toplantısı</span>
+                    {e.m.status !== "held" && <span className="text-muted-foreground"> ({MEETING_STATUS_LABEL[e.m.status]})</span>}
+                    {" "}— Katılımcılar: {[...e.m.internalIds, ...e.m.contactIds].map((x) => personName(state, x)).join(", ")}
                   </p>
                 ) : e.a && (
                   <div className="text-sm mt-1">

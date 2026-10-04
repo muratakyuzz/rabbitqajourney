@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { advanceAll, projectPlan } from "./flow";
+import { projectPlan } from "./flow";
 import { allAlerts, computeAlerts, type AlertView } from "./alerts";
 import { setActiveHolidays } from "./business-days";
 import { fmtDate } from "./labels";
@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ADAPTATION_FLOW, ADAPTATION_STEPS, DEFAULT_PROJECT_INTEGRATIONS, buildFromTemplate, createSeed, uid } from "./seed";
 import { analyzeText, type IncomingMeta } from "./ai-mock";
 import { matchEmail } from "./email-match";
+import { manualStatusError, settleAll } from "./completion";
 import type {
   AiInsight, ChatChannel, InsightSource, IntegrationConfig, ProjectIntegrations, UnmatchedEmail,
   CustomerReport, User, Action, AdaptationSession, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RiskDecision, RqState, Step, SupportTicket, TrainingSession,
@@ -15,16 +16,16 @@ import type {
 import { todayISO } from "./labels";
 import { buildReportSnapshot, defaultNextWeek } from "./reports";
 import { weekStartOf } from "./alerts";
-import { applyInstallType, applyLlmChoice, setStepByKey } from "./rules";
+import { applyInstallType, applyLlmChoice, applyMeetingHeldRules, installChoiceError, setStepByKey } from "./rules";
 
-const KEY = "rabbitqa-demo-state-v8";
+const KEY = "rabbitqa-demo-state-v9";
 
 function load(): RqState {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as RqState;
-      if (s.version === 8) return s;
+      if (s.version === 9) return s;
     }
   } catch { /* ignore */ }
   return createSeed();
@@ -53,12 +54,13 @@ interface Ctx {
   updateContact: (id: string, patch: Partial<Contact>) => void;
   addCommitment: (c: Omit<Commitment, "id">) => void;
   updateCommitment: (id: string, patch: Partial<Commitment>, reason?: string) => void;
+  setNoCommitments: (projectId: string, value: boolean) => string | null;
   addTeam: (projectId: string, team: string) => void;
   setTeamInfo: (projectId: string, team: string, info: { contact: string; users: number | null }) => void;
-  setKickoff: (projectId: string, patch: Pick<Project, "presentationShared" | "installType" | "llmChoice" | "reqDocShared" | "reqDocSharedAt">, reason?: string) => string | null;
+  setKickoff: (projectId: string, patch: Pick<Project, "presentationShared" | "installType" | "llmChoice" | "reqDocShared" | "reqDocSharedAt">, reason?: string) => { error: string | null; summary: string | null };
   addKpi: (k: Omit<Kpi, "id" | "measurements" | "isCustomerVisible"> & { isCustomerVisible?: boolean }) => void;
   updateKpi: (id: string, patch: Partial<Kpi>) => void;
-  updateMeeting: (id: string, patch: Partial<Meeting>) => void;
+  updateMeeting: (id: string, patch: Partial<Meeting>, reason?: string) => string | null;
   addMeasurement: (kpiId: string, m: { date: string; value: number }) => void;
   addTraining: (t: Omit<TrainingSession, "id">) => void;
   updateTraining: (id: string, patch: Partial<TrainingSession>) => void;
@@ -110,7 +112,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
       const n = typeof u === "function" ? u(s) : u;
       if (n === s) return s;
       if (n.holidays !== s.holidays) setActiveHolidays(n.holidays);
-      const next = advanceAll(n, mkRef.current);
+      const next = settleAll(n, mkRef.current);
       flowMsgs.current = flowMessages(s, next);
       return next;
     });
@@ -203,7 +205,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
       const project: Project = {
         ...input, id: uid("p"), health: "green", healthReason: "", teams: [], desiredModules: [], discoveryAnswers: {}, teamInfo: {},
         installType: null, llmChoice: null, presentationShared: false, reqDocShared: false, reqDocSharedAt: null, createdAt: new Date().toISOString(),
-        integrations: structuredClone(DEFAULT_PROJECT_INTEGRATIONS),
+        integrations: structuredClone(DEFAULT_PROJECT_INTEGRATIONS), noCommitments: false,
       };
       setState((s) => {
         const { phases, steps } = buildFromTemplate(project, s.users, {}, s.template);
@@ -262,6 +264,8 @@ export function RqProvider({ children }: { children: ReactNode }) {
         if (old.status === "locked") return "Adımın sırası gelmedi; durumu elle değiştirilemez";
         if (p.status === "locked") return "\"Sırası gelmedi\" elle seçilemez";
       }
+      const manualErr = manualStatusError(old, p.status);
+      if (manualErr) return manualErr;
       const changes = { ...p };
       if (p.ball && p.ball !== old.ball) changes.ballSince = new Date().toISOString();
       patch<Step>("steps", id, changes, reason);
@@ -272,21 +276,45 @@ export function RqProvider({ children }: { children: ReactNode }) {
     addMeeting: (m, actions) => {
       const meeting: Meeting = { ...m, isCustomerVisible: m.isCustomerVisible ?? false, id: uid("m") };
       add<Meeting>("meetings", meeting, `Toplantı kaydedildi`);
-      if (m.type === "devops_handover") {
-        setState((s) => setStepByKey(s, m.projectId, "devops_handover", { status: "done", ball: "devops", ballSince: new Date().toISOString() }, mkAudit, "Otomatik kural: DevOps devir toplantısı kaydedildi, top DevOps'a geçti"));
-      }
-      if (m.type === "go_no_go") {
-        setState((s) => setStepByKey(s, m.projectId, "gonogo", { status: "done" }, mkAudit, "Otomatik kural: Go/No-Go toplantısı kaydedildi"));
-      }
+      setState((s) => applyMeetingHeldRules(s, meeting, mkAudit));
       actions.forEach((a) =>
         add<Action>("actions", { ...a, isCustomerVisible: a.isCustomerVisible ?? true, id: uid("a"), projectId: m.projectId, source: "meeting", meetingId: meeting.id, createdAt: new Date().toISOString() }),
       );
       return meeting.id;
     },
-    updateMeeting: (id, p) => patch<Meeting>("meetings", id, p),
+    updateMeeting: (id, p, reason) => {
+      const old = state.meetings.find((m) => m.id === id);
+      if (!old) return "Toplantı bulunamadı";
+      if (p.status && p.status !== old.status) {
+        if (old.status !== "planned") return "Yalnızca Planlandı toplantının durumu değiştirilebilir";
+        if (p.status === "cancelled" && !reason?.trim()) return "İptal için gerekçe zorunlu";
+      }
+      patch<Meeting>("meetings", id, p, reason);
+      if (p.status === "held") {
+        setState((s) => {
+          const m = s.meetings.find((x) => x.id === id);
+          return m ? applyMeetingHeldRules(s, m, mkAudit) : s;
+        });
+      }
+      return null;
+    },
     addContact: (c) => add<Contact>("contacts", { ...c, id: uid("c") }),
     updateContact: (id, p) => patch<Contact>("contacts", id, p),
-    addCommitment: (c) => add<Commitment>("commitments", { ...c, id: uid("cm") }),
+    addCommitment: (c) => {
+      setState((s) => {
+        const commitment: Commitment = { ...c, id: uid("cm") };
+        let next: RqState = { ...s, commitments: [...s.commitments, commitment], audit: [...s.audit, mkAudit({ projectId: c.projectId, kind: "create", entity: "commitment", entityId: commitment.id, label: commitment.text })] };
+        const project = next.projects.find((p) => p.id === c.projectId);
+        if (project?.noCommitments) {
+          next = {
+            ...next,
+            projects: next.projects.map((p) => (p.id === c.projectId ? { ...p, noCommitments: false } : p)),
+            audit: [...next.audit, mkAudit({ projectId: c.projectId, kind: "update", entity: "project", entityId: c.projectId, label: "Taahhüt yok", field: "noCommitments", oldValue: "true", newValue: "false", reason: "Otomatik kural: taahhüt eklendi" })],
+          };
+        }
+        return next;
+      });
+    },
     updateCommitment: (id, p, reason) => patch<Commitment>("commitments", id, p, reason, (base) => {
       const c = base.commitments.find((x) => x.id === id);
       if (!c) return {};
@@ -294,6 +322,13 @@ export function RqProvider({ children }: { children: ReactNode }) {
       if (!open.length) return setStepByKey(base, c.projectId, "commit_check", { status: "done" }, mkAudit, "Otomatik kural: açık taahhüt kalmadı");
       return {};
     }),
+    setNoCommitments: (projectId, value) => {
+      const p = state.projects.find((x) => x.id === projectId);
+      if (!p) return "Proje bulunamadı";
+      if (value && state.commitments.some((c) => c.projectId === projectId)) return "Taahhüt varken 'Taahhüt yok' işaretlenemez";
+      patch<Project>("projects", projectId, { noCommitments: value });
+      return null;
+    },
     addTeam: (projectId, team) => {
       setState((s) => {
         const project = s.projects.find((p) => p.id === projectId);
@@ -302,7 +337,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
         const start = s.steps.filter((x) => x.phaseId === phase.id).length;
         const newSteps: Step[] = ADAPTATION_STEPS.map((t, i) => ({
           id: uid("st"), projectId, phaseId: phase.id, title: `${team} — ${t}`, required: true, ownerId: project.csmId, ball: "csm",
-          ballSince: new Date().toISOString(), due: null, status: "locked", order: start + i, ...ADAPTATION_FLOW[i], activatedAt: null,
+          ballSince: new Date().toISOString(), due: null, status: "locked", order: start + i, ...ADAPTATION_FLOW[i], activatedAt: null, completion: "manual",
         }));
         return {
           ...s,
@@ -317,34 +352,34 @@ export function RqProvider({ children }: { children: ReactNode }) {
       if (p) patch<Project>("projects", projectId, { teamInfo: { ...p.teamInfo, [team]: info } });
     },
     setKickoff: (projectId, kp, reason) => {
-      const before = state;
+      const old = state.projects.find((p) => p.id === projectId);
+      if (!old) return { error: "Proje bulunamadı", summary: null };
+      const choiceErr = installChoiceError(old, kp, reason);
+      if (choiceErr) return { error: choiceErr, summary: null };
       let summary: string | null = null;
       setState((s) => {
-        const old = s.projects.find((p) => p.id === projectId);
-        if (!old) return s;
+        const cur = s.projects.find((p) => p.id === projectId);
+        if (!cur) return s;
         const audit: AuditEntry[] = [];
         (Object.keys(kp) as (keyof typeof kp)[]).forEach((k) => {
-          if (str(old[k]) !== str(kp[k])) {
-            audit.push(mkAudit({ projectId, kind: "update", entity: "project", entityId: projectId, label: "Kick-off", field: k, oldValue: str(old[k]), newValue: str(kp[k]), reason }));
+          if (str(cur[k]) !== str(kp[k])) {
+            audit.push(mkAudit({ projectId, kind: "update", entity: "project", entityId: projectId, label: "Kick-off", field: k, oldValue: str(cur[k]), newValue: str(kp[k]), reason }));
           }
         });
         if (!audit.length) return s;
         let next: RqState = { ...s, projects: s.projects.map((p) => (p.id === projectId ? { ...p, ...kp } : p)), audit: [...s.audit, ...audit] };
-        if (kp.installType && kp.installType !== old.installType) {
+        if (kp.installType && kp.installType !== cur.installType) {
           next = applyInstallType(next, projectId, kp.installType, mkAudit, reason);
-          next = setStepByKey(next, projectId, "install_type", { status: "done" }, mkAudit, "Kurulum tipi girildi");
         }
-        if (kp.llmChoice && kp.llmChoice !== old.llmChoice) {
+        if (kp.llmChoice && kp.llmChoice !== cur.llmChoice) {
           next = applyLlmChoice(next, projectId, kp.llmChoice, mkAudit, reason);
-          next = setStepByKey(next, projectId, "llm", { status: "done" }, mkAudit, "LLM tercihi girildi");
         }
-        if (kp.presentationShared && !old.presentationShared) next = setStepByKey(next, projectId, "presentation", { status: "done" }, mkAudit, "Sunum paylaşıldı");
-        if (kp.reqDocShared && !old.reqDocShared) next = setStepByKey(next, projectId, "reqdoc", { status: "done" }, mkAudit, "Gereksinim dokümanı paylaşıldı");
+        if (kp.presentationShared && !cur.presentationShared) next = setStepByKey(next, projectId, "presentation", { status: "done" }, mkAudit, "Sunum paylaşıldı");
+        if (kp.reqDocShared && !cur.reqDocShared) next = setStepByKey(next, projectId, "reqdoc", { status: "done" }, mkAudit, "Gereksinim dokümanı paylaşıldı");
         summary = kickoffSummary(s, next, projectId);
         return next;
       });
-      void before;
-      return summary;
+      return { error: null, summary };
     },
     addKpi: (k) => add<Kpi>("kpis", { ...k, isCustomerVisible: k.isCustomerVisible ?? true, id: uid("k"), measurements: [] }),
     updateKpi: (id, p) => patch<Kpi>("kpis", id, p),
@@ -361,7 +396,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
         const step: Step = {
           id: uid("st"), projectId: t.projectId, phaseId: phase.id, title: `Katılımcı girişi — ${t.date.split("-").reverse().join(".")} session'ı`, required: false,
           ownerId: s.projects.find((p) => p.id === t.projectId)?.csmId ?? null, ball: "csm", ballSince: new Date().toISOString(), due: t.attendees ? t.date : null, status: t.attendees ? "done" : "locked", order: 100,
-          dependency: "independent", durationDays: 2, activatedAt: t.attendees ? new Date().toISOString() : null,
+          dependency: "independent", durationDays: 2, activatedAt: t.attendees ? new Date().toISOString() : null, completion: "manual",
         };
         return { ...s, steps: [...s.steps, step], audit: [...s.audit, mkAudit({ projectId: t.projectId, kind: "create", entity: "step", entityId: step.id, label: `${step.title} — adım açıldı (otomatik kural)` })] };
       });
@@ -382,8 +417,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
     },
     addDocument: (d) => {
       add<DocumentRec>("documents", { ...d, id: uid("d"), addedAt: new Date().toISOString() }, `Doküman eklendi — ${d.name}`);
-      const key = d.type === "offer" ? "offer" : d.type === "contract" ? "contract" : d.type === "req_doc" ? "reqdoc" : null;
-      if (key) setState((s) => setStepByKey(s, d.projectId, key, { status: "done" }, mkAudit, `Otomatik kural: ${d.name} yüklendi`));
+      if (d.type === "req_doc") setState((s) => setStepByKey(s, d.projectId, "reqdoc", { status: "done" }, mkAudit, `Otomatik kural: ${d.name} yüklendi`));
     },
     addAlert: (a) => add<Alert>("alerts", { ...a, id: uid("al"), status: "open", source: "manual", createdAt: new Date().toISOString(), resolvedAt: null, resolvedBy: null }, `Uyarı eklendi — ${a.title}`),
     snoozeAlert: (key, until, reason) => {
@@ -613,7 +647,13 @@ export function RqProvider({ children }: { children: ReactNode }) {
           break;
         }
         case "action_update": if (ins.targetId) api.updateAction(ins.targetId, v, reason); break;
-        case "step_update": if (ins.targetId) patch<Step>("steps", ins.targetId, v as Partial<Step>, reason); break;
+        case "step_update": {
+          if (!ins.targetId) break;
+          const targetStep = state.steps.find((s) => s.id === ins.targetId);
+          if (targetStep && targetStep.completion !== "manual") return "Bu adım veriyle tamamlanır";
+          patch<Step>("steps", ins.targetId, v as Partial<Step>, reason);
+          break;
+        }
         case "risk_create":
         case "decision_create": {
           const rid = uid("r");

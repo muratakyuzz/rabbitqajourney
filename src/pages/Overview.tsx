@@ -82,7 +82,7 @@ export default function Overview() {
   ] as { id: string; tone: "danger" | "warning" | "info"; tag: string; text: string; projectId: string }[];
 
   const events = [
-    ...state.meetings.filter((m) => pids.has(m.projectId) && m.date.slice(0, 10) >= today && m.date.slice(0, 10) <= weekEnd).map((m) => ({ id: m.id, date: m.date, label: MEETING_TYPE_LABEL[m.type], projectId: m.projectId })),
+    ...state.meetings.filter((m) => pids.has(m.projectId) && m.status !== "cancelled" && m.date.slice(0, 10) >= today && m.date.slice(0, 10) <= weekEnd).map((m) => ({ id: m.id, date: m.date, label: MEETING_TYPE_LABEL[m.type], projectId: m.projectId })),
     ...state.trainings.filter((t) => pids.has(t.projectId) && t.date.slice(0, 10) >= today && t.date.slice(0, 10) <= weekEnd).map((t) => ({ id: t.id, date: t.date, label: "Eğitim", projectId: t.projectId })),
     ...state.adaptations.filter((a: any) => pids.has(a.projectId) && a.date && a.date.slice(0, 10) >= today && a.date.slice(0, 10) <= weekEnd).map((a: any) => ({ id: a.id, date: a.date, label: "Adaptasyon", projectId: a.projectId })),
     ...state.steps.filter((s) => pids.has(s.projectId) && openStep(s) && s.due && s.due >= today && s.due <= weekEnd && (s.key === "gonogo" || s.key === "customer_approval")).map((s) => ({ id: s.id, date: s.due!, label: s.title, projectId: s.projectId })),

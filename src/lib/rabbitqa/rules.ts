@@ -1,5 +1,5 @@
 import { uid } from "./seed";
-import type { Action, AuditEntry, InstallType, LlmChoice, RqState, Step } from "./types";
+import type { Action, AuditEntry, InstallType, LlmChoice, Meeting, Project, RqState, Step } from "./types";
 
 export type MkAudit = (e: Omit<AuditEntry, "id" | "at" | "userId">) => AuditEntry;
 
@@ -43,7 +43,7 @@ export function applyInstallType(s: RqState, projectId: string, type: InstallTyp
         const step: Step = {
           id: uid("st"), projectId, phaseId: phase.id, title: "SaaS ortamının hazırlanması", required: true, ownerId: devopsId(next), ball: "devops",
           ballSince: new Date().toISOString(), due: null, status: "locked", order: -1, key: "saas_env",
-          dependency: "previous", durationDays: 3, activatedAt: null,
+          dependency: "previous", durationDays: 3, activatedAt: null, completion: "manual",
         };
         next = { ...next, steps: [...next.steps, step], audit: [...next.audit, mk({ projectId, kind: "create", entity: "step", entityId: step.id, label: `${step.title} — adım açıldı`, reason: r })] };
       }
@@ -98,6 +98,37 @@ export function applyLlmChoice(s: RqState, projectId: string, choice: LlmChoice,
   if (model && model.status !== "done") {
     if (choice === "gpu" && model.status === "out_of_scope") next = setStepByKey(next, projectId, "model_install", { status: "locked", required: true, due: null, activatedAt: null }, mk, r);
     if (choice !== "gpu" && model.status !== "out_of_scope") next = setStepByKey(next, projectId, "model_install", { status: "out_of_scope" }, mk, r);
+  }
+  return next;
+}
+
+export function installChoiceError(
+  old: Pick<Project, "installType" | "llmChoice">,
+  next: Partial<Pick<Project, "installType" | "llmChoice">>,
+  reason?: string,
+): string | null {
+  if ("installType" in next) {
+    if (old.installType !== null && next.installType === null) return "Kurulum tipi seçildikten sonra 'Henüz belli değil' yapılamaz";
+    if (old.installType !== null && next.installType !== null && next.installType !== old.installType && !reason?.trim()) return "Kurulum tipi veya LLM değişikliğinde gerekçe zorunlu";
+  }
+  if ("llmChoice" in next) {
+    if (old.llmChoice !== null && next.llmChoice === null) return "LLM tercihi seçildikten sonra 'Henüz belli değil' yapılamaz";
+    if (old.llmChoice !== null && next.llmChoice !== null && next.llmChoice !== old.llmChoice && !reason?.trim()) return "Kurulum tipi veya LLM değişikliğinde gerekçe zorunlu";
+  }
+  return null;
+}
+
+export function applyMeetingHeldRules(s: RqState, m: Meeting, mk: MkAudit): RqState {
+  if (m.status !== "held") return s;
+  let next = s;
+  if (m.type === "devops_handover") {
+    const step = next.steps.find((x) => x.projectId === m.projectId && x.key === "devops_handover");
+    if (step && step.status !== "out_of_scope") {
+      next = setStepByKey(next, m.projectId, "devops_handover", { ball: "devops", ballSince: new Date().toISOString() }, mk, "Otomatik kural: DevOps devir toplantısı yapıldı, top DevOps'a geçti");
+    }
+  }
+  if (m.type === "go_no_go") {
+    next = setStepByKey(next, m.projectId, "gonogo", { status: "done" }, mk, "Otomatik kural: Go/No-Go toplantısı kaydedildi");
   }
   return next;
 }

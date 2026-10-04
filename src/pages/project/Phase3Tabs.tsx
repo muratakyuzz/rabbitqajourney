@@ -466,7 +466,7 @@ export function GoLiveTab({ project }: { project: Project }) {
                 <Pill tone={done ? "success" : "muted"}>{done ? "Tamamlandı" : "Bekliyor"}</Pill>
                 {key === "gonogo" && !done && manage && (
                   <Button size="sm" variant="outline" onClick={() => {
-                    addMeeting({ projectId: project.id, type: "go_no_go", date: todayISO(), internalIds: project.csmId ? [project.csmId] : [], contactIds: [], notes: "Go/No-Go toplantısı (hızlı kayıt)", decisions: "" }, []);
+                    addMeeting({ projectId: project.id, type: "go_no_go", date: todayISO(), internalIds: project.csmId ? [project.csmId] : [], contactIds: [], notes: "Go/No-Go toplantısı (hızlı kayıt)", decisions: "", status: "held" }, []);
                     toast.success("Go/No-Go toplantısı kaydedildi — detayları Toplantılar sekmesinden düzenleyebilirsiniz");
                   }}>Toplantıyı kaydet</Button>
                 )}

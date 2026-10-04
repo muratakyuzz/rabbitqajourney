@@ -23,6 +23,8 @@ export type MeetingType =
 export type InstallType = "saas" | "onprem";
 export type LlmChoice = "rabbitqa" | "own" | "gpu";
 export type DocType = "offer" | "contract" | "req_doc" | "presentation" | "other";
+export type StepCompletion = "manual" | "data" | "meeting";
+export type MeetingStatus = "planned" | "held" | "cancelled";
 
 export interface User {
   id: string;
@@ -71,6 +73,7 @@ export interface Project {
   createdAt: string;
   integrations: ProjectIntegrations;
   goLiveApproval?: GoLiveApproval | null;
+  noCommitments: boolean;
 }
 
 export interface Phase {
@@ -107,6 +110,8 @@ export interface Step {
   dependency: Dependency;
   durationDays: number;
   activatedAt: string | null;
+  completion: StepCompletion;
+  meetingType?: MeetingType;
 }
 
 export interface Action {
@@ -136,6 +141,8 @@ export interface Meeting {
   notes: string;
   decisions: string;
   isCustomerVisible: boolean;
+  status: MeetingStatus;
+  teamId?: string | null;
 }
 
 export interface Contact {
@@ -291,7 +298,7 @@ export interface CustomerReport {
 }
 export interface GoLiveApproval { contactId: string; approvedAt: string; recordedBy: string; recordedAt: string }
 
-export interface StepTpl { title: string; ball: Ball; required: boolean; ownerRole?: "manager"; key?: string; dependency: Dependency; durationDays: number }
+export interface StepTpl { title: string; ball: Ball; required: boolean; ownerRole?: "manager"; key?: string; dependency: Dependency; durationDays: number; completion?: StepCompletion; meetingType?: MeetingType }
 export interface PhaseTpl { code: string; name: string; dependency: Dependency; steps: StepTpl[] }
 
 export interface RqState {

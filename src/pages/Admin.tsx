@@ -15,12 +15,21 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useAuth } from "@/lib/auth-context";
 import { useRq } from "@/lib/rabbitqa/store";
 import { uid } from "@/lib/rabbitqa/seed";
-import { BALL_LABEL, QUESTION_TYPE_LABEL, fmtDateTime } from "@/lib/rabbitqa/labels";
+import { STEP_CONDITIONS } from "@/lib/rabbitqa/completion";
+import { Pill } from "@/components/rq/Badges";
+import { BALL_LABEL, COMPLETION_LABEL, MEETING_TYPE_LABEL, QUESTION_TYPE_LABEL, fmtDateTime } from "@/lib/rabbitqa/labels";
 import { IntegrationsAdmin } from "./admin/IntegrationsAdmin";
 import { AlertsAdmin, SalespeopleAdmin } from "./admin/AlertsAdmin";
 import { UsersAdmin } from "./admin/UsersAdmin";
 import { canAccessAdmin } from "@/lib/rabbitqa/perm";
-import type { Ball, Dependency, PhaseTpl } from "@/lib/rabbitqa/types";
+import type { Ball, Dependency, PhaseTpl, StepTpl } from "@/lib/rabbitqa/types";
+
+function completionText(s: StepTpl) {
+  const c = s.completion ?? "manual";
+  if (c === "manual") return COMPLETION_LABEL.manual;
+  if (c === "data") return `${COMPLETION_LABEL.data}: ${s.key ? STEP_CONDITIONS[s.key]?.label ?? s.key : ""}`;
+  return `${COMPLETION_LABEL.meeting}: ${s.meetingType ? MEETING_TYPE_LABEL[s.meetingType] : ""}`;
+}
 
 export default function Admin() {
   const { user } = useAuth();
@@ -125,13 +134,19 @@ function TemplateEditor() {
                       onChange={(e) => upd(pi, (x) => { x.steps[si].durationDays = Math.max(1, Math.min(60, Number(e.target.value) || 1)); })} />
                     <span className="text-xs text-muted-foreground">iş günü</span>
                     <label className="flex items-center gap-1 text-xs whitespace-nowrap"><Checkbox checked={s.required} onCheckedChange={(c) => upd(pi, (x) => { x.steps[si].required = !!c; })} />Zorunlu</label>
+                    <Pill tone="muted">{completionText(s)}</Pill>
                     <Button variant="ghost" size="icon" disabled={si === 0} aria-label="Yukarı taşı" onClick={() => move(pi, si, -1)}><ArrowUp className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" disabled={si === p.steps.length - 1} aria-label="Aşağı taşı" onClick={() => move(pi, si, 1)}><ArrowDown className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" disabled={!!s.key} title={s.key ? "Otomatik kurala bağlı adım silinemez" : "Sil"} onClick={() => upd(pi, (x) => { x.steps.splice(si, 1); })}><Trash2 className="h-4 w-4" /></Button>
+                    <Button
+                      variant="ghost" size="icon"
+                      disabled={(s.completion && s.completion !== "manual") || !!s.key}
+                      title={s.completion && s.completion !== "manual" ? "Sistem adımı — veriyle tamamlanır" : s.key ? "Otomatik kurala bağlı adım silinemez" : "Sil"}
+                      onClick={() => upd(pi, (x) => { x.steps.splice(si, 1); })}
+                    ><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 );
               })}
-              {p.code !== "05" && <Button variant="outline" size="sm" onClick={() => upd(pi, (x) => { x.steps.push({ title: "Yeni adım", ball: "csm", required: false, dependency: "previous", durationDays: 2 }); })}><Plus className="h-4 w-4 mr-1" />Adım ekle</Button>}
+              {p.code !== "05" && <Button variant="outline" size="sm" onClick={() => upd(pi, (x) => { x.steps.push({ title: "Yeni adım", ball: "csm", required: false, dependency: "previous", durationDays: 2, completion: "manual" }); })}><Plus className="h-4 w-4 mr-1" />Adım ekle</Button>}
             </AccordionContent>
           </AccordionItem>
         ))}

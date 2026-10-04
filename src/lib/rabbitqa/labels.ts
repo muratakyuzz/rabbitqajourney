@@ -1,5 +1,5 @@
 import type {
-  ActionSource, ActionStatus, Ball, CommitmentStatus, ContactRole, Health, MeetingType, PhaseStatus, Priority, Role, StepStatus,
+  ActionSource, ActionStatus, Ball, CommitmentStatus, ContactRole, Health, MeetingStatus, MeetingType, PhaseStatus, Priority, Role, StepCompletion, StepStatus,
 } from "./types";
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -31,16 +31,18 @@ export const SOURCE_LABEL: Record<ActionSource, string> = { meeting: "Toplantı"
 export const CONTACT_ROLE_LABEL: Record<ContactRole, string> = { sponsor: "Sponsor", pm: "Proje sorumlusu", tech: "Teknik sorumlu" };
 export const COMMIT_STATUS_LABEL: Record<CommitmentStatus, string> = { open: "Açık", met: "Karşılandı", unmet: "Karşılanamadı" };
 export const MEETING_TYPE_LABEL: Record<MeetingType, string> = {
-  brief: "Internal brif",
+  brief: "Satış devri",
   kickoff: "Kick-off",
   discovery: "Keşif",
-  devops_handover: "DevOps devir",
+  devops_handover: "DevOps devri",
   training: "Eğitim",
   adaptation: "Uyarlama",
   checkin: "CS check-in",
   go_no_go: "Go/No-Go",
   other: "Diğer",
 };
+export const COMPLETION_LABEL: Record<StepCompletion, string> = { manual: "Elle", data: "Veriyle", meeting: "Toplantıyla" };
+export const MEETING_STATUS_LABEL: Record<MeetingStatus, string> = { planned: "Planlandı", held: "Yapıldı", cancelled: "İptal" };
 export const ENTITY_LABEL: Record<string, string> = {
   project: "Proje", phase: "Aşama", step: "Adım", action: "Aksiyon", meeting: "Toplantı", contact: "Kişi", commitment: "Taahhüt",
   kpi: "KPI", training: "Eğitim", adaptation: "Uyarlama", credential: "Erişim bilgisi", document: "Doküman",

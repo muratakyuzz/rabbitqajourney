@@ -64,7 +64,7 @@ export function computeAlerts(state: RqState, today: string): ComputedAlert[] {
     });
 
     // 6 gereksinim dokümanı
-    const kickoff = state.meetings.filter((m) => m.projectId === pid && m.type === "kickoff").sort((a, b) => a.date.localeCompare(b.date))[0];
+    const kickoff = state.meetings.filter((m) => m.projectId === pid && m.type === "kickoff" && m.status === "held").sort((a, b) => a.date.localeCompare(b.date))[0];
     if (p.installType === "onprem" && !p.reqDocShared && kickoff && bd(kickoff.date, today) >= t.reqDocDays) {
       push({ type: "reqdoc_not_shared", level: "yellow", projectId: pid, entity: "project", entityId: pid, ownerId: csm, title: "Gereksinim dokümanı paylaşılmadı", detail: `Kick-off ${fmt(kickoff.date)} tarihindeydi; On-prem kurulum gereksinim dokümanı hâlâ paylaşılmadı.` });
     }

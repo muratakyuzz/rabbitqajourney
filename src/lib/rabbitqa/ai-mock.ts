@@ -46,7 +46,7 @@ export function analyzeText(state: RqState, projectId: string, source: InsightSo
       if (act && act.n > 0) {
         out.push(mk("action_update", s, { targetId: act.a.id, current: { status: act.a.status }, proposed: { status: "done" }, confidence: 80, rationale: `Mesajda "${act.a.title}" aksiyonunun yapıldığı belirtiliyor.` }));
       } else {
-        const st = state.steps.filter((x) => x.projectId === projectId && (x.status === "pending" || x.status === "in_progress"))
+        const st = state.steps.filter((x) => x.projectId === projectId && x.completion === "manual" && (x.status === "pending" || x.status === "in_progress"))
           .map((x) => ({ x, n: overlap(x.title, s) })).sort((a, b) => b.n - a.n)[0];
         if (st && st.n > 0) out.push(mk("step_update", s, { targetId: st.x.id, current: { status: st.x.status }, proposed: { status: "done" }, confidence: 75, rationale: `Mesajda "${st.x.title}" adımının tamamlandığı belirtiliyor.` }));
       }

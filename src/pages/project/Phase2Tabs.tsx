@@ -39,16 +39,17 @@ export function KickoffTab({ project }: { project: Project }) {
   const [reason, setReason] = useState("");
 
   const choiceChanged = (project.installType && installType !== project.installType) || (project.llmChoice && llm !== project.llmChoice);
-  const kickoffMeeting = state.meetings.find((m) => m.projectId === project.id && m.type === "kickoff");
+  const kickoffMeeting = state.meetings.find((m) => m.projectId === project.id && m.type === "kickoff" && m.status === "held");
   const ruleActions = state.actions.filter((a) => a.projectId === project.id && a.source === "rule");
 
   const save = () => {
     if (choiceChanged && !reason.trim()) return toast.error("Kurulum tipi veya LLM değişikliğinde gerekçe zorunlu");
-    const summary = setKickoff(project.id, {
+    const { error, summary } = setKickoff(project.id, {
       presentationShared: presentation, installType, llmChoice: llm,
       reqDocShared: installType === "onprem" ? reqDoc : false,
       reqDocSharedAt: installType === "onprem" && reqDoc ? reqDocAt || todayISO() : null,
     }, reason.trim() || undefined);
+    if (error) return toast.error(error);
     setReason("");
     toast.success("Kick-off bilgileri kaydedildi", {
       description: summary ? <span>{summary}. <Link className="underline" to={`/app/projects/${project.id}?tab=history`}>Müşteri geçmişinde gör</Link></span> : undefined,
@@ -72,10 +73,11 @@ export function KickoffTab({ project }: { project: Project }) {
 
           <div className="space-y-2">
             <Label>Kurulum tipi</Label>
-            <RadioGroup value={installType ?? ""} onValueChange={(v) => setInstallType(v as InstallType)} className="flex gap-6" disabled={!manage}>
+            <RadioGroup value={installType ?? NONE} onValueChange={(v) => setInstallType(v === NONE ? null : v as InstallType)} className="flex gap-6" disabled={!manage}>
               {(Object.keys(INSTALL_LABEL) as InstallType[]).map((k) => (
                 <label key={k} className="flex items-center gap-2 text-sm"><RadioGroupItem value={k} />{INSTALL_LABEL[k]}</label>
               ))}
+              <label className="flex items-center gap-2 text-sm"><RadioGroupItem value={NONE} disabled={project.installType !== null} />Henüz belli değil</label>
             </RadioGroup>
           </div>
 
@@ -93,10 +95,11 @@ export function KickoffTab({ project }: { project: Project }) {
 
           <div className="space-y-2">
             <Label>LLM tercihi</Label>
-            <RadioGroup value={llm ?? ""} onValueChange={(v) => setLlm(v as LlmChoice)} className="grid gap-2" disabled={!manage}>
+            <RadioGroup value={llm ?? NONE} onValueChange={(v) => setLlm(v === NONE ? null : v as LlmChoice)} className="grid gap-2" disabled={!manage}>
               {(Object.keys(LLM_LABEL) as LlmChoice[]).map((k) => (
                 <label key={k} className="flex items-center gap-2 text-sm"><RadioGroupItem value={k} />{LLM_LABEL[k]}</label>
               ))}
+              <label className="flex items-center gap-2 text-sm"><RadioGroupItem value={NONE} disabled={project.llmChoice !== null} />Henüz belli değil</label>
             </RadioGroup>
           </div>
 
