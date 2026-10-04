@@ -1,6 +1,6 @@
 # M-09a — Adım tamamlanma tipi (veri / toplantı / elle) ve otomatik tamamlanma
 
-**Durum:** Taslak
+**Durum:** Tamamlandı
 **Spec referansı:** docs/PRODUCT_SPEC.md → Ek B.2 (adım tamamlama tipleri), B.1 (sıralı akış), B.5 (sistem adımları silinemez)
 **Üst plan:** docs/plans/M-09-step-completion-workspaces.md → M-09a (bu doküman o görev metnini koddaki gerçek adlarla eşler ve test edilebilir hale getirir)
 **Branch:** feat/m09a-step-completion (main'den)

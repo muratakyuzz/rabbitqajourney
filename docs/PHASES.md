@@ -35,7 +35,7 @@ Lovable turları (Faz 1–4, AI Insight, akış, uyarı motoru, kapanış) tamam
 
 | Kod | Görev | Kural | Durum |
 |---|---|---|---|
-| M-09a | Adım tamamlama motoru (veri / toplantı / elle), toplantı durumu, "Taahhüt yok", kurulum tipi + LLM Satış Devri'ne | ● | ⬜ |
+| M-09a | Adım tamamlama motoru (veri / toplantı / elle), toplantı durumu, "Taahhüt yok", kurulum tipi + LLM Satış Devri'ne | ● | ✅ |
 | M-09b | Aşama çalışma alanı altyapısı + 00 Satış Devri paneli; Satış devri ve Kick-off sekmeleri kalkar | | ⬜ |
 | M-09c | Keşif, Erişim, Eğitim, Uyarlama çalışma alanları; uyarı rozeti/paneli; 13 sekmelik son düzen; Destek kayıtları pasif (Faz 2) | ● | ⬜ |
 | M-06 | **Dondurma:** `/phase-close M` → her ekran × rol görsel referansı (`docs/reviews/M-06/baseline/`), spec kapsaması son kontrol, `mockup-freeze` etiketi | | ⬜ |
