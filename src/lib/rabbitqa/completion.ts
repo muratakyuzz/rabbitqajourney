@@ -1,9 +1,9 @@
 import { addBusinessDays, holidayDates } from "./business-days";
-import { advanceFlow } from "./flow";
+import { advanceFlow, type MkAudit } from "./flow";
 import { MEETING_TYPE_LABEL } from "./labels";
-import type { AuditEntry, MeetingType, RqState, Step, StepStatus } from "./types";
+import type { AuditEntry, Meeting, MeetingType, RqState, Step, StepStatus } from "./types";
 
-export type MkAudit = (e: Omit<AuditEntry, "id" | "at" | "userId">) => AuditEntry;
+export type { MkAudit };
 
 export interface ConditionCheck { field: string; label: string; met: boolean }
 export interface ConditionResult { met: boolean; missing: { field: string; label: string }[]; checks: ConditionCheck[] }
@@ -65,6 +65,10 @@ export const STEP_CONDITIONS: Record<string, StepCondition> = {
   contract: {
     label: "Sözleşme",
     check: (state, projectId) => fromChecks([{ field: "doc:contract", label: "Sözleşme dokümanı", met: state.documents.some((d) => d.projectId === projectId && d.type === "contract") }]),
+  },
+  reqdoc: {
+    label: "Kurulum gereksinim dokümanı",
+    check: (state, projectId) => fromChecks([{ field: "doc:req_doc", label: "Kurulum gereksinim dokümanı", met: state.documents.some((d) => d.projectId === projectId && d.type === "req_doc") }]),
   },
   discovery_form: {
     label: "Keşif formu",
@@ -143,7 +147,9 @@ export function applyStepCompletion(state: RqState, projectId: string, mk: MkAud
     if (phase && (phase.status === "done" || phase.status === "out_of_scope")) return;
     if (met) return;
     const label = step.completion === "meeting" ? (step.meetingType ? MEETING_TYPE_LABEL[step.meetingType] : "") : STEP_CONDITIONS[step.key ?? ""]?.label ?? "";
-    const reason = `Otomatik kural: veri eksildi — ${label}`;
+    const reason = step.completion === "meeting"
+      ? `Otomatik kural: Yapıldı durumunda ${label} toplantısı kalmadı`
+      : `Otomatik kural: veri eksildi — ${label}`;
     if (step.activatedAt) {
       const due = step.due ?? addBusinessDays(today, step.durationDays || 1, hol);
       const next: Step = { ...step, status: "pending", due };
@@ -174,10 +180,19 @@ export function settleAll(state: RqState, mk: MkAudit, now: Date = new Date()): 
   return state.projects.reduce((s, p) => settleProject(s, p.id, mk, now), state);
 }
 
+export const isAutoStep = (s: Pick<Step, "completion">) => s.completion === "data" || s.completion === "meeting";
+
 export function manualStatusError(step: Step, next: StepStatus | undefined): string | null {
-  if (step.completion === "manual") return null;
+  if (!isAutoStep(step)) return null;
   if (next === undefined || next === step.status) return null;
   if (next === "done") return "Bu adım veriyle tamamlanır";
   if (step.status === "done" && (next === "pending" || next === "in_progress")) return "Bu adım veriyle tamamlanır";
   return null;
+}
+
+/** Projede, verilen türde en son tarihli "Yapıldı" toplantı. */
+export function latestHeldMeeting(state: RqState, projectId: string, type: MeetingType): Meeting | null {
+  return state.meetings
+    .filter((m) => m.projectId === projectId && m.type === type && m.status === "held")
+    .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
 }

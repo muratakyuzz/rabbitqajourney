@@ -1,7 +1,8 @@
+import type { MkAudit } from "./flow";
 import { uid } from "./seed";
 import type { Action, AuditEntry, InstallType, LlmChoice, Meeting, Project, RqState, Step } from "./types";
 
-export type MkAudit = (e: Omit<AuditEntry, "id" | "at" | "userId">) => AuditEntry;
+export type { MkAudit };
 
 const ONPREM_KEYS = ["reqdoc", "vpn_req", "vpn_info", "servers", "devops_handover"];
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyStepCompletion, manualStatusError, settleAll, settleProject, stepConditionResult, STEP_CONDITIONS } from "./completion";
+import { applyStepCompletion, isAutoStep, latestHeldMeeting, manualStatusError, settleAll, settleProject, stepConditionResult, STEP_CONDITIONS } from "./completion";
 import { installChoiceError, applyMeetingHeldRules } from "./rules";
 import { analyzeText } from "./ai-mock";
 import { computeAlerts } from "./alerts";
@@ -231,6 +231,49 @@ describe("applyStepCompletion", () => {
   });
 });
 
+describe("AC12 — reqdoc completes via settleAll when a req_doc document is added (S5/S6)", () => {
+  const withReqDoc = (s: RqState, pid: string): RqState => ({
+    ...s,
+    documents: [...s.documents, { id: "d_test", projectId: pid, type: "req_doc" as const, name: "Gereksinim.pdf", linkType: "project" as const, linkId: null, addedAt: NOW.toISOString() }],
+  });
+
+  it("a) out_of_scope reqdoc (RUL-13): settleAll leaves it out_of_scope, no new audit for that step", () => {
+    const s = seed();
+    const pid = "p_ornek";
+    const reqdoc = s.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const oos: RqState = { ...s, steps: s.steps.map((x) => (x.id === reqdoc.id ? { ...x, status: "out_of_scope" as const } : x)) };
+    const withDoc = withReqDoc(oos, pid);
+    const { mk, audit } = mkMk();
+    const next = settleAll(withDoc, mk, NOW);
+    expect(next.steps.find((x) => x.id === reqdoc.id)!.status).toBe("out_of_scope");
+    expect(audit.find((a) => a.entityId === reqdoc.id)).toBeUndefined();
+  });
+
+  it("b) locked reqdoc completes directly to done with the data-completion audit reason", () => {
+    const s = seed();
+    const pid = "p_ornek";
+    const reqdoc = s.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    expect(reqdoc.status).toBe("locked");
+    const withDoc = withReqDoc(s, pid);
+    const { mk, audit } = mkMk();
+    const next = settleAll(withDoc, mk, NOW);
+    expect(next.steps.find((x) => x.id === reqdoc.id)!.status).toBe("done");
+    const entry = audit.find((a) => a.entityId === reqdoc.id && a.newValue === "done");
+    expect(entry?.reason).toBe("Otomatik kural: veri tamamlandı — Kurulum gereksinim dokümanı");
+  });
+
+  it("c) pending reqdoc completes to done", () => {
+    const s = seed();
+    const pid = "p_ornek";
+    const reqdoc = s.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const pending: RqState = { ...s, steps: s.steps.map((x) => (x.id === reqdoc.id ? { ...x, status: "pending" as const, activatedAt: NOW.toISOString() } : x)) };
+    const withDoc = withReqDoc(pending, pid);
+    const { mk } = mkMk();
+    const next = settleAll(withDoc, mk, NOW);
+    expect(next.steps.find((x) => x.id === reqdoc.id)!.status).toBe("done");
+  });
+});
+
 describe("AC2 — flow chains through settleProject", () => {
   it("Taahhütler done opens Satış devri toplantısı (previous-dependency chain); install_llm stays independent", () => {
     const s = createSeed();
@@ -307,6 +350,13 @@ describe("manualStatusError", () => {
     expect(manualStatusError(step, undefined)).toBeNull();
     expect(manualStatusError(step, step.status)).toBeNull();
   });
+
+  it("reqdoc (AC12 d): manual 'done' rejected, 'out_of_scope' allowed", () => {
+    const s = createSeed();
+    const step = s.steps.find((x) => x.projectId === "p_ornek" && x.key === "reqdoc")!;
+    expect(manualStatusError(step, "done")).toBe("Bu adım veriyle tamamlanır");
+    expect(manualStatusError(step, "out_of_scope")).toBeNull();
+  });
 });
 
 describe("installChoiceError", () => {
@@ -362,15 +412,88 @@ describe("AI / alerts interplay", () => {
   it("reqdoc_not_shared only counts held kickoff (RUL-02)", () => {
     const s = createSeed();
     const pid = "p_garanti";
+    const reqdoc = s.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const open: RqState = { ...s, steps: s.steps.map((x) => (x.id === reqdoc.id ? { ...x, status: "pending" as const } : x)) };
     const onlyPlanned: RqState = {
-      ...s,
-      meetings: s.meetings.map((m) => (m.projectId === pid && m.type === "kickoff" ? { ...m, status: "planned" as const } : m)),
+      ...open,
+      meetings: open.meetings.map((m) => (m.projectId === pid && m.type === "kickoff" ? { ...m, status: "planned" as const } : m)),
     };
     const alerts1 = computeAlerts(onlyPlanned, "2026-10-20");
     expect(alerts1.some((a) => a.type === "reqdoc_not_shared" && a.projectId === pid)).toBe(false);
 
-    const alerts2 = computeAlerts(s, "2026-10-20");
+    const alerts2 = computeAlerts(open, "2026-10-20");
     expect(alerts2.some((a) => a.type === "reqdoc_not_shared" && a.projectId === pid)).toBe(true);
+  });
+});
+
+describe("reqdoc_not_shared — reads step status, not a project field (AC7, M-09b)", () => {
+  function fixtureWithOpenReqdoc(pid: string) {
+    const s = createSeed();
+    const reqdoc = s.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    return { s, reqdoc };
+  }
+
+  it("pending reqdoc + held kickoff + threshold reached -> alert fires", () => {
+    const { s, reqdoc } = fixtureWithOpenReqdoc("p_garanti");
+    const next: RqState = { ...s, steps: s.steps.map((x) => (x.id === reqdoc.id ? { ...x, status: "pending" as const } : x)) };
+    const alerts = computeAlerts(next, "2026-10-20");
+    expect(alerts.some((a) => a.type === "reqdoc_not_shared" && a.projectId === "p_garanti")).toBe(true);
+  });
+
+  it.each(["done", "out_of_scope", "locked"] as const)("%s reqdoc never produces the alert", (status) => {
+    const { s, reqdoc } = fixtureWithOpenReqdoc("p_garanti");
+    const next: RqState = { ...s, steps: s.steps.map((x) => (x.id === reqdoc.id ? { ...x, status } : x)) };
+    const alerts = computeAlerts(next, "2026-10-20");
+    expect(alerts.some((a) => a.type === "reqdoc_not_shared" && a.projectId === "p_garanti")).toBe(false);
+  });
+
+  it("adding a req_doc document and settling closes the step and the alert", () => {
+    const { s, reqdoc } = fixtureWithOpenReqdoc("p_garanti");
+    const open: RqState = { ...s, steps: s.steps.map((x) => (x.id === reqdoc.id ? { ...x, status: "pending" as const } : x)) };
+    expect(computeAlerts(open, "2026-10-20").some((a) => a.type === "reqdoc_not_shared" && a.projectId === "p_garanti")).toBe(true);
+    const withDoc: RqState = { ...open, documents: [...open.documents, { id: "d_test_reqdoc", projectId: "p_garanti", type: "req_doc" as const, name: "Gereksinim.pdf", linkType: "project" as const, linkId: null, addedAt: "2026-10-20T10:00:00.000Z" }] };
+    const { mk } = mkMk();
+    const settled = settleAll(withDoc, mk, new Date("2026-10-20T09:00:00"));
+    expect(settled.steps.find((x) => x.id === reqdoc.id)!.status).toBe("done");
+    expect(computeAlerts(settled, "2026-10-20").some((a) => a.type === "reqdoc_not_shared" && a.projectId === "p_garanti")).toBe(false);
+  });
+
+  it("only-planned kickoff never produces the alert even with an open reqdoc", () => {
+    const { s, reqdoc } = fixtureWithOpenReqdoc("p_garanti");
+    const open: RqState = {
+      ...s,
+      steps: s.steps.map((x) => (x.id === reqdoc.id ? { ...x, status: "pending" as const } : x)),
+      meetings: s.meetings.map((m) => (m.projectId === "p_garanti" && m.type === "kickoff" ? { ...m, status: "planned" as const } : m)),
+    };
+    expect(computeAlerts(open, "2026-10-20").some((a) => a.type === "reqdoc_not_shared")).toBe(false);
+  });
+
+  it("seed itself never produces reqdoc_not_shared for any project", () => {
+    const s = createSeed();
+    expect(computeAlerts(s, "2026-10-20").some((a) => a.type === "reqdoc_not_shared")).toBe(false);
+  });
+});
+
+describe("RUL-12 — reqdoc_not_shared business-day threshold (holiday boundary)", () => {
+  it("bd = reqDocDays - 1 -> no alert; bd = reqDocDays -> alert (count crosses the 29 Oct full-day holiday)", () => {
+    const s = createSeed();
+    const pid = "p_garanti";
+    const reqdoc = s.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const open: RqState = {
+      ...s,
+      steps: s.steps.map((x) => (x.id === reqdoc.id ? { ...x, status: "pending" as const } : x)),
+      meetings: s.meetings.map((m) => (m.projectId === pid && m.type === "kickoff" ? { ...m, status: "held" as const, date: "2026-10-27" } : m)),
+    };
+    // Kickoff 2026-10-27 (Tue). 28 Oct is a half-day holiday (arife) and still counts as a business
+    // day; 29 Oct is the full-day Cumhuriyet Bayramı holiday and is skipped entirely.
+    // 27 -> 28: 1 business day (bd = reqDocDays - 1 = 1) -> no alert.
+    expect(computeAlerts(open, "2026-10-28").some((a) => a.type === "reqdoc_not_shared" && a.projectId === pid)).toBe(false);
+    // 27 -> 29: still only 1 business day (28 counts, 29 is the full-day holiday itself and is skipped) ->
+    // no alert. This is the assertion that actually proves the holiday is excluded from the count: if 29
+    // Oct were not skipped, this would be bd = 2 and the alert would fire (REV-12).
+    expect(computeAlerts(open, "2026-10-29").some((a) => a.type === "reqdoc_not_shared" && a.projectId === pid)).toBe(false);
+    // 27 -> 30: 2 business days (28 counts, 29 is skipped, 30 is the 2nd business day) -> alert (bd = reqDocDays = 2).
+    expect(computeAlerts(open, "2026-10-30").some((a) => a.type === "reqdoc_not_shared" && a.projectId === pid)).toBe(true);
   });
 });
 
@@ -394,6 +517,66 @@ describe("template", () => {
     const teamsStep = ph02.steps.find((s) => s.key === "teams")!;
     expect(teamsStep.required).toBe(false);
   });
+
+  it("01 reqdoc is completion 'data' (S5); 01 has exactly 3 steps: meeting / data / manual", () => {
+    const ph01 = PHASE_TEMPLATE.find((p) => p.code === "01")!;
+    expect(ph01.steps.length).toBe(3);
+    const reqdoc = ph01.steps.find((s) => s.key === "reqdoc")!;
+    expect(reqdoc.completion).toBe("data");
+    const kickoff = ph01.steps.find((s) => s.key === "kickoff")!;
+    expect(kickoff.completion).toBe("meeting");
+    const presentation = ph01.steps.find((s) => s.key === "presentation")!;
+    expect(presentation.completion).toBeUndefined();
+  });
+
+  it("stepConditionResult for an unmet reqdoc step reports missing field doc:req_doc", () => {
+    const s = createSeed();
+    const step = s.steps.find((x) => x.projectId === "p_ornek" && x.key === "reqdoc")!;
+    const r = stepConditionResult(s, step)!;
+    expect(r.met).toBe(false);
+    expect(r.missing.map((m) => m.field)).toContain("doc:req_doc");
+  });
+});
+
+describe("isAutoStep (REV-08)", () => {
+  it("data and meeting steps are auto; manual and undefined completion are not", () => {
+    expect(isAutoStep({ completion: "data" })).toBe(true);
+    expect(isAutoStep({ completion: "meeting" })).toBe(true);
+    expect(isAutoStep({ completion: "manual" })).toBe(false);
+    expect(isAutoStep({ completion: undefined as unknown as "manual" })).toBe(false);
+  });
+});
+
+describe("latestHeldMeeting", () => {
+  it("returns the most recent held meeting of the given type, ignoring planned/cancelled", () => {
+    const s = createSeed();
+    const m = latestHeldMeeting(s, "p_isyatirim", "brief");
+    expect(m?.id).toBe("m_brief_isy");
+  });
+  it("returns null when no held meeting of that type exists", () => {
+    const s = createSeed();
+    expect(latestHeldMeeting(s, "p_ornek", "kickoff")).toBeNull();
+  });
+});
+
+describe("RUL-09 — meeting step reopen reason", () => {
+  it("done meeting step in a not-done phase, with no held meeting left, reopens with the RUL-09 phrasing", () => {
+    const s = createSeed();
+    const pid = "p_ornek";
+    const step = s.steps.find((x) => x.projectId === pid && x.key === "brief")!;
+    // seed has this brief meeting only "planned" for p_ornek — force it held+done to set up the reopen scenario
+    const held: RqState = {
+      ...s,
+      meetings: s.meetings.map((m) => (m.id === "m_brief_ornek" ? { ...m, status: "held" as const } : m)),
+      steps: s.steps.map((x) => (x.id === step.id ? { ...x, status: "done" as const, activatedAt: NOW.toISOString() } : x)),
+    };
+    const noHeldBrief: RqState = { ...held, meetings: held.meetings.map((m) => (m.id === "m_brief_ornek" ? { ...m, type: "checkin" as const } : m)) };
+    const { mk, audit } = mkMk();
+    const back = applyStepCompletion(noHeldBrief, pid, mk, NOW);
+    expect(back.steps.find((x) => x.id === step.id)!.status).toBe("pending");
+    const entry = audit.find((a) => a.entityId === step.id && a.field === "status");
+    expect(entry?.reason).toBe("Otomatik kural: Yapıldı durumunda Satış devri toplantısı kalmadı");
+  });
 });
 
 describe("seed invariants (AC16)", () => {
@@ -416,10 +599,14 @@ describe("seed invariants (AC16)", () => {
     expect(r2.missing.map((m) => m.field)).toEqual(["installType", "llmChoice"]);
   });
   it("every done data/meeting step in a done phase satisfies its condition (AC16 invariant, REV-03/RUL-03)", () => {
+    // Exception: reqdoc (M-09b §7/§11 risk, accepted) — seed has no req_doc documents, so done 01
+    // phases carry a reqdoc step that is "done" by seed fiat without satisfying its data condition.
+    // The phase being done means the engine never reopens it (by design); this is accepted demo-data
+    // inconsistency, not a regression.
     const s = createSeed();
     const donePhaseIds = new Set(s.phases.filter((p) => p.status === "done").map((p) => p.id));
     const offenders = s.steps.filter(
-      (st) => donePhaseIds.has(st.phaseId) && st.status === "done" && st.completion !== "manual",
+      (st) => donePhaseIds.has(st.phaseId) && st.status === "done" && st.completion !== "manual" && st.key !== "reqdoc",
     ).filter((st) => !(stepConditionResult(s, st)?.met ?? false));
     expect(offenders).toEqual([]);
   });

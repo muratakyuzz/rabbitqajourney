@@ -1,4 +1,4 @@
-import { SEED_USERS } from "@/lib/rabbitqa/seed";
+import { SEED_USERS, STATE_KEY, STATE_VERSION } from "@/lib/rabbitqa/seed";
 import type { Role, User } from "@/lib/rabbitqa/types";
 
 export type AppRole = Role;
@@ -16,7 +16,6 @@ export interface AuthUser {
 const TOKEN_PREFIX = "rabbitqa-demo::";
 
 export const demoUsers = SEED_USERS;
-const STATE_KEY = "rabbitqa-demo-state-v8";
 
 /** Kayıtlı demo state'teki kullanıcılar; yoksa seed kullanıcıları. */
 function currentUsers(): User[] {
@@ -24,7 +23,7 @@ function currentUsers(): User[] {
     const raw = localStorage.getItem(STATE_KEY);
     if (raw) {
       const s = JSON.parse(raw) as { version?: number; users?: User[] };
-      if (s.version === 8 && Array.isArray(s.users) && s.users.length) return s.users;
+      if (s.version === STATE_VERSION && Array.isArray(s.users) && s.users.length) return s.users;
     }
   } catch { /* ignore */ }
   return SEED_USERS;

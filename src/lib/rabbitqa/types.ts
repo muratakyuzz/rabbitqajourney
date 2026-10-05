@@ -67,9 +67,6 @@ export interface Project {
   teamInfo: Record<string, { contact: string; users: number | null }>;
   installType: InstallType | null;
   llmChoice: LlmChoice | null;
-  presentationShared: boolean;
-  reqDocShared: boolean;
-  reqDocSharedAt: string | null;
   createdAt: string;
   integrations: ProjectIntegrations;
   goLiveApproval?: GoLiveApproval | null;

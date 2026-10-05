@@ -53,6 +53,8 @@ export function canHandleAlert(u: AuthUser | null, p: Project, a: Pick<ComputedA
   return canManageProject(u, p) || (!!u && a.ownerId === u.id);
 }
 export const canManageUsers = (u: AuthUser | null) => u?.role === "admin";
+/** CSM ataması yalnızca Manager yapar (admin dahil değil; S3). */
+export const canAssignCsm = (u: AuthUser | null) => u?.role === "manager";
 /** Haftalık raporu oluşturma / düzenleme / gönderildi işaretleme. */
 export const canEditReport = (u: AuthUser | null, p: Project) => canManageProject(u, p);
 export const canMarkReportSent = canEditReport;

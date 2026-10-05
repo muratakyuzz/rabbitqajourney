@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+import { toast } from "sonner";
 import { RqProvider, useRq } from "./store";
 import { manualStatusError } from "./completion";
+import { loginApi } from "@/lib/auth-api";
 
 vi.mock("@/lib/auth-context", () => ({
   useAuth: () => ({ user: { id: "u_manager", role: "manager", name: "Örnek Manager", email: "manager@virgosol.com" } }),
 }));
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 function setup() {
   return renderHook(() => useRq(), { wrapper: RqProvider });
@@ -13,6 +17,7 @@ function setup() {
 
 beforeEach(() => {
   localStorage.clear();
+  vi.clearAllMocks();
 });
 
 describe("updateStep — manual completion guard (AC10)", () => {
@@ -182,13 +187,13 @@ describe("updateStep — out_of_scope reopens via settle (AC10, REV-03)", () => 
   });
 });
 
-describe("setKickoff (AC14, AC-NEG3)", () => {
+describe("setInstallChoice (AC14, AC-NEG3)", () => {
   it("null -> onprem without reason succeeds and logs an audit entry", () => {
     const { result } = setup();
     const pid = "p_ornek";
     let res: { error: string | null; summary: string | null } = { error: null, summary: null };
     act(() => {
-      res = result.current.setKickoff(pid, { presentationShared: false, installType: "onprem", llmChoice: null, reqDocShared: false, reqDocSharedAt: null });
+      res = result.current.setInstallChoice(pid, { installType: "onprem" });
     });
     expect(res.error).toBeNull();
     const entry = result.current.state.audit.find((a) => a.projectId === pid && a.field === "installType");
@@ -199,12 +204,12 @@ describe("setKickoff (AC14, AC-NEG3)", () => {
     const { result } = setup();
     const pid = "p_ornek";
     act(() => {
-      result.current.setKickoff(pid, { presentationShared: false, installType: "onprem", llmChoice: null, reqDocShared: false, reqDocSharedAt: null });
+      result.current.setInstallChoice(pid, { installType: "onprem" });
     });
     const before = result.current.state;
     let res: { error: string | null; summary: string | null } = { error: null, summary: null };
     act(() => {
-      res = result.current.setKickoff(pid, { presentationShared: false, installType: "saas", llmChoice: null, reqDocShared: false, reqDocSharedAt: null });
+      res = result.current.setInstallChoice(pid, { installType: "saas" });
     });
     expect(res.error).toBe("Kurulum tipi veya LLM değişikliğinde gerekçe zorunlu");
     expect(result.current.state).toBe(before);
@@ -214,11 +219,11 @@ describe("setKickoff (AC14, AC-NEG3)", () => {
     const { result } = setup();
     const pid = "p_ornek";
     act(() => {
-      result.current.setKickoff(pid, { presentationShared: false, installType: "onprem", llmChoice: null, reqDocShared: false, reqDocSharedAt: null });
+      result.current.setInstallChoice(pid, { installType: "onprem" });
     });
     let res: { error: string | null; summary: string | null } = { error: null, summary: null };
     act(() => {
-      res = result.current.setKickoff(pid, { presentationShared: false, installType: "saas", llmChoice: null, reqDocShared: false, reqDocSharedAt: null }, "müşteri kararı");
+      res = result.current.setInstallChoice(pid, { installType: "saas" }, "müşteri kararı");
     });
     expect(res.error).toBeNull();
     const reqdoc = result.current.state.steps.find((s) => s.projectId === pid && s.key === "reqdoc")!;
@@ -231,7 +236,7 @@ describe("setKickoff (AC14, AC-NEG3)", () => {
     const { result } = setup();
     const pid = "p_ornek";
     act(() => {
-      result.current.setKickoff(pid, { presentationShared: false, installType: "saas", llmChoice: null, reqDocShared: false, reqDocSharedAt: null });
+      result.current.setInstallChoice(pid, { installType: "saas" });
     });
     const saasEnvAfterFirst = result.current.state.steps.find((s) => s.projectId === pid && s.key === "saas_env")!;
     expect(saasEnvAfterFirst).toBeDefined();
@@ -239,7 +244,7 @@ describe("setKickoff (AC14, AC-NEG3)", () => {
     expect(vpnInfoAfterSaas.status).toBe("out_of_scope");
 
     act(() => {
-      result.current.setKickoff(pid, { presentationShared: false, installType: "onprem", llmChoice: null, reqDocShared: false, reqDocSharedAt: null }, "müşteri onprem'e döndü");
+      result.current.setInstallChoice(pid, { installType: "onprem" }, "müşteri onprem'e döndü");
     });
     const vpnInfoAfterOnprem = result.current.state.steps.find((s) => s.projectId === pid && s.key === "vpn_info")!;
     expect(vpnInfoAfterOnprem.status).toBe("locked");
@@ -247,7 +252,7 @@ describe("setKickoff (AC14, AC-NEG3)", () => {
     expect(saasEnvAfterOnprem.status).toBe("out_of_scope");
 
     act(() => {
-      result.current.setKickoff(pid, { presentationShared: false, installType: "saas", llmChoice: null, reqDocShared: false, reqDocSharedAt: null }, "müşteri tekrar saas'a döndü");
+      result.current.setInstallChoice(pid, { installType: "saas" }, "müşteri tekrar saas'a döndü");
     });
     const saasEnvSteps = result.current.state.steps.filter((s) => s.projectId === pid && s.key === "saas_env");
     expect(saasEnvSteps.length).toBe(1);
@@ -262,11 +267,11 @@ describe("setKickoff (AC14, AC-NEG3)", () => {
     const { result } = setup();
     const pid = "p_ornek";
     act(() => {
-      result.current.setKickoff(pid, { presentationShared: false, installType: "onprem", llmChoice: null, reqDocShared: false, reqDocSharedAt: null });
+      result.current.setInstallChoice(pid, { installType: "onprem" });
     });
     let res: { error: string | null; summary: string | null } = { error: null, summary: null };
     act(() => {
-      res = result.current.setKickoff(pid, { presentationShared: false, installType: null, llmChoice: null, reqDocShared: false, reqDocSharedAt: null });
+      res = result.current.setInstallChoice(pid, { installType: null });
     });
     expect(res.error).toBe("Kurulum tipi seçildikten sonra 'Henüz belli değil' yapılamaz");
   });
@@ -301,12 +306,12 @@ describe("addTraining — participant step is manual (REV-01)", () => {
   });
 });
 
-describe("setKickoff — SaaS step is manual (REV-01)", () => {
+describe("setInstallChoice — SaaS step is manual (REV-01)", () => {
   it("saas_env step is created with completion manual and can be completed by hand", () => {
     const { result } = setup();
     const pid = "p_akbank";
     act(() => {
-      result.current.setKickoff(pid, { presentationShared: true, installType: "saas", llmChoice: "rabbitqa", reqDocShared: true, reqDocSharedAt: "2026-09-08" }, "müşteri kararı");
+      result.current.setInstallChoice(pid, { installType: "saas", llmChoice: "rabbitqa" }, "müşteri kararı");
     });
     const saasEnv = result.current.state.steps.find((s) => s.projectId === pid && s.key === "saas_env")!;
     expect(saasEnv).toBeDefined();
@@ -329,5 +334,194 @@ describe("approveInsight — step_update guard (AC17)", () => {
     let err: string | null = null;
     act(() => { err = result.current.approveInsight(insight.id); });
     expect(err).toBe("Bu adım veriyle tamamlanır");
+  });
+});
+
+describe("flowMessages — Tamamlandı toast (AC10)", () => {
+  it("auto-completing a data step toasts 'Tamamlandı: <title>'", () => {
+    const { result } = setup();
+    const pid = "p_ornek";
+    act(() => { result.current.updateProject(pid, { licenseModel: "X" }); });
+    expect(toast.success).toHaveBeenCalledWith("Tamamlandı: Satışçı ve lisans modelinin girilmesi");
+  });
+
+  it("a held brief meeting with a rule action keeps its toast across the follow-up setState (does not get overwritten)", () => {
+    const { result } = setup();
+    const pid = "p_ornek";
+    act(() => {
+      result.current.addMeeting(
+        { projectId: pid, type: "brief", date: "2026-10-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "held" },
+        [{ title: "Takip aksiyonu", ownerId: null, ball: "csm", due: null, priority: "medium", status: "open" }],
+      );
+    });
+    const calls = (toast.success as unknown as { mock: { calls: unknown[][] } }).mock.calls.map((c) => c[0]);
+    const matches = calls.filter((m) => m === "Tamamlandı: Satış devri toplantısı");
+    expect(matches.length).toBe(1);
+  });
+});
+
+describe("state v10 + login (AC11)", () => {
+  it("createSeed version is 10", async () => {
+    const { createSeed } = await import("./seed");
+    expect(createSeed().version).toBe(10);
+  });
+
+  it("a v9 localStorage record is discarded and the seed is reloaded", () => {
+    localStorage.setItem("rabbitqa-demo-state-v9", JSON.stringify({ version: 9, users: [] }));
+    const { result } = setup();
+    expect(result.current.state.version).toBe(10);
+    expect(result.current.state.projects.length).toBeGreaterThan(0);
+  });
+
+  it("addUser then loginApi succeeds for the new user", async () => {
+    const { result } = setup();
+    act(() => { result.current.addUser({ name: "Yeni Kişi", email: "yeni@virgosol.com", role: "csm" }); });
+    const res = await loginApi("yeni@virgosol.com", "x");
+    expect(res.user.email).toBe("yeni@virgosol.com");
+  });
+
+  it("a deactivated user cannot log in", async () => {
+    const { result } = setup();
+    const u = result.current.state.users.find((x) => x.role === "csm" && x.active !== false)!;
+    act(() => { result.current.updateUser(u.id, { active: false }); });
+    await expect(loginApi(u.email, "x")).rejects.toThrow("Hesap pasif");
+  });
+});
+
+describe("reqdoc — data-completed step, RUL-13 (AC12)", () => {
+  it("a) out_of_scope reqdoc stays out_of_scope when a req_doc document is added; no new step audit", () => {
+    const { result } = setup();
+    const pid = "p_ornek";
+    act(() => { result.current.setInstallChoice(pid, { installType: "saas" }); });
+    const reqdoc = result.current.state.steps.find((s) => s.projectId === pid && s.key === "reqdoc")!;
+    expect(reqdoc.status).toBe("out_of_scope");
+    const auditCountBefore = result.current.state.audit.filter((a) => a.entityId === reqdoc.id).length;
+    act(() => { result.current.addDocument({ projectId: pid, type: "req_doc", name: "Gereksinim.pdf", linkType: "project", linkId: null }); });
+    const after = result.current.state.steps.find((s) => s.id === reqdoc.id)!;
+    expect(after.status).toBe("out_of_scope");
+    const auditCountAfter = result.current.state.audit.filter((a) => a.entityId === reqdoc.id).length;
+    expect(auditCountAfter).toBe(auditCountBefore);
+    expect(result.current.state.documents.some((d) => d.projectId === pid && d.type === "req_doc")).toBe(true);
+  });
+
+  it("b) locked reqdoc completes directly (done) when a req_doc document is added; 01 stays locked", () => {
+    const { result } = setup();
+    const pid = "p_ornek";
+    const reqdoc = result.current.state.steps.find((s) => s.projectId === pid && s.key === "reqdoc")!;
+    expect(reqdoc.status).toBe("locked");
+    act(() => { result.current.addDocument({ projectId: pid, type: "req_doc", name: "Gereksinim.pdf", linkType: "project", linkId: null }); });
+    const after = result.current.state.steps.find((s) => s.id === reqdoc.id)!;
+    expect(after.status).toBe("done");
+    const entry = result.current.state.audit.find((a) => a.entityId === reqdoc.id && a.newValue === "done");
+    expect(entry?.reason).toBe("Otomatik kural: veri tamamlandı — Kurulum gereksinim dokümanı");
+    expect(toast.success).toHaveBeenCalledWith("Tamamlandı: Kurulum gereksinim dokümanının paylaşılması");
+    const ph01 = result.current.state.phases.find((p) => p.projectId === pid && p.code === "01")!;
+    expect(ph01.status).toBe("locked");
+  });
+
+  it("c) pending reqdoc completes when a req_doc document is added", () => {
+    const { result } = setup();
+    const pid = "p_ornek";
+    act(() => { result.current.setInstallChoice(pid, { installType: "onprem" }); });
+    const reqdoc = result.current.state.steps.find((s) => s.projectId === pid && s.key === "reqdoc")!;
+    expect(["pending", "in_progress", "locked"]).toContain(reqdoc.status);
+    act(() => { result.current.addDocument({ projectId: pid, type: "req_doc", name: "Gereksinim.pdf", linkType: "project", linkId: null }); });
+    expect(result.current.state.steps.find((s) => s.id === reqdoc.id)!.status).toBe("done");
+  });
+
+  it("e) req_doc present: out_of_scope reqdoc re-completes to done once On-prem reopens it (locked -> done via settle)", () => {
+    const { result } = setup();
+    const pid = "p_ornek";
+    // Go SaaS first (no req_doc yet) so reqdoc becomes out_of_scope, then add the document while still SaaS (RUL-13: no-op),
+    // then switch back to On-prem: applyInstallType reopens the out_of_scope step to locked, and the same setState's
+    // settleAll immediately completes it since the req_doc document already exists.
+    act(() => { result.current.setInstallChoice(pid, { installType: "saas" }); });
+    expect(result.current.state.steps.find((s) => s.projectId === pid && s.key === "reqdoc")!.status).toBe("out_of_scope");
+    act(() => { result.current.addDocument({ projectId: pid, type: "req_doc", name: "Gereksinim.pdf", linkType: "project", linkId: null }); });
+    expect(result.current.state.steps.find((s) => s.projectId === pid && s.key === "reqdoc")!.status).toBe("out_of_scope");
+    act(() => { result.current.setInstallChoice(pid, { installType: "onprem" }, "müşteri on-prem'e döndü"); });
+    expect(result.current.state.steps.find((s) => s.projectId === pid && s.key === "reqdoc")!.status).toBe("done");
+  });
+
+  it("f) no setStepByKey call referencing 'reqdoc' remains in store.tsx", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const dir = path.dirname(new URL(import.meta.url).pathname);
+    const src = fs.readFileSync(path.join(dir, "store.tsx"), "utf-8");
+    expect(/setStepByKey\([^)]*"reqdoc"/.test(src)).toBe(false);
+  });
+});
+
+describe("setInstallChoice — SaaS -> On-prem -> SaaS (AC13, RUL-10)", () => {
+  it("each transition adds a new 'Otomatik kural: kurulum tipi' audit; saas_env re-locks on return to SaaS with the same id throughout", () => {
+    const { result } = setup();
+    const pid = "p_ornek";
+    const kuralAuditCount = () => result.current.state.audit.filter((a) => a.projectId === pid && a.reason?.startsWith("Otomatik kural: kurulum tipi")).length;
+
+    act(() => { result.current.setInstallChoice(pid, { installType: "saas" }); });
+    const afterFirst = kuralAuditCount();
+    expect(afterFirst).toBeGreaterThan(0);
+    const saasEnvId = result.current.state.steps.find((s) => s.projectId === pid && s.key === "saas_env")!.id;
+    expect(result.current.state.steps.find((s) => s.projectId === pid && s.key === "saas_env")!.status).toBe("locked");
+
+    act(() => { result.current.setInstallChoice(pid, { installType: "onprem" }, "müşteri on-prem'e döndü"); });
+    const afterSecond = kuralAuditCount();
+    expect(afterSecond).toBeGreaterThan(afterFirst);
+    const saasEnvAfterOnprem = result.current.state.steps.find((s) => s.projectId === pid && s.key === "saas_env")!;
+    expect(saasEnvAfterOnprem.id).toBe(saasEnvId);
+    expect(saasEnvAfterOnprem.status).toBe("out_of_scope");
+
+    act(() => { result.current.setInstallChoice(pid, { installType: "saas" }, "müşteri saas'a döndü"); });
+    const afterThird = kuralAuditCount();
+    expect(afterThird).toBeGreaterThan(afterSecond);
+    // RUL-10: SaaS -> On-prem -> SaaS must re-lock saas_env (no duplicate step), not leave it out_of_scope.
+    const saasEnvAfterReturn = result.current.state.steps.find((s) => s.projectId === pid && s.key === "saas_env")!;
+    expect(saasEnvAfterReturn.id).toBe(saasEnvId);
+    expect(saasEnvAfterReturn.status).toBe("locked");
+    expect(result.current.state.steps.filter((s) => s.projectId === pid && s.key === "saas_env").length).toBe(1);
+
+    act(() => { result.current.setInstallChoice(pid, { installType: "onprem" }, "müşteri tekrar on-prem'e döndü"); });
+    const saasEnvFinal = result.current.state.steps.find((s) => s.projectId === pid && s.key === "saas_env")!;
+    expect(saasEnvFinal.id).toBe(saasEnvId);
+    expect(saasEnvFinal.status).toBe("out_of_scope");
+  });
+});
+
+describe("setInstallChoice — LLM gpu -> own -> gpu (AC13, RUL-11)", () => {
+  it("toggles gpu/own actions and model_install step exactly once per ruleKey, each transition audited", () => {
+    const { result } = setup();
+    const pid = "p_isyatirim"; // llmChoice starts as rabbitqa
+    act(() => { result.current.setInstallChoice(pid, { llmChoice: "gpu" }, "gpu'ya geçiş"); });
+    const gpuActions1 = result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "gpu_req");
+    expect(gpuActions1.length).toBe(1);
+    expect(gpuActions1[0].status).toBe("open");
+    const model1 = result.current.state.steps.find((s) => s.projectId === pid && s.key === "model_install")!;
+    expect(model1.status).not.toBe("out_of_scope");
+
+    act(() => { result.current.setInstallChoice(pid, { llmChoice: "own" }, "own'a geçiş"); });
+    const gpuActions2 = result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "gpu_req");
+    expect(gpuActions2.length).toBe(1);
+    expect(gpuActions2[0].status).toBe("cancelled");
+    const ownActions = result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "llm_endpoint");
+    expect(ownActions.length).toBe(1);
+    expect(ownActions[0].status).toBe("open");
+    const model2 = result.current.state.steps.find((s) => s.projectId === pid && s.key === "model_install")!;
+    expect(model2.status).toBe("out_of_scope");
+
+    act(() => { result.current.setInstallChoice(pid, { llmChoice: "gpu" }, "gpu'ya tekrar geçiş"); });
+    const gpuActions3 = result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "gpu_req");
+    expect(gpuActions3.length).toBe(1);
+    expect(gpuActions3[0].status).toBe("open");
+    const ownActions2 = result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "llm_endpoint");
+    expect(ownActions2[0].status).toBe("cancelled");
+    const model3 = result.current.state.steps.find((s) => s.projectId === pid && s.key === "model_install")!;
+    expect(model3.status).not.toBe("out_of_scope");
+
+    const llmAudits = result.current.state.audit.filter((a) => a.projectId === pid && a.reason?.startsWith("Otomatik kural: LLM tercihi"));
+    expect(llmAudits.length).toBeGreaterThan(0);
+
+    const auditCountBefore = result.current.state.audit.length;
+    act(() => { result.current.setInstallChoice(pid, { llmChoice: "gpu" }); });
+    expect(result.current.state.audit.length).toBe(auditCountBefore);
   });
 });

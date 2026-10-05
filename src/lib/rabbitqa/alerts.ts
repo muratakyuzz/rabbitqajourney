@@ -1,6 +1,6 @@
 import { businessDaysBetween, holidayDates } from "./business-days";
 import { isActivePhase, isOpenStep, isPassed } from "./flow";
-import type { AlertState, AlertStateStatus, AlertType, ComputedAlert, Phase, PhaseStatus, RqState } from "./types";
+import type { AlertState, AlertStateStatus, AlertType, ComputedAlert, Phase, PhaseStatus, RqState, Step } from "./types";
 
 export const DEFAULT_THRESHOLDS = { phaseRiskDays: 3, dueSoonDays: 2, customerWaitDays: 5, customerWaitRedDays: 10, reqDocDays: 2, goLiveCommitDays: 5, credentialDays: 7, silentDays: 10 };
 
@@ -65,7 +65,8 @@ export function computeAlerts(state: RqState, today: string): ComputedAlert[] {
 
     // 6 gereksinim dokümanı
     const kickoff = state.meetings.filter((m) => m.projectId === pid && m.type === "kickoff" && m.status === "held").sort((a, b) => a.date.localeCompare(b.date))[0];
-    if (p.installType === "onprem" && !p.reqDocShared && kickoff && bd(kickoff.date, today) >= t.reqDocDays) {
+    const reqdoc = steps.find((s) => s.key === "reqdoc") as Step | undefined;
+    if (p.installType === "onprem" && reqdoc && isOpenStep(reqdoc) && kickoff && bd(kickoff.date, today) >= t.reqDocDays) {
       push({ type: "reqdoc_not_shared", level: "yellow", projectId: pid, entity: "project", entityId: pid, ownerId: csm, title: "Gereksinim dokümanı paylaşılmadı", detail: `Kick-off ${fmt(kickoff.date)} tarihindeydi; On-prem kurulum gereksinim dokümanı hâlâ paylaşılmadı.` });
     }
 

@@ -53,7 +53,7 @@ export const PHASE_TEMPLATE: PhaseTpl[] = [
   ]},
   { code: "01", name: "Kick-off", dependency: "previous", steps: [
     S("Kick-off toplantısı", "csm", true, "Ö", 3, { key: "kickoff", completion: "meeting", meetingType: "kickoff" }),
-    S("Kurulum gereksinim dokümanının paylaşılması", "csm", true, "Ö", 2, { key: "reqdoc" }),
+    S("Kurulum gereksinim dokümanının paylaşılması", "csm", true, "Ö", 2, { key: "reqdoc", completion: "data" }),
     S("Onboarding sunumunun paylaşılması", "csm", false, "B", 2, { key: "presentation" }),
   ]},
   { code: "02", name: "Keşif", dependency: "previous", steps: [
@@ -136,6 +136,9 @@ function prevBusinessDay(iso: string) {
   return d.toISOString().slice(0, 10);
 }
 
+export const STATE_VERSION = 10;
+export const STATE_KEY = `rabbitqa-demo-state-v${STATE_VERSION}`;
+
 export const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
 
 export function ownerFor(ball: Ball, csmId: string | null, users: User[], ownerRole?: "manager") {
@@ -206,9 +209,6 @@ export function createSeed(): RqState {
     },
     installType: "onprem",
     llmChoice: "rabbitqa",
-    presentationShared: true,
-    reqDocShared: true,
-    reqDocSharedAt: "2026-08-28",
     createdAt: "2026-08-21T09:00:00.000Z",
     integrations: {
       chat: { provider: "teams", channelId: "ch_isy", active: true, since: "2026-08-28T09:00:00.000Z" },
@@ -284,7 +284,7 @@ export function createSeed(): RqState {
       q_notes: "", q_kpi: "Otomasyon kapsamının artırılması.",
     },
     teamInfo: { "Mobil Bankacılık": { contact: "Burak Aydın", users: null } },
-    installType: null, llmChoice: null, presentationShared: false, reqDocShared: false, reqDocSharedAt: null, createdAt: "2026-09-18T09:00:00.000Z",
+    installType: null, llmChoice: null, createdAt: "2026-09-18T09:00:00.000Z",
     integrations: {
       chat: { provider: "teams", channelId: null, active: false, since: null },
       email: { active: false, extraDomains: ["garantibbva.com.tr"], since: null },
@@ -318,7 +318,7 @@ export function createSeed(): RqState {
       }
       if (ph.code === "06") ph.dependency = "independent";
     });
-    p2.installType = "onprem"; p2.llmChoice = "rabbitqa"; p2.presentationShared = true; p2.reqDocShared = false; p2.reqDocSharedAt = null;
+    p2.installType = "onprem"; p2.llmChoice = "rabbitqa";
   }
   phases.push(...b2.phases);
   steps.push(...b2.steps);
@@ -333,7 +333,7 @@ export function createSeed(): RqState {
     id: "p_akbank", customerName: "Akbank Teknoloji", name: "RabbitQA Customer Onboarding", csmId: "u_deniz", salespersonId: "s_3",
     licenseModel: "Yıllık abonelik", purchasedModules: ["TestPilot"], desiredModules: ["TestPilot"],
     startDate: "2026-09-01", goLiveDate: "2026-12-15", health: "yellow", healthReason: "Müşteriden dönüş alınamıyor.", teams: [], discoveryAnswers: {}, teamInfo: {},
-    installType: "onprem", llmChoice: "rabbitqa", presentationShared: true, reqDocShared: true, reqDocSharedAt: "2026-09-08", createdAt: "2026-09-01T09:00:00.000Z",
+    installType: "onprem", llmChoice: "rabbitqa", createdAt: "2026-09-01T09:00:00.000Z",
     integrations: { chat: { provider: "teams", channelId: null, active: false, since: null }, email: { active: false, extraDomains: [], since: null } },
     noCommitments: false,
   };
@@ -368,7 +368,7 @@ export function createSeed(): RqState {
     id: "p_ornek", customerName: "Örnek Sigorta A.Ş.", name: "RabbitQA Customer Onboarding", csmId: "u_deniz", salespersonId: "s_1",
     licenseModel: "", purchasedModules: [], desiredModules: [], teams: [], discoveryAnswers: {}, teamInfo: {},
     startDate: p4StartDate, goLiveDate: addBusinessDays(p4StartDate, 60), health: "green", healthReason: "",
-    installType: null, llmChoice: null, presentationShared: false, reqDocShared: false, reqDocSharedAt: null, createdAt: new Date().toISOString(),
+    installType: null, llmChoice: null, createdAt: new Date().toISOString(),
     integrations: { chat: { provider: "teams", channelId: null, active: false, since: null }, email: { active: false, extraDomains: [], since: null } },
     noCommitments: false,
   };
@@ -442,7 +442,7 @@ export function createSeed(): RqState {
   ];
 
   const seedState: RqState = {
-    version: 9,
+    version: STATE_VERSION,
     template: PHASE_TEMPLATE,
     users,
     salespeople: SEED_SALESPEOPLE,

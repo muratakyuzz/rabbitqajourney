@@ -9,7 +9,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -18,117 +17,12 @@ import { Pill, StepStatusBadge } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { personName, useRq } from "@/lib/rabbitqa/store";
 import { canManageProject, canSeeCredentials, selectableUsers } from "@/lib/rabbitqa/perm";
-import { Link } from "react-router-dom";
 import { KpiChart } from "@/components/rq/KpiChart";
 import { VisibleIcon } from "@/components/rq/VisibleIcon";
 import { DOC_TYPE_LABEL, INSTALL_LABEL, LLM_LABEL, MEETING_TYPE_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
-import type { DocType, InstallType, LlmChoice, Project } from "@/lib/rabbitqa/types";
+import type { DocType, Project } from "@/lib/rabbitqa/types";
 
 const NONE = "__none";
-
-/* ── Kick-off ───────────────────────────────────────────── */
-export function KickoffTab({ project }: { project: Project }) {
-  const { state, setKickoff } = useRq();
-  const { user } = useAuth();
-  const manage = canManageProject(user, project);
-  const [installType, setInstallType] = useState<InstallType | null>(project.installType);
-  const [llm, setLlm] = useState<LlmChoice | null>(project.llmChoice);
-  const [presentation, setPresentation] = useState(project.presentationShared);
-  const [reqDoc, setReqDoc] = useState(project.reqDocShared);
-  const [reqDocAt, setReqDocAt] = useState(project.reqDocSharedAt ?? "");
-  const [reason, setReason] = useState("");
-
-  const choiceChanged = (project.installType && installType !== project.installType) || (project.llmChoice && llm !== project.llmChoice);
-  const kickoffMeeting = state.meetings.find((m) => m.projectId === project.id && m.type === "kickoff" && m.status === "held");
-  const ruleActions = state.actions.filter((a) => a.projectId === project.id && a.source === "rule");
-
-  const save = () => {
-    if (choiceChanged && !reason.trim()) return toast.error("Kurulum tipi veya LLM değişikliğinde gerekçe zorunlu");
-    const { error, summary } = setKickoff(project.id, {
-      presentationShared: presentation, installType, llmChoice: llm,
-      reqDocShared: installType === "onprem" ? reqDoc : false,
-      reqDocSharedAt: installType === "onprem" && reqDoc ? reqDocAt || todayISO() : null,
-    }, reason.trim() || undefined);
-    if (error) return toast.error(error);
-    setReason("");
-    toast.success("Kick-off bilgileri kaydedildi", {
-      description: summary ? <span>{summary}. <Link className="underline" to={`/app/projects/${project.id}?tab=history`}>Müşteri geçmişinde gör</Link></span> : undefined,
-      duration: summary ? 8000 : undefined,
-    });
-  };
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      <Card className="lg:col-span-2">
-        <CardHeader><CardTitle className="text-base">Kick-off</CardTitle></CardHeader>
-        <CardContent className="space-y-5">
-          <div className="text-sm">
-            Kick-off toplantısı:{" "}
-            {kickoffMeeting ? <span className="font-medium">{fmtDate(kickoffMeeting.date)} tarihinde yapıldı</span> : <span className="text-muted-foreground">Henüz kaydedilmedi ("Toplantılar" sekmesinden ekleyin)</span>}
-          </div>
-          <label className="flex items-center gap-3 text-sm">
-            <Switch checked={presentation} onCheckedChange={setPresentation} disabled={!manage} />
-            Onboarding sunumu müşteriyle paylaşıldı
-          </label>
-
-          <div className="space-y-2">
-            <Label>Kurulum tipi</Label>
-            <RadioGroup value={installType ?? NONE} onValueChange={(v) => setInstallType(v === NONE ? null : v as InstallType)} className="flex gap-6" disabled={!manage}>
-              {(Object.keys(INSTALL_LABEL) as InstallType[]).map((k) => (
-                <label key={k} className="flex items-center gap-2 text-sm"><RadioGroupItem value={k} />{INSTALL_LABEL[k]}</label>
-              ))}
-              <label className="flex items-center gap-2 text-sm"><RadioGroupItem value={NONE} disabled={project.installType !== null} />Henüz belli değil</label>
-            </RadioGroup>
-          </div>
-
-          {installType === "onprem" && (
-            <div className="rounded-lg border p-3 space-y-3">
-              <label className="flex items-center gap-3 text-sm">
-                <Switch checked={reqDoc} onCheckedChange={setReqDoc} disabled={!manage} />
-                Kurulum gereksinim dokümanı {reqDoc ? "paylaşıldı" : "paylaşılmadı"}
-              </label>
-              {reqDoc && (
-                <div className="grid gap-2 max-w-xs"><Label>Paylaşım tarihi</Label><Input type="date" value={reqDocAt} onChange={(e) => setReqDocAt(e.target.value)} disabled={!manage} /></div>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label>LLM tercihi</Label>
-            <RadioGroup value={llm ?? NONE} onValueChange={(v) => setLlm(v === NONE ? null : v as LlmChoice)} className="grid gap-2" disabled={!manage}>
-              {(Object.keys(LLM_LABEL) as LlmChoice[]).map((k) => (
-                <label key={k} className="flex items-center gap-2 text-sm"><RadioGroupItem value={k} />{LLM_LABEL[k]}</label>
-              ))}
-              <label className="flex items-center gap-2 text-sm"><RadioGroupItem value={NONE} disabled={project.llmChoice !== null} />Henüz belli değil</label>
-            </RadioGroup>
-          </div>
-
-          {choiceChanged && (
-            <div className="grid gap-2">
-              <Label>Değişiklik gerekçesi (zorunlu)</Label>
-              <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Neden değişti?" />
-              <p className="text-xs text-muted-foreground">Eski adımlar silinmez, "Kapsam dışı" yapılır; yeni adım ve aksiyonlar açılır.</p>
-            </div>
-          )}
-          {manage && <Button onClick={save}>Kaydet</Button>}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">Otomatik açılan aksiyonlar</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          {ruleActions.length === 0 && <p className="text-sm text-muted-foreground">Bu seçimlere bağlı otomatik aksiyon yok.</p>}
-          {ruleActions.map((a) => (
-            <div key={a.id} className="rounded-lg border p-2.5 text-sm">
-              <p className={a.status === "cancelled" ? "line-through text-muted-foreground" : "font-medium"}>{a.title}</p>
-              <p className="text-xs text-muted-foreground">{personName(state, a.ownerId)} · {a.status === "cancelled" ? "İptal" : a.status === "done" ? "Tamamlandı" : "Açık"}</p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
 /* ── KPI ────────────────────────────────────────────────── */
 export function KpiSection({ project }: { project: Project }) {
@@ -442,16 +336,68 @@ export function AccessTab({ project }: { project: Project }) {
 }
 
 /* ── Documents ──────────────────────────────────────────── */
-export function DocumentsTab({ project }: { project: Project }) {
+export function DocumentUploadDialog({ project, lockedType, defaultLink, onClose, onSaved }: {
+  project: Project; lockedType?: DocType; defaultLink?: { linkType: "project" | "meeting" | "step"; linkId: string | null }; onClose: () => void; onSaved?: () => void;
+}) {
   const { state, addDocument } = useRq();
-  const { user } = useAuth();
-  const manage = canManageProject(user, project);
-  const docs = state.documents.filter((d) => d.projectId === project.id).sort((a, b) => b.addedAt.localeCompare(a.addedAt));
   const meetings = state.meetings.filter((m) => m.projectId === project.id);
   const steps = state.steps.filter((s) => s.projectId === project.id && s.status !== "out_of_scope");
-  const [type, setType] = useState<DocType>("other");
+  const [type, setType] = useState<DocType>(lockedType ?? "other");
   const [name, setName] = useState("");
-  const [link, setLink] = useState("project");
+  const [link, setLink] = useState(defaultLink ? `${defaultLink.linkType}${defaultLink.linkId ? `:${defaultLink.linkId}` : ""}` : "project");
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Doküman ekle</DialogTitle></DialogHeader>
+        <div className="grid gap-3">
+          <div className="grid gap-1">
+            <Label className="text-xs">Dosya</Label>
+            <Input type="file" onChange={(e) => setName(e.target.files?.[0]?.name ?? "")} />
+          </div>
+          <div className="grid gap-1">
+            <Label className="text-xs">Tür</Label>
+            <Select value={type} onValueChange={(v) => setType(v as DocType)} disabled={!!lockedType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{(Object.keys(DOC_TYPE_LABEL) as DocType[]).map((k) => <SelectItem key={k} value={k}>{DOC_TYPE_LABEL[k]}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1">
+            <Label className="text-xs">Bağla</Label>
+            <Select value={link} onValueChange={setLink}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="project">Proje</SelectItem>
+                {meetings.map((m) => <SelectItem key={m.id} value={`meeting:${m.id}`}>Toplantı: {MEETING_TYPE_LABEL[m.type]} {fmtDate(m.date)}</SelectItem>)}
+                {steps.map((s) => <SelectItem key={s.id} value={`step:${s.id}`}>Adım: {s.title}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground">Demo: dosyanın kendisi saklanmaz, yalnızca adı ve bilgileri kaydedilir.</p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Vazgeç</Button>
+          <Button onClick={() => {
+            if (!name) return toast.error("Dosya seçin");
+            const [lt, lid] = link.split(":");
+            addDocument({ projectId: project.id, type, name, linkType: lt as "project" | "meeting" | "step", linkId: lid ?? null });
+            toast.success("Doküman eklendi");
+            onSaved?.();
+            onClose();
+          }}>Kaydet</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function DocumentsTab({ project }: { project: Project }) {
+  const { state } = useRq();
+  const { user } = useAuth();
+  const manage = canManageProject(user, project);
+  const [open, setOpen] = useState(false);
+  const docs = state.documents.filter((d) => d.projectId === project.id).sort((a, b) => b.addedAt.localeCompare(a.addedAt));
+  const meetings = state.meetings.filter((m) => m.projectId === project.id);
 
   const linkText = (d: (typeof docs)[number]) => {
     if (d.linkType === "meeting") { const m = meetings.find((x) => x.id === d.linkId); return m ? `Toplantı: ${MEETING_TYPE_LABEL[m.type]} ${fmtDate(m.date)}` : "Toplantı"; }
@@ -461,7 +407,11 @@ export function DocumentsTab({ project }: { project: Project }) {
 
   return (
     <Card>
-      <CardContent className="p-4 space-y-4">
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <CardTitle className="text-base">Dokümanlar</CardTitle>
+        {manage && <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" />Doküman ekle</Button>}
+      </CardHeader>
+      <CardContent className="space-y-4">
         {docs.length === 0 ? <EmptyState title="Doküman yok" description="Teklif, sözleşme ve diğer dokümanları ekleyin." /> : (
           <Table>
             <TableHeader><TableRow><TableHead>Doküman</TableHead><TableHead>Tür</TableHead><TableHead>Bağlı olduğu</TableHead><TableHead>Eklenme</TableHead></TableRow></TableHeader>
@@ -475,41 +425,8 @@ export function DocumentsTab({ project }: { project: Project }) {
             ))}</TableBody>
           </Table>
         )}
-        {manage && (
-          <div className="grid gap-2 sm:grid-cols-[1fr_180px_220px_auto] items-end border-t pt-4">
-            <div className="grid gap-1">
-              <Label className="text-xs">Dosya</Label>
-              <Input type="file" onChange={(e) => setName(e.target.files?.[0]?.name ?? "")} />
-            </div>
-            <div className="grid gap-1">
-              <Label className="text-xs">Tür</Label>
-              <Select value={type} onValueChange={(v) => setType(v as DocType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{(Object.keys(DOC_TYPE_LABEL) as DocType[]).map((k) => <SelectItem key={k} value={k}>{DOC_TYPE_LABEL[k]}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1">
-              <Label className="text-xs">Bağla</Label>
-              <Select value={link} onValueChange={setLink}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="project">Proje</SelectItem>
-                  {meetings.map((m) => <SelectItem key={m.id} value={`meeting:${m.id}`}>Toplantı: {MEETING_TYPE_LABEL[m.type]} {fmtDate(m.date)}</SelectItem>)}
-                  {steps.map((s) => <SelectItem key={s.id} value={`step:${s.id}`}>Adım: {s.title}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={() => {
-              if (!name) return toast.error("Dosya seçin");
-              const [lt, lid] = link.split(":");
-              addDocument({ projectId: project.id, type, name, linkType: lt as "project" | "meeting" | "step", linkId: lid ?? null });
-              toast.success("Doküman eklendi");
-              setName("");
-            }}>Ekle</Button>
-          </div>
-        )}
-        <p className="text-xs text-muted-foreground">Demo: dosyanın kendisi saklanmaz, yalnızca adı ve bilgileri kaydedilir.</p>
       </CardContent>
+      {open && <DocumentUploadDialog project={project} onClose={() => setOpen(false)} />}
     </Card>
   );
 }

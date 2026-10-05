@@ -5,10 +5,10 @@ import { allAlerts, computeAlerts, type AlertView } from "./alerts";
 import { setActiveHolidays } from "./business-days";
 import { fmtDate } from "./labels";
 import { useAuth } from "@/lib/auth-context";
-import { ADAPTATION_FLOW, ADAPTATION_STEPS, DEFAULT_PROJECT_INTEGRATIONS, buildFromTemplate, createSeed, uid } from "./seed";
+import { ADAPTATION_FLOW, ADAPTATION_STEPS, DEFAULT_PROJECT_INTEGRATIONS, STATE_KEY, STATE_VERSION, buildFromTemplate, createSeed, uid } from "./seed";
 import { analyzeText, type IncomingMeta } from "./ai-mock";
 import { matchEmail } from "./email-match";
-import { manualStatusError, settleAll } from "./completion";
+import { isAutoStep, manualStatusError, settleAll } from "./completion";
 import type {
   AiInsight, ChatChannel, InsightSource, IntegrationConfig, ProjectIntegrations, UnmatchedEmail,
   CustomerReport, User, Action, AdaptationSession, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RiskDecision, RqState, Step, SupportTicket, TrainingSession,
@@ -18,14 +18,12 @@ import { buildReportSnapshot, defaultNextWeek } from "./reports";
 import { weekStartOf } from "./alerts";
 import { applyInstallType, applyLlmChoice, applyMeetingHeldRules, installChoiceError, setStepByKey } from "./rules";
 
-const KEY = "rabbitqa-demo-state-v9";
-
 function load(): RqState {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(STATE_KEY);
     if (raw) {
       const s = JSON.parse(raw) as RqState;
-      if (s.version === 9) return s;
+      if (s.version === STATE_VERSION) return s;
     }
   } catch { /* ignore */ }
   return createSeed();
@@ -57,7 +55,7 @@ interface Ctx {
   setNoCommitments: (projectId: string, value: boolean) => string | null;
   addTeam: (projectId: string, team: string) => void;
   setTeamInfo: (projectId: string, team: string, info: { contact: string; users: number | null }) => void;
-  setKickoff: (projectId: string, patch: Pick<Project, "presentationShared" | "installType" | "llmChoice" | "reqDocShared" | "reqDocSharedAt">, reason?: string) => { error: string | null; summary: string | null };
+  setInstallChoice: (projectId: string, patch: Partial<Pick<Project, "installType" | "llmChoice">>, reason?: string) => { error: string | null; summary: string | null };
   addKpi: (k: Omit<Kpi, "id" | "measurements" | "isCustomerVisible"> & { isCustomerVisible?: boolean }) => void;
   updateKpi: (id: string, patch: Partial<Kpi>) => void;
   updateMeeting: (id: string, patch: Partial<Meeting>, reason?: string) => string | null;
@@ -113,7 +111,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
       if (n === s) return s;
       if (n.holidays !== s.holidays) setActiveHolidays(n.holidays);
       const next = settleAll(n, mkRef.current);
-      flowMsgs.current = flowMessages(s, next);
+      flowMsgs.current = uniq([...flowMsgs.current, ...flowMessages(s, next)]);
       return next;
     });
   }, []);
@@ -125,7 +123,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   useEffect(() => {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    localStorage.setItem(STATE_KEY, JSON.stringify(state));
   }, [state]);
 
   const mkAudit = useCallback(
@@ -204,7 +202,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
     createProject: (input) => {
       const project: Project = {
         ...input, id: uid("p"), health: "green", healthReason: "", teams: [], desiredModules: [], discoveryAnswers: {}, teamInfo: {},
-        installType: null, llmChoice: null, presentationShared: false, reqDocShared: false, reqDocSharedAt: null, createdAt: new Date().toISOString(),
+        installType: null, llmChoice: null, createdAt: new Date().toISOString(),
         integrations: structuredClone(DEFAULT_PROJECT_INTEGRATIONS), noCommitments: false,
       };
       setState((s) => {
@@ -351,7 +349,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
       const p = state.projects.find((x) => x.id === projectId);
       if (p) patch<Project>("projects", projectId, { teamInfo: { ...p.teamInfo, [team]: info } });
     },
-    setKickoff: (projectId, kp, reason) => {
+    setInstallChoice: (projectId, kp, reason) => {
       const old = state.projects.find((p) => p.id === projectId);
       if (!old) return { error: "Proje bulunamadı", summary: null };
       const choiceErr = installChoiceError(old, kp, reason);
@@ -363,7 +361,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
         const audit: AuditEntry[] = [];
         (Object.keys(kp) as (keyof typeof kp)[]).forEach((k) => {
           if (str(cur[k]) !== str(kp[k])) {
-            audit.push(mkAudit({ projectId, kind: "update", entity: "project", entityId: projectId, label: "Kick-off", field: k, oldValue: str(cur[k]), newValue: str(kp[k]), reason }));
+            audit.push(mkAudit({ projectId, kind: "update", entity: "project", entityId: projectId, label: "Kurulum ve LLM", field: k, oldValue: str(cur[k]), newValue: str(kp[k]), reason }));
           }
         });
         if (!audit.length) return s;
@@ -374,9 +372,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
         if (kp.llmChoice && kp.llmChoice !== cur.llmChoice) {
           next = applyLlmChoice(next, projectId, kp.llmChoice, mkAudit, reason);
         }
-        if (kp.presentationShared && !cur.presentationShared) next = setStepByKey(next, projectId, "presentation", { status: "done" }, mkAudit, "Sunum paylaşıldı");
-        if (kp.reqDocShared && !cur.reqDocShared) next = setStepByKey(next, projectId, "reqdoc", { status: "done" }, mkAudit, "Gereksinim dokümanı paylaşıldı");
-        summary = kickoffSummary(s, next, projectId);
+        summary = installChoiceSummary(s, next, projectId);
         return next;
       });
       return { error: null, summary };
@@ -417,7 +413,6 @@ export function RqProvider({ children }: { children: ReactNode }) {
     },
     addDocument: (d) => {
       add<DocumentRec>("documents", { ...d, id: uid("d"), addedAt: new Date().toISOString() }, `Doküman eklendi — ${d.name}`);
-      if (d.type === "req_doc") setState((s) => setStepByKey(s, d.projectId, "reqdoc", { status: "done" }, mkAudit, `Otomatik kural: ${d.name} yüklendi`));
     },
     addAlert: (a) => add<Alert>("alerts", { ...a, id: uid("al"), status: "open", source: "manual", createdAt: new Date().toISOString(), resolvedAt: null, resolvedBy: null }, `Uyarı eklendi — ${a.title}`),
     snoozeAlert: (key, until, reason) => {
@@ -650,7 +645,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
         case "step_update": {
           if (!ins.targetId) break;
           const targetStep = state.steps.find((s) => s.id === ins.targetId);
-          if (targetStep && targetStep.completion !== "manual") return "Bu adım veriyle tamamlanır";
+          if (targetStep && isAutoStep(targetStep)) return "Bu adım veriyle tamamlanır";
           patch<Step>("steps", ins.targetId, v as Partial<Step>, reason);
           break;
         }
@@ -763,6 +758,10 @@ export function personName(state: RqState, id: string | null) {
   return state.users.find((u) => u.id === id)?.name ?? state.contacts.find((c) => c.id === id)?.name ?? "—";
 }
 
+function uniq(arr: string[]): string[] {
+  return [...new Set(arr)];
+}
+
 /** Önceki ve sonraki state arasında akışın açtığı aşama/adımlar için Türkçe bildirimler. */
 function flowMessages(prev: RqState, next: RqState): string[] {
   const oldIds = new Set(prev.projects.map((p) => p.id));
@@ -770,6 +769,8 @@ function flowMessages(prev: RqState, next: RqState): string[] {
   const prevSt = new Map(prev.steps.map((s) => [s.id, s]));
   const name = (id: string | null) => next.users.find((u) => u.id === id)?.name ?? next.contacts.find((c) => c.id === id)?.name ?? "atanmamış";
   const msgs: string[] = [];
+  const autoDone = next.steps.filter((s) => oldIds.has(s.projectId) && isAutoStep(s) && prevSt.get(s.id)?.status !== "done" && s.status === "done");
+  autoDone.forEach((s) => msgs.push(`Tamamlandı: ${s.title}`));
   const opened = next.steps.filter((s) => oldIds.has(s.projectId) && prevSt.get(s.id)?.status === "locked" && s.status === "pending");
   const donePh = next.phases.filter((p) => oldIds.has(p.projectId) && prevPh.get(p.id) && prevPh.get(p.id)!.status !== "done" && p.status === "done");
   donePh.forEach((ph) => {
@@ -784,8 +785,8 @@ function flowMessages(prev: RqState, next: RqState): string[] {
   return msgs;
 }
 
-/** Kick-off kaydının otomatik kurallarla yaptığı değişikliklerin özeti. */
-function kickoffSummary(prev: RqState, next: RqState, projectId: string): string | null {
+/** Kurulum ve LLM seçiminin otomatik kurallarla yaptığı değişikliklerin özeti. */
+function installChoiceSummary(prev: RqState, next: RqState, projectId: string): string | null {
   const ps = new Map(prev.steps.map((s) => [s.id, s.status]));
   const pa = new Map(prev.actions.map((a) => [a.id, a.status]));
   const steps = next.steps.filter((s) => s.projectId === projectId);

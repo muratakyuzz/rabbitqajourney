@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Check, CheckCircle2, FileText, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, FileText, PanelRight, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,9 +15,12 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/EmptyState";
-import { AccessTab, AdaptationTab, DocumentsTab, KickoffTab, KpiSection, TeamRow, TrainingTab } from "./project/Phase2Tabs";
+import { AccessTab, AdaptationTab, DocumentsTab, KpiSection, TeamRow, TrainingTab } from "./project/Phase2Tabs";
 import { AlertsTab, GoLiveTab, RisksTab, TicketsTab } from "./project/Phase3Tabs";
 import { ContinuityTab, MeetingExtras } from "./project/ContinuityTab";
+import { ActionFields, type ActionDraft, EnumSelect, MeetingDetailDialog, MeetingDialog, NONE, PersonSelect } from "./project/MeetingDialog";
+import { PHASE_WORKSPACES, stepClickTarget } from "./project/workspaces";
+import { PhaseWorkspaceSheet } from "./project/workspaces/PhaseWorkspaceSheet";
 import { VisibleIcon } from "@/components/rq/VisibleIcon";
 import { Switch } from "@/components/ui/switch";
 import { IntegrationsTab } from "./project/IntegrationsTab";
@@ -30,7 +33,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { personName, projectProgress, useComputedAlerts, useRq } from "@/lib/rabbitqa/store";
 import { derivePhaseStatus } from "@/lib/rabbitqa/alerts";
-import { canEditFlow, canEditItem, canManageProject, isAllSeeing, selectableCsms, selectableUsers } from "@/lib/rabbitqa/perm";
+import { canEditFlow, canEditItem, canManageProject, selectableUsers } from "@/lib/rabbitqa/perm";
 import { isActivePhase, isOpenStep, previousStep } from "@/lib/rabbitqa/flow";
 import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
 import {
@@ -38,37 +41,8 @@ import {
   PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, SOURCE_LABEL, fmtDate, fmtDateTime, todayISO,
 } from "@/lib/rabbitqa/labels";
 import type {
-  Action, ActionStatus, Ball, Commitment, Dependency, CommitmentStatus, ContactRole, Health, MeetingStatus, MeetingType, Phase, PhaseStatus, Priority, Project, Step, StepStatus,
+  Action, ActionStatus, Ball, ContactRole, Dependency, Health, MeetingStatus, MeetingType, Phase, PhaseStatus, Priority, Project, Step, StepStatus,
 } from "@/lib/rabbitqa/types";
-
-const NONE = "__none";
-
-function PersonSelect({ value, onChange, projectId, includeContacts = true }: { value: string | null; onChange: (v: string | null) => void; projectId: string; includeContacts?: boolean }) {
-  const { state } = useRq();
-  return (
-    <Select value={value ?? NONE} onValueChange={(v) => onChange(v === NONE ? null : v)}>
-      <SelectTrigger><SelectValue /></SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NONE}>Atanmadı</SelectItem>
-        {selectableUsers(state, value).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-        {includeContacts && state.contacts.filter((c) => c.projectId === projectId).map((c) => (
-          <SelectItem key={c.id} value={c.id}>{c.name} (müşteri)</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-function EnumSelect<T extends string>({ value, onChange, labels }: { value: T; onChange: (v: T) => void; labels: Record<T, string> }) {
-  return (
-    <Select value={value} onValueChange={(v) => onChange(v as T)}>
-      <SelectTrigger><SelectValue /></SelectTrigger>
-      <SelectContent>
-        {(Object.keys(labels) as T[]).map((k) => <SelectItem key={k} value={k}>{labels[k]}</SelectItem>)}
-      </SelectContent>
-    </Select>
-  );
-}
 
 function AiSourceBadge({ action }: { action: Action }) {
   const { state } = useRq();
@@ -127,47 +101,53 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <Tabs key={searchParams.get("tab") ?? "phases"} defaultValue={searchParams.get("tab") ?? "phases"}>
-        <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="phases">Aşamalar ve adımlar</TabsTrigger>
-          <TabsTrigger value="actions">Aksiyonlar</TabsTrigger>
-          <TabsTrigger value="meetings">Toplantılar</TabsTrigger>
-          <TabsTrigger value="handover">Satış devri</TabsTrigger>
-          <TabsTrigger value="kickoff">Kick-off</TabsTrigger>
-          <TabsTrigger value="discovery">Keşif ve takımlar</TabsTrigger>
-          <TabsTrigger value="access">Kurulum ve erişim</TabsTrigger>
-          <TabsTrigger value="training">Eğitim</TabsTrigger>
-          <TabsTrigger value="adaptation">Uyarlama</TabsTrigger>
-          <TabsTrigger value="documents">Dokümanlar</TabsTrigger>
-          <TabsTrigger value="alerts">Uyarılar</TabsTrigger>
-          <TabsTrigger value="tickets">Destek kayıtları</TabsTrigger>
-          <TabsTrigger value="risks">Riskler ve kararlar</TabsTrigger>
-          <TabsTrigger value="golive">Go-Live</TabsTrigger>
-          <TabsTrigger value="continuity">Süreklilik</TabsTrigger>
-          <TabsTrigger value="integrations">Entegrasyonlar</TabsTrigger>
-          <TabsTrigger value="contacts">Müşteri kişileri</TabsTrigger>
-          <TabsTrigger value="history">Müşteri geçmişi</TabsTrigger>
-        </TabsList>
-        <TabsContent value="phases"><PhasesTab project={project} /></TabsContent>
-        <TabsContent value="actions"><ActionsTab project={project} /></TabsContent>
-        <TabsContent value="meetings"><MeetingsTab project={project} /></TabsContent>
-        <TabsContent value="handover"><HandoverTab project={project} /></TabsContent>
-        <TabsContent value="kickoff"><KickoffTab project={project} /></TabsContent>
-        <TabsContent value="discovery"><DiscoveryTab project={project} /></TabsContent>
-        <TabsContent value="access"><AccessTab project={project} /></TabsContent>
-        <TabsContent value="training"><TrainingTab project={project} /></TabsContent>
-        <TabsContent value="adaptation"><AdaptationTab project={project} /></TabsContent>
-        <TabsContent value="documents"><DocumentsTab project={project} /></TabsContent>
-        <TabsContent value="alerts"><AlertsTab project={project} /></TabsContent>
-        <TabsContent value="tickets"><TicketsTab project={project} /></TabsContent>
-        <TabsContent value="risks"><RisksTab project={project} /></TabsContent>
-        <TabsContent value="golive"><GoLiveTab project={project} /></TabsContent>
-        <TabsContent value="continuity"><ContinuityTab project={project} renderCheckinDialog={(close) => <MeetingDialog project={project} onClose={close} defaultType="checkin" />} /></TabsContent>
-        <TabsContent value="integrations"><IntegrationsTab project={project} /></TabsContent>
-        <TabsContent value="contacts"><ContactsTab project={project} /></TabsContent>
-        <TabsContent value="history"><HistoryTab project={project} /></TabsContent>
-      </Tabs>
+      <ProjectTabs project={project} searchParams={searchParams} />
     </div>
+  );
+}
+
+function ProjectTabs({ project, searchParams }: { project: Project; searchParams: URLSearchParams }) {
+  const raw = searchParams.get("tab");
+  const legacy = raw === "handover" || raw === "kickoff";
+  const tab = legacy ? "phases" : raw ?? "phases";
+  const ws = legacy ? "00" : searchParams.get("ws");
+  return (
+    <Tabs key={tab} defaultValue={tab}>
+      <TabsList className="flex-wrap h-auto">
+        <TabsTrigger value="phases">Aşamalar ve adımlar</TabsTrigger>
+        <TabsTrigger value="actions">Aksiyonlar</TabsTrigger>
+        <TabsTrigger value="meetings">Toplantılar</TabsTrigger>
+        <TabsTrigger value="discovery">Keşif ve takımlar</TabsTrigger>
+        <TabsTrigger value="access">Kurulum ve erişim</TabsTrigger>
+        <TabsTrigger value="training">Eğitim</TabsTrigger>
+        <TabsTrigger value="adaptation">Uyarlama</TabsTrigger>
+        <TabsTrigger value="documents">Dokümanlar</TabsTrigger>
+        <TabsTrigger value="alerts">Uyarılar</TabsTrigger>
+        <TabsTrigger value="tickets">Destek kayıtları</TabsTrigger>
+        <TabsTrigger value="risks">Riskler ve kararlar</TabsTrigger>
+        <TabsTrigger value="golive">Go-Live</TabsTrigger>
+        <TabsTrigger value="continuity">Süreklilik</TabsTrigger>
+        <TabsTrigger value="integrations">Entegrasyonlar</TabsTrigger>
+        <TabsTrigger value="contacts">Müşteri kişileri</TabsTrigger>
+        <TabsTrigger value="history">Müşteri geçmişi</TabsTrigger>
+      </TabsList>
+      <TabsContent value="phases"><PhasesTab project={project} initialWorkspace={ws ?? undefined} /></TabsContent>
+      <TabsContent value="actions"><ActionsTab project={project} /></TabsContent>
+      <TabsContent value="meetings"><MeetingsTab project={project} /></TabsContent>
+      <TabsContent value="discovery"><DiscoveryTab project={project} /></TabsContent>
+      <TabsContent value="access"><AccessTab project={project} /></TabsContent>
+      <TabsContent value="training"><TrainingTab project={project} /></TabsContent>
+      <TabsContent value="adaptation"><AdaptationTab project={project} /></TabsContent>
+      <TabsContent value="documents"><DocumentsTab project={project} /></TabsContent>
+      <TabsContent value="alerts"><AlertsTab project={project} /></TabsContent>
+      <TabsContent value="tickets"><TicketsTab project={project} /></TabsContent>
+      <TabsContent value="risks"><RisksTab project={project} /></TabsContent>
+      <TabsContent value="golive"><GoLiveTab project={project} /></TabsContent>
+      <TabsContent value="continuity"><ContinuityTab project={project} renderCheckinDialog={(close) => <MeetingDialog project={project} onClose={close} defaultType="checkin" />} /></TabsContent>
+      <TabsContent value="integrations"><IntegrationsTab project={project} /></TabsContent>
+      <TabsContent value="contacts"><ContactsTab project={project} /></TabsContent>
+      <TabsContent value="history"><HistoryTab project={project} /></TabsContent>
+    </Tabs>
   );
 }
 
@@ -246,16 +226,32 @@ function CompletionHint({ step }: { step: Step }) {
   );
 }
 
-function PhasesTab({ project }: { project: Project }) {
+function PhasesTab({ project, initialWorkspace }: { project: Project; initialWorkspace?: string }) {
   const { state, completePhase } = useRq();
   const { user } = useAuth();
   const manage = canManageProject(user, project);
   const phases = state.phases.filter((p) => p.projectId === project.id).sort((a, b) => a.order - b.order);
   const [editStep, setEditStep] = useState<Step | null>(null);
   const [editPhase, setEditPhase] = useState<Phase | null>(null);
+  const [ws, setWs] = useState<{ phaseId: string; field: string | null; nonce: number } | null>(() => {
+    if (!initialWorkspace) return null;
+    const ph = phases.find((p) => p.code === initialWorkspace);
+    return ph ? { phaseId: ph.id, field: null, nonce: 0 } : null;
+  });
+  const [meetingFormType, setMeetingFormType] = useState<MeetingType | null>(null);
+  const [meetingDetailId, setMeetingDetailId] = useState<string | null>(null);
   const activeIds = phases.filter(isActivePhase).map((p) => p.id);
   const today = todayISO();
   const computed = useComputedAlerts();
+
+  const onStepClick = (ph: Phase, s: Step) => {
+    const hasWorkspace = !!PHASE_WORKSPACES[ph.code];
+    const target = stepClickTarget(state, s, { hasWorkspace, canManage: manage, canEdit: canEditItem(user, project, s.ownerId) });
+    if (target.kind === "workspace") setWs((cur) => ({ phaseId: ph.id, field: target.field, nonce: (cur?.phaseId === ph.id ? cur.nonce : 0) + 1 }));
+    else if (target.kind === "meeting_form") setMeetingFormType(target.type);
+    else if (target.kind === "meeting_detail") setMeetingDetailId(target.meetingId);
+    else if (target.kind === "step_dialog") setEditStep(s);
+  };
 
   return (
     <>
@@ -266,6 +262,7 @@ function PhasesTab({ project }: { project: Project }) {
           const done = counted.filter((s) => s.status === "done").length;
           const locked = ph.status === "locked";
           const prevPh = phases[idx - 1];
+          const hasWorkspace = !!PHASE_WORKSPACES[ph.code];
           return (
             <AccordionItem key={ph.id} value={ph.id} className={`rounded-lg border bg-card px-4 ${locked ? "opacity-80" : ""}`}>
               <AccordionTrigger className="hover:no-underline">
@@ -289,17 +286,20 @@ function PhasesTab({ project }: { project: Project }) {
                   <span>Baseline bitiş: {fmtDate(ph.baselineEnd)}</span>
                   <span>Gerçekleşen: {fmtDate(ph.actualStart)} – {fmtDate(ph.actualEnd)}</span>
                   {ph.approvedBy && <span>Onaylayan: {personName(state, ph.approvedBy)} · {fmtDate(ph.approvedAt)}</span>}
-                  {manage && (
-                    <div className="ml-auto flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setEditPhase(ph)}><Pencil className="h-3.5 w-3.5 mr-1" />Aşamayı düzenle</Button>
-                      {ph.status !== "done" && !locked && (
-                        <Button size="sm" onClick={() => {
-                          const err = completePhase(ph.id);
-                          if (err) toast.error(`Aşama tamamlanamaz: ${err}`);
-                        }}><CheckCircle2 className="h-3.5 w-3.5 mr-1" />Aşamayı tamamla</Button>
-                      )}
-                    </div>
-                  )}
+                  <div className="ml-auto flex gap-2">
+                    {hasWorkspace && (
+                      <Button size="sm" variant="outline" onClick={() => setWs((cur) => ({ phaseId: ph.id, field: null, nonce: (cur?.phaseId === ph.id ? cur.nonce : 0) + 1 }))}>
+                        <PanelRight className="h-3.5 w-3.5 mr-1" />Formu aç
+                      </Button>
+                    )}
+                    {manage && <Button size="sm" variant="outline" onClick={() => setEditPhase(ph)}><Pencil className="h-3.5 w-3.5 mr-1" />Aşamayı düzenle</Button>}
+                    {manage && ph.status !== "done" && !locked && (
+                      <Button size="sm" onClick={() => {
+                        const err = completePhase(ph.id);
+                        if (err) toast.error(`Aşama tamamlanamaz: ${err}`);
+                      }}><CheckCircle2 className="h-3.5 w-3.5 mr-1" />Aşamayı tamamla</Button>
+                    )}
+                  </div>
                 </div>
                 {steps.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-2">
@@ -319,10 +319,27 @@ function PhasesTab({ project }: { project: Project }) {
                         const late = isOpenStep(s) && !!s.due && s.due < today;
                         const lateDays = late ? businessDaysBetween(s.due!, today) : 0;
                         const prev = previousStep(steps, s);
+                        const target = stepClickTarget(state, s, { hasWorkspace, canManage: manage, canEdit: canEditItem(user, project, s.ownerId) });
+                        const rowClickable = target.kind !== "none";
+                        const titleTooltip = sLocked && (s.completion === "data" || s.completion === "meeting") ? "Sırası gelmedi — veri şimdiden girilebilir" : null;
                         return (
-                          <TableRow key={s.id} className={s.status === "out_of_scope" || sLocked ? "opacity-60" : ""}>
+                          <TableRow
+                            key={s.id}
+                            className={`${s.status === "out_of_scope" || sLocked ? "opacity-60" : ""} ${rowClickable ? "cursor-pointer" : ""}`}
+                            onClick={rowClickable ? () => onStepClick(ph, s) : undefined}
+                          >
                             <TableCell className="font-medium">
-                              {s.title}{s.required && <span className="text-destructive ml-1" title="Zorunlu">*</span>}
+                              {titleTooltip ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button type="button" className="text-left hover:underline" onClick={(e) => { e.stopPropagation(); if (rowClickable) onStepClick(ph, s); }}>{s.title}</button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{titleTooltip}</TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <button type="button" className="text-left hover:underline" onClick={(e) => { e.stopPropagation(); if (rowClickable) onStepClick(ph, s); }}>{s.title}</button>
+                              )}
+                              {s.required && <span className="text-destructive ml-1" title="Zorunlu">*</span>}
                               {isOpenStep(s) && isNewlyActivated(s.activatedAt) && <Pill tone="info" className="ml-2">Yeni</Pill>}
                             </TableCell>
                             <TableCell><DepIcon dep={s.dependency} /></TableCell>
@@ -346,7 +363,7 @@ function PhasesTab({ project }: { project: Project }) {
                             </TableCell>
                             <TableCell>
                               {canEditItem(user, project, s.ownerId) && (
-                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditStep(s)} aria-label="Adımı düzenle"><Pencil className="h-3.5 w-3.5" /></Button>
+                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setEditStep(s); }} aria-label="Adımı düzenle"><Pencil className="h-3.5 w-3.5" /></Button>
                               )}
                             </TableCell>
                           </TableRow>
@@ -362,6 +379,12 @@ function PhasesTab({ project }: { project: Project }) {
       </Accordion>
       {editStep && <StepDialog step={editStep} project={project} onClose={() => setEditStep(null)} />}
       {editPhase && <PhaseDialog phase={editPhase} onClose={() => setEditPhase(null)} />}
+      {ws && (() => {
+        const phase = phases.find((p) => p.id === ws.phaseId);
+        return phase ? <PhaseWorkspaceSheet project={project} phase={phase} focus={{ field: ws.field, nonce: ws.nonce }} onClose={() => setWs(null)} /> : null;
+      })()}
+      {meetingFormType && <MeetingDialog project={project} defaultType={meetingFormType} onClose={() => setMeetingFormType(null)} />}
+      {meetingDetailId && <MeetingDetailDialog meetingId={meetingDetailId} onClose={() => setMeetingDetailId(null)} />}
     </>
   );
 }
@@ -570,8 +593,6 @@ function ActionsTab({ project }: { project: Project }) {
   );
 }
 
-type ActionDraft = { title: string; ownerId: string | null; ball: Ball; due: string | null; priority: Priority; status: ActionStatus; isCustomerVisible: boolean };
-
 function ActionDialog({ project, action, onClose, onCreate }: { project: Project; action: Action | null; onClose: () => void; onCreate: (a: ActionDraft) => void }) {
   const { updateAction, state } = useRq();
   const [d, setD] = useState<ActionDraft>(action ? { title: action.title, ownerId: action.ownerId, ball: action.ball, due: action.due, priority: action.priority, status: action.status, isCustomerVisible: action.isCustomerVisible } : { title: "", ownerId: project.csmId, ball: "csm", due: null, priority: "medium", status: "open", isCustomerVisible: true });
@@ -600,21 +621,6 @@ function ActionDialog({ project, action, onClose, onCreate }: { project: Project
   );
 }
 
-function ActionFields({ d, setD, projectId, showStatus }: { d: ActionDraft; setD: (d: ActionDraft) => void; projectId: string; showStatus?: boolean }) {
-  return (
-    <div className="grid gap-3">
-      <div className="grid gap-2"><Label>Başlık</Label><Input value={d.title} onChange={(e) => setD({ ...d, title: e.target.value })} /></div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="grid gap-2"><Label>Sahip</Label><PersonSelect value={d.ownerId} onChange={(v) => setD({ ...d, ownerId: v })} projectId={projectId} /></div>
-        <div className="grid gap-2"><Label>Top kimde</Label><EnumSelect value={d.ball} onChange={(v) => setD({ ...d, ball: v })} labels={BALL_LABEL} /></div>
-        <div className="grid gap-2"><Label>Termin</Label><Input type="date" value={d.due ?? ""} onChange={(e) => setD({ ...d, due: e.target.value || null })} /></div>
-        <div className="grid gap-2"><Label>Öncelik</Label><EnumSelect value={d.priority} onChange={(v) => setD({ ...d, priority: v })} labels={PRIORITY_LABEL} /></div>
-        {showStatus && <div className="grid gap-2"><Label>Durum</Label><EnumSelect value={d.status} onChange={(v) => setD({ ...d, status: v })} labels={ACTION_STATUS_LABEL} /></div>}
-      </div>
-      <label className="flex items-center gap-3 text-sm"><Switch checked={d.isCustomerVisible} onCheckedChange={(c) => setD({ ...d, isCustomerVisible: c })} />Müşteriye görünür</label>
-    </div>
-  );
-}
 
 /* ── Meetings ───────────────────────────────────────────── */
 function MeetingsTab({ project }: { project: Project }) {
@@ -665,230 +671,6 @@ function MeetingsTab({ project }: { project: Project }) {
       })}
       {open && <MeetingDialog project={project} onClose={() => setOpen(false)} />}
     </div>
-  );
-}
-
-export function MeetingDialog({ project, onClose, defaultType = "checkin" }: { project: Project; onClose: () => void; defaultType?: MeetingType }) {
-  const { state, addMeeting, addDocument } = useRq();
-  const [type, setType] = useState<MeetingType>(defaultType);
-  const [visible, setVisible] = useState(false);
-  const [docs, setDocs] = useState<string[]>([]);
-  const [docName, setDocName] = useState("");
-  const [date, setDate] = useState(todayISO());
-  const [statusTouched, setStatusTouched] = useState(false);
-  const [status, setStatus] = useState<MeetingStatus>("held"); // default date is today
-  const [teamId, setTeamId] = useState<string | null>(null);
-  const [internalIds, setInternalIds] = useState<string[]>(project.csmId ? [project.csmId] : []);
-  const [contactIds, setContactIds] = useState<string[]>([]);
-  const [notes, setNotes] = useState("");
-  const [decisions, setDecisions] = useState("");
-  const [actions, setActions] = useState<ActionDraft[]>([]);
-  const contacts = state.contacts.filter((c) => c.projectId === project.id);
-  const toggle = (arr: string[], set: (v: string[]) => void, id: string, on: boolean) => set(on ? [...arr, id] : arr.filter((x) => x !== id));
-  const onDateChange = (v: string) => {
-    setDate(v);
-    if (!statusTouched) setStatus(v > todayISO() ? "planned" : "held");
-  };
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Toplantı kaydet</DialogTitle></DialogHeader>
-        <div className="grid gap-3">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="grid gap-2"><Label>Tür</Label><EnumSelect value={type} onChange={setType} labels={MEETING_TYPE_LABEL} /></div>
-            <div className="grid gap-2"><Label>Tarih</Label><Input type="date" value={date} onChange={(e) => onDateChange(e.target.value)} /></div>
-            <div className="grid gap-2">
-              <Label>Durum</Label>
-              <EnumSelect value={status} onChange={(v) => { setStatus(v); setStatusTouched(true); }} labels={MEETING_STATUS_LABEL} />
-            </div>
-          </div>
-          {type === "adaptation" && (
-            <div className="grid gap-2">
-              <Label>Takım</Label>
-              {project.teams.length === 0 ? <p className="text-xs text-muted-foreground">Önce Keşif'te takım ekleyin.</p> : (
-                <Select value={teamId ?? NONE} onValueChange={(v) => setTeamId(v === NONE ? null : v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>Takım seçilmedi</SelectItem>
-                    {project.teams.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          )}
-          <div className="grid gap-2">
-            <Label>İç katılımcılar</Label>
-            <div className="flex flex-wrap gap-3">{selectableUsers(state).map((u) => (
-              <label key={u.id} className="flex items-center gap-2 text-sm"><Checkbox checked={internalIds.includes(u.id)} onCheckedChange={(c) => toggle(internalIds, setInternalIds, u.id, !!c)} />{u.name}</label>
-            ))}</div>
-          </div>
-          <div className="grid gap-2">
-            <Label>Müşteri katılımcıları</Label>
-            {contacts.length === 0 ? <p className="text-xs text-muted-foreground">Önce "Müşteri kişileri" sekmesinden kişi ekleyin.</p> : (
-              <div className="flex flex-wrap gap-3">{contacts.map((c) => (
-                <label key={c.id} className="flex items-center gap-2 text-sm"><Checkbox checked={contactIds.includes(c.id)} onCheckedChange={(v) => toggle(contactIds, setContactIds, c.id, !!v)} />{c.name}</label>
-              ))}</div>
-            )}
-          </div>
-          <div className="grid gap-2"><Label>Notlar</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
-          <div className="grid gap-2"><Label>Alınan kararlar</Label><Textarea value={decisions} onChange={(e) => setDecisions(e.target.value)} /></div>
-          <div className="grid gap-2">
-            <Label>Ekler</Label>
-            {docs.length === 0 ? <p className="text-xs text-muted-foreground">Ek yok.</p> : <ul className="text-sm list-disc pl-5">{docs.map((d, i) => <li key={i}>{d}</li>)}</ul>}
-            <div className="flex gap-2"><Input placeholder="Doküman adı (örn. Sunum.pdf)" value={docName} onChange={(e) => setDocName(e.target.value)} />
-              <Button type="button" variant="outline" onClick={() => { if (docName.trim()) { setDocs([...docs, docName.trim()]); setDocName(""); } }}>Ek ekle</Button></div>
-          </div>
-          <label className="flex items-center gap-3 text-sm"><Switch checked={visible} onCheckedChange={setVisible} />Müşteriye görünür</label>
-          <div className="grid gap-2">
-            <div className="flex items-center justify-between">
-              <Label>Toplantıdan doğan aksiyonlar</Label>
-              <Button size="sm" variant="outline" onClick={() => setActions([...actions, { title: "", ownerId: project.csmId, ball: "csm", due: null, priority: "medium", status: "open", isCustomerVisible: true }])}><Plus className="h-3.5 w-3.5 mr-1" />Aksiyon</Button>
-            </div>
-            {actions.map((a, i) => (
-              <div key={i} className="rounded-lg border p-3 relative">
-                <Button size="icon" variant="ghost" className="h-7 w-7 absolute right-2 top-2" onClick={() => setActions(actions.filter((_, j) => j !== i))} aria-label="Kaldır"><Trash2 className="h-3.5 w-3.5" /></Button>
-                <ActionFields d={a} setD={(v) => setActions(actions.map((x, j) => (j === i ? v : x)))} projectId={project.id} />
-              </div>
-            ))}
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Vazgeç</Button>
-          <Button onClick={() => {
-            if (actions.some((a) => !a.title.trim())) return toast.error("Aksiyon başlıkları boş olamaz");
-            const mid = addMeeting({ projectId: project.id, type, date, internalIds, contactIds, notes, decisions, isCustomerVisible: visible, status, teamId: type === "adaptation" ? teamId : null }, actions);
-            docs.forEach((name) => addDocument({ projectId: project.id, type: "other", name, linkType: "meeting", linkId: mid }));
-            toast.success(status === "held" ? "Toplantı kaydedildi" : "Toplantı planlandı");
-            onClose();
-          }}>Kaydet</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/* ── Handover & commitments ─────────────────────────────── */
-function HandoverTab({ project }: { project: Project }) {
-  const { state, updateProject, addCommitment, updateCommitment, setNoCommitments } = useRq();
-  const { user } = useAuth();
-  const manage = canManageProject(user, project);
-  const [text, setText] = useState("");
-  const [phaseCode, setPhaseCode] = useState("07");
-  const [editC, setEditC] = useState<Commitment | null>(null);
-  const commitments = state.commitments.filter((c) => c.projectId === project.id);
-  const phases = state.phases.filter((p) => p.projectId === project.id).sort((a, b) => a.order - b.order);
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader><CardTitle className="text-base">Satış devri</CardTitle></CardHeader>
-        <CardContent className="grid gap-3">
-          <div className="grid gap-2">
-            <Label>CSM {isAllSeeing(user) ? "" : "(Manager atar)"}</Label>
-            <Select value={project.csmId ?? NONE} disabled={!isAllSeeing(user)} onValueChange={(v) => updateProject(project.id, { csmId: v === NONE ? null : v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>Atanmadı</SelectItem>
-                {selectableCsms(state, project.csmId).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>Devir alınan satışçı</Label>
-            <Select value={project.salespersonId ?? NONE} disabled={!manage} onValueChange={(v) => updateProject(project.id, { salespersonId: v === NONE ? null : v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>Seçilmedi</SelectItem>
-                {state.salespeople.filter((s) => s.active !== false || s.id === project.salespersonId).map((s) => <SelectItem key={s.id} value={s.id} disabled={s.active === false}>{s.name}{s.active === false ? " (pasif)" : ""}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>Lisans modeli</Label>
-            <Input defaultValue={project.licenseModel} disabled={!manage} onBlur={(e) => updateProject(project.id, { licenseModel: e.target.value })} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Satın alınan modüller</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {state.modules.map((m) => (
-                <label key={m} className="flex items-center gap-2 text-sm">
-                  <Checkbox disabled={!manage} checked={project.purchasedModules.includes(m)}
-                    onCheckedChange={(c) => updateProject(project.id, { purchasedModules: c ? [...project.purchasedModules, m] : project.purchasedModules.filter((x) => x !== m) })} />
-                  {m}
-                </label>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">Sözler ve taahhütler</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          {commitments.length === 0 && <p className="text-sm text-muted-foreground">Taahhüt girilmedi.</p>}
-          {commitments.map((c) => (
-            <div key={c.id} className="rounded-lg border p-3 flex items-start gap-3">
-              <div className="flex-1">
-                <p className="text-sm font-medium">{c.text}</p>
-                <p className="text-xs text-muted-foreground">Hedef aşama: {phases.find((p) => p.code === c.targetPhaseCode)?.name ?? c.targetPhaseCode}{c.note ? ` · ${c.note}` : ""}</p>
-              </div>
-              <Pill tone={c.status === "met" ? "success" : c.status === "unmet" ? "danger" : "warning"}>{COMMIT_STATUS_LABEL[c.status]}</Pill>
-              {manage && <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditC(c)} aria-label="Taahhüdü düzenle"><Pencil className="h-3.5 w-3.5" /></Button>}
-            </div>
-          ))}
-          {manage && (
-            <div className="flex gap-2 pt-2 border-t">
-              <Input placeholder="Yeni taahhüt" value={text} onChange={(e) => setText(e.target.value)} />
-              <Select value={phaseCode} onValueChange={setPhaseCode}>
-                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-                <SelectContent>{phases.map((p) => <SelectItem key={p.code} value={p.code}>{p.name}</SelectItem>)}</SelectContent>
-              </Select>
-              <Button onClick={() => {
-                if (!text.trim()) return;
-                addCommitment({ projectId: project.id, text: text.trim(), targetPhaseCode: phaseCode, status: "open", note: "" });
-                setText("");
-              }}>Ekle</Button>
-            </div>
-          )}
-          {manage && (
-            <label className="flex items-center gap-3 text-sm border-t pt-3" title={commitments.length > 0 ? "Taahhüt varken işaretlenemez" : undefined}>
-              <Checkbox checked={project.noCommitments} disabled={commitments.length > 0} onCheckedChange={(c) => {
-                const err = setNoCommitments(project.id, !!c);
-                if (err) toast.error(err);
-              }} />
-              Taahhüt yok
-            </label>
-          )}
-        </CardContent>
-      </Card>
-      {editC && <CommitmentDialog c={editC} onClose={() => setEditC(null)} onSave={(p, r) => updateCommitment(editC.id, p, r)} />}
-    </div>
-  );
-}
-
-function CommitmentDialog({ c, onClose, onSave }: { c: Commitment; onClose: () => void; onSave: (p: Partial<Commitment>, reason?: string) => void }) {
-  const [status, setStatus] = useState<CommitmentStatus>(c.status);
-  const [note, setNote] = useState(c.note);
-  const [reason, setReason] = useState("");
-  const needsReason = status !== c.status;
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>{c.text}</DialogTitle></DialogHeader>
-        <div className="grid gap-3">
-          <div className="grid gap-2"><Label>Durum</Label><EnumSelect value={status} onChange={setStatus} labels={COMMIT_STATUS_LABEL} /></div>
-          <div className="grid gap-2"><Label>Not</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} /></div>
-          {needsReason && <div className="grid gap-2"><Label>Gerekçe (zorunlu)</Label><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></div>}
-        </div>
-        <DialogFooter>
-          <Button onClick={() => {
-            if (needsReason && !reason.trim()) return toast.error("Gerekçe zorunlu");
-            onSave({ status, note }, reason.trim() || undefined);
-            onClose();
-          }}>Kaydet</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
