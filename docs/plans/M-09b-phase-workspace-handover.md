@@ -1,6 +1,6 @@
 # M-09b — Aşama çalışma alanı altyapısı ve 00 Satış Devri paneli; Satış devri ve Kick-off sekmeleri kalkar
 
-**Durum:** Onaylandı (Murat, 2026-10-04 — S1–S8 cevapları §11'de karar olarak işlendi)
+**Durum:** Tamamlandı (main'e merge edildi, main @ aee9657, 2026-10-05). Onaylandı (Murat, 2026-10-04 — S1–S8 cevapları §11'de karar olarak işlendi)
 **Spec referansı:** docs/PRODUCT_SPEC.md → Ek B.2 (son madde: "Aşamanın verisi aşamanın çalışma alanında (sağ panel) girilir; eksik adıma tıklanınca eksik alan vurgulanır"), Ek B.2 tamamlanma tipleri (satır 324–325), B.1 (kilitli adım iş sayılmaz), 00 Satış Devri, 01 Kick-off
 **Üst plan:** docs/plans/M-09-step-completion-workspaces.md → M-09b. Bu doküman o görev metnini main'deki gerçek M-09a koduna (main @ f9bc25f) göre eşler ve test edilebilir hale getirir. İkisi çelişirse bu doküman geçerlidir.
 **Branch:** feat/m09b-phase-workspace-handover (main'den)

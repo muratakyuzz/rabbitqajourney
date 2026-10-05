@@ -216,6 +216,10 @@ KABUL KRİTERLERİ
 ## M-09c — Keşif, Erişim, Eğitim, Uyarlama çalışma alanları + sekme düzeni
 **Branch:** `feat/m09c-phase-workspaces-tabs` · **Ön koşul:** M-09b merge edildi.
 
+M-09b'den devredilen notlar:
+- **Seed (S2, §7):** `reqdoc_not_shared` uyarısını gösteren örnek proje eklenir: On-prem, 01 aşaması aktif, `reqdoc` adımı açık, `req_doc` dokümanı yok, held kick-off'u `reqDocDays` iş gününden eski.
+- **RUL-05 kural kararı:** M-09c planında Murat'a sorulacak.
+
 ```
 [§0 BAĞLAM]
 

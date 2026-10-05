@@ -97,6 +97,7 @@ pg-mem'de desteklenmediği veya farklı davrandığı bilinen / şüphelenilen h
 | Q1 | < 50 ms | idx_… |
 
 ## 9. Açık sorular
+- F1-00: `steps.completed_at` alanı gerekli mi? (M-09b S4: demo'da paylaşım/tamamlanma tarihi audit kaydından okunuyor — `entity: step`, `field: status`, `newValue: done`.)
 - …
 
 ## Değişiklik geçmişi

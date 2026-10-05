@@ -3,10 +3,11 @@
 Lovable ile mockup geliştirmesi **bitti**; Lovable artık kullanılmaz. Bu sürüm mockup'ın son halini, spec kapsamasını ve BE'ye geçiş öncesi teknik durumu kaydeder. Önceki sürümler: v1 (77b938d), v2 (49976be).
 
 ## 1. Özet
-- Demo uygulama (backend yok, veri localStorage'da) spec'in tamamını ve Ek A'yı (AI Insight + entegrasyonlar) ekranda karşılıyor. State sürümü **v8** (`rabbitqa-demo-state-v8`), store'da **52 işlem**.
+- Demo uygulama (backend yok, veri localStorage'da) spec'in tamamını ve Ek A'yı (AI Insight + entegrasyonlar) ekranda karşılıyor. State sürümü **v10** (`rabbitqa-demo-state-v10`, M-09b main @ aee9657), store'da **53 işlem**.
 - Lovable'ın son turları: sıralı akış (bağlılık, iş günü süresi, kilitli adım), 14 tipli uyarı motoru, tatil takvimi ve eşikler, satışçı ve kullanıcı yönetimi, "müşteriye görünür" işareti, haftalık rapor arşivi (snapshot), yönetim raporu, Süreklilik sekmesi, risk/destek/Go-Live alanları.
-- **Kalan mockup işi uygulama oturumunda:** M-09 (adım tamamlama motoru + aşama çalışma alanları + sekme sadeleştirme), ardından M-06 dondurma. Planlar: `docs/plans/M-09-step-completion-workspaces.md`.
-- Kit dosyaları (AGENTS.md, CLAUDE.md, `.claude/`, `docs/`, CI) **hâlâ repoda değil**; repodaki `AGENTS.md` Lovable'ın notu.
+- **M-09a + M-09b main'de (tamamlandı).** M-09b ile "Satış devri" ve "Kick-off" sekmeleri kalktı; 00 Satış Devri artık aşama çalışma alanı panelinde (`PhaseWorkspaceSheet`/`HandoverWorkspace`), `reqdoc` adımı veriyle (`data`) tamamlanıyor.
+- **Kalan mockup işi uygulama oturumunda:** M-09c (Keşif/Erişim/Eğitim/Uyarlama çalışma alanları + 13 sekmelik son düzen), ardından M-06 dondurma. Planlar: `docs/plans/M-09-step-completion-workspaces.md`.
+- Kit dosyaları (AGENTS.md, CLAUDE.md, `.claude/`, `docs/`, CI) artık repoda.
 
 ## 2. Ekranlar (son hal)
 | Rota | Ekran |
@@ -15,13 +16,13 @@ Lovable ile mockup geliştirmesi **bitti**; Lovable artık kullanılmaz. Bu sür
 | /app/overview | Genel bakış: KPI kartları, AI Insight kartı, darboğazlar |
 | /app/insights | AI Insight: Bekleyen / Geçmiş |
 | /app/projects | Müşteri projeleri (açık uyarı kolonu) |
-| /app/projects/:id | 18 sekme: Aşamalar ve adımlar · Aksiyonlar · Toplantılar · Satış devri · Kick-off · Keşif ve takımlar · Kurulum ve erişim · Eğitim · Uyarlama · Dokümanlar · Uyarılar · Destek kayıtları · Riskler ve kararlar · Go-Live · Süreklilik · Entegrasyonlar · Müşteri kişileri · Müşteri geçmişi |
+| /app/projects/:id | 16 sekme (M-09b ile Satış devri ve Kick-off sekmeleri kalktı; 00 Satış Devri çalışma alanı paneline taşındı): Aşamalar ve adımlar · Aksiyonlar · Toplantılar · Keşif ve takımlar · Kurulum ve erişim · Eğitim · Uyarlama · Dokümanlar · Uyarılar · Destek kayıtları · Riskler ve kararlar · Go-Live · Süreklilik · Entegrasyonlar · Müşteri kişileri · Müşteri geçmişi |
 | /app/projects/:id/report | Haftalık müşteri raporu (oluştur, düzenle, gönderildi, arşiv, yazdır/PDF) |
 | /app/my-work | Bana atananlar (+ Uyarılarım, Sıradaki işlerim, bana önerilen AI önerileri) |
 | /app/reports | Yönetim raporu (dönem seçimi, grafikler) — manager, admin |
 | /app/admin | Sistem ayarları: Aşama şablonu · Modüller · Entegrasyonlar · Keşif soruları · Kullanıcılar · Satışçılar · Uyarılar · Değişiklikler — admin |
 
-M-09 sonrası proje detayı **13 sekmeye** iner (Satış devri, Kick-off, Eğitim, Uyarlama, Uyarılar sekmeleri aşama çalışma alanına / başlık rozetine taşınır; Destek kayıtları "Faz 2" olarak pasif).
+M-09c sonrası proje detayı **13 sekmeye** iner (Eğitim, Uyarlama, Uyarılar sekmeleri de aşama çalışma alanına / başlık rozetine taşınır; Destek kayıtları "Faz 2" olarak pasif).
 
 ## 3. BE sözleşmesinin kaynağı
 - **Store `Ctx` (52 işlem):** proje/aşama/adım/aksiyon · toplantı/kişi/taahhüt · kick-off/takım/KPI/eğitim/uyarlama/erişim/doküman · uyarı (ekle, ertele, kapat) · destek · risk/karar · Go-Live onayı · haftalık rapor (oluştur, güncelle, gönderildi) · kullanıcı (ekle, güncelle) · ayarlar (`setConfig`) · entegrasyon & AI (test, kes, secret göster, proje entegrasyonu, öneri onay/red, eşleşmeyen e-posta, simülasyon).
@@ -34,7 +35,7 @@ M-09 sonrası proje detayı **13 sekmeye** iner (Satış devri, Kick-off, Eğiti
   | `business-days.ts` | İş günü + tatil listesi | `packages/shared/business-days` (F6-01) |
   | `reports.ts` | Haftalık rapor snapshot'ı | F7-02 |
   | `email-match.ts`, `ai-mock.ts` | E-posta eşleştirme, mock AI analizi | F8 |
-  | `completion.ts` (M-09a ile gelecek) | Veri/toplantı ile adım tamamlama | `core/rules` |
+  | `completion.ts` (M-09a ile geldi) | Veri/toplantı ile adım tamamlama | `core/rules` |
 
 ## 4. Spec kapsaması (son)
 İlk spec: **31/31 karşılandı.** Ek A (AI Insight + entegrasyonlar): **7/7.** Mockup'ta bilinçli olarak yapılmayan ve **BE veri modeline (F1-00)** bırakılanlar:
@@ -61,7 +62,9 @@ M-09 sonrası proje detayı **13 sekmeye** iner (Satış devri, Kick-off, Eğiti
 | Rol kontrolü `perm.ts` dışında | 2 | 2 | 0 (Overview'daki role göre içerik hariç) |
 | Kullanılmayan | xlsx, supabase, confetti, mcp-js, lovable-tagger | aynı | aynı + `.lovable/` planları, README'deki Lovable metni |
 
+**M-09b notu (main @ aee9657):** `npm ci` artık çalışıyor — `package-lock.json` senkronize edildi (QA-01). `bun.lockb` hâlâ repoda; kalkması F0-02'de.
+
 ## 6. Sonuç
-1. Lovable'a bağlı hiçbir iş kalmadı. Mockup'ın kalanı (M-09) uygulama oturumu ile, kitteki `/plan → uygulama oturumu → /gate` döngüsüyle yapılır.
+1. Lovable'a bağlı hiçbir iş kalmadı. Mockup'ın kalanı (M-09c) uygulama oturumu ile, kitteki `/plan → uygulama oturumu → /gate` döngüsüyle yapılır.
 2. M-09c bitince **M-06 dondurma**: görsel referans + `mockup-freeze` etiketi → F0 başlar.
-3. F0-02 temizliği büyüdü: `.lovable/`, README, Supabase dosyaları, kullanılmayan paketler, kilit dosyaları, lint, bundle.
+3. F0-02 temizliği büyüdü: `.lovable/`, README, Supabase dosyaları, kullanılmayan paketler, `bun.lockb`, lint, bundle. `package-lock.json` senkronu M-09b'de tamamlandı.
