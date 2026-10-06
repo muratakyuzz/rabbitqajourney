@@ -1,6 +1,6 @@
 # M-09c — Keşif, Erişim, Eğitim ve Uyarlama çalışma alanları; uyarı rozeti ve paneli; 13 sekmelik son düzen
 
-**Durum:** Hazır. Tüm açık sorular (S1–S7, RUL-05 dahil) 2026-10-05'te Murat tarafından cevaplandı. Kararlar §11'de. **S2 (RUL-05):** Seçenek A + ekler. **S6:** güvenli varsayımın tersi, "Kurulum özeti" kartı kalır. `/build` başlayabilir.
+**Durum:** Tamamlandı. main'e merge edildi (2026-10-06, `48b6788`). Değişiklik notu: `docs/changes/feat_m09c-phase-workspaces-tabs.md`. Gate kayıtları: `docs/reviews/feat_m09c-phase-workspaces-tabs/`.
 **Spec referansı:** `docs/PRODUCT_SPEC.md`
 - Ek B.2 (tamamlanma tipleri; Eğitim = toplantı; Uyarlama: takım başına tek adım + kontrol listesi; çalışma alanı)
 - Ek B.1 (kilitli adım iş sayılmaz)

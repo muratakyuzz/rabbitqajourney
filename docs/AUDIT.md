@@ -3,10 +3,10 @@
 Lovable ile mockup geliştirmesi **bitti**; Lovable artık kullanılmaz. Bu sürüm mockup'ın son halini, spec kapsamasını ve BE'ye geçiş öncesi teknik durumu kaydeder. Önceki sürümler: v1 (77b938d), v2 (49976be).
 
 ## 1. Özet
-- Demo uygulama (backend yok, veri localStorage'da) spec'in tamamını ve Ek A'yı (AI Insight + entegrasyonlar) ekranda karşılıyor. State sürümü **v10** (`rabbitqa-demo-state-v10`, M-09b main @ aee9657), store'da **53 işlem**.
+- Demo uygulama (backend yok, veri localStorage'da) spec'in tamamını ve Ek A'yı (AI Insight + entegrasyonlar) ekranda karşılıyor. State sürümü **v11** (`rabbitqa-demo-state-v11`, M-09c main @ 48b6788), store'da **51 işlem**.
 - Lovable'ın son turları: sıralı akış (bağlılık, iş günü süresi, kilitli adım), 14 tipli uyarı motoru, tatil takvimi ve eşikler, satışçı ve kullanıcı yönetimi, "müşteriye görünür" işareti, haftalık rapor arşivi (snapshot), yönetim raporu, Süreklilik sekmesi, risk/destek/Go-Live alanları.
-- **M-09a + M-09b main'de (tamamlandı).** M-09b ile "Satış devri" ve "Kick-off" sekmeleri kalktı; 00 Satış Devri artık aşama çalışma alanı panelinde (`PhaseWorkspaceSheet`/`HandoverWorkspace`), `reqdoc` adımı veriyle (`data`) tamamlanıyor.
-- **Kalan mockup işi uygulama oturumunda:** M-09c (Keşif/Erişim/Eğitim/Uyarlama çalışma alanları + 13 sekmelik son düzen), ardından M-06 dondurma. Planlar: `docs/plans/M-09-step-completion-workspaces.md`.
+- **M-09a + M-09b + M-09c main'de (tamamlandı).** M-09b ile "Satış devri" ve "Kick-off" sekmeleri kalktı; 00 Satış Devri artık aşama çalışma alanı panelinde (`PhaseWorkspaceSheet`/`HandoverWorkspace`), `reqdoc` adımı veriyle (`data`) tamamlanıyor. M-09c ile proje detayı **13 sekmeye** indi (Eğitim, Uyarlama, Uyarılar sekmeleri aşama çalışma alanına / başlık rozetine taşındı; Destek kayıtları "Faz 2" olarak pasif); `TrainingSession`/`AdaptationSession`/`trainings` koleksiyonu kalktı (Eğitim = `meetings.type: "training"`, Uyarlama = takım başına tek veri adımı + 5 maddelik kontrol listesi); RUL-05 Seçenek A (`ensureReviewAction`/`cancelReviewAction`, `rule_review:*` aksiyon ailesi) uygulandı.
+- **Kalan mockup işi uygulama oturumunda:** M-06 dondurma (görsel referans + `mockup-freeze` etiketi). Planlar: `docs/plans/M-09-step-completion-workspaces.md`.
 - Kit dosyaları (AGENTS.md, CLAUDE.md, `.claude/`, `docs/`, CI) artık repoda.
 
 ## 2. Ekranlar (son hal)
@@ -16,16 +16,16 @@ Lovable ile mockup geliştirmesi **bitti**; Lovable artık kullanılmaz. Bu sür
 | /app/overview | Genel bakış: KPI kartları, AI Insight kartı, darboğazlar |
 | /app/insights | AI Insight: Bekleyen / Geçmiş |
 | /app/projects | Müşteri projeleri (açık uyarı kolonu) |
-| /app/projects/:id | 16 sekme (M-09b ile Satış devri ve Kick-off sekmeleri kalktı; 00 Satış Devri çalışma alanı paneline taşındı): Aşamalar ve adımlar · Aksiyonlar · Toplantılar · Keşif ve takımlar · Kurulum ve erişim · Eğitim · Uyarlama · Dokümanlar · Uyarılar · Destek kayıtları · Riskler ve kararlar · Go-Live · Süreklilik · Entegrasyonlar · Müşteri kişileri · Müşteri geçmişi |
+| /app/projects/:id | 13 sekme (M-09c ile son düzen): Aşamalar ve adımlar · Aksiyonlar · Toplantılar · Keşif ve takımlar · Erişim bilgileri (yalnızca `canSeeCredentials`) · Dokümanlar · Riskler ve kararlar · Go-Live · Süreklilik · Entegrasyonlar · Müşteri kişileri · Müşteri geçmişi · Destek kayıtları (pasif, "Faz 2"). 02 Keşif, 03 Erişim, 04 Eğitim, 05 Uyarlama artık aşama çalışma alanı panelinde (`PhaseWorkspaceSheet`); uyarılar başlık rozeti + sağ panelde (`ProjectAlertsPanel`) |
 | /app/projects/:id/report | Haftalık müşteri raporu (oluştur, düzenle, gönderildi, arşiv, yazdır/PDF) |
 | /app/my-work | Bana atananlar (+ Uyarılarım, Sıradaki işlerim, bana önerilen AI önerileri) |
 | /app/reports | Yönetim raporu (dönem seçimi, grafikler) — manager, admin |
 | /app/admin | Sistem ayarları: Aşama şablonu · Modüller · Entegrasyonlar · Keşif soruları · Kullanıcılar · Satışçılar · Uyarılar · Değişiklikler — admin |
 
-M-09c sonrası proje detayı **13 sekmeye** iner (Eğitim, Uyarlama, Uyarılar sekmeleri de aşama çalışma alanına / başlık rozetine taşınır; Destek kayıtları "Faz 2" olarak pasif).
+M-09c tamamlandı: yukarıdaki satır bu halin sonucudur.
 
 ## 3. BE sözleşmesinin kaynağı
-- **Store `Ctx` (52 işlem):** proje/aşama/adım/aksiyon · toplantı/kişi/taahhüt · kick-off/takım/KPI/eğitim/uyarlama/erişim/doküman · uyarı (ekle, ertele, kapat) · destek · risk/karar · Go-Live onayı · haftalık rapor (oluştur, güncelle, gönderildi) · kullanıcı (ekle, güncelle) · ayarlar (`setConfig`) · entegrasyon & AI (test, kes, secret göster, proje entegrasyonu, öneri onay/red, eşleşmeyen e-posta, simülasyon).
+- **Store `Ctx` (51 işlem, M-09c ile 53 → 51):** proje/aşama/adım/aksiyon · toplantı/kişi/taahhüt · kick-off/takım/KPI/erişim/doküman · uyarı (ekle, ertele, kapat) · destek · risk/karar · Go-Live onayı · haftalık rapor (oluştur, güncelle, gönderildi) · kullanıcı (ekle, güncelle) · ayarlar (`setConfig`) · entegrasyon & AI (test, kes, secret göster, proje entegrasyonu, öneri onay/red, eşleşmeyen e-posta, simülasyon). M-09c ile `addTraining`/`updateTraining`/`saveAdaptation` kalktı, `setAdaptationCheck` eklendi (Uyarlama artık takım başına tek veri adımı + 5 maddelik kontrol listesi; Eğitim `meetings.type: "training"`).
 - **Saf iş mantığı (BE'ye taşınacak, `packages/shared` veya `apps/api/core`):**
   | Dosya | İçerik | Hedef |
   |---|---|---|
@@ -65,6 +65,14 @@ M-09c sonrası proje detayı **13 sekmeye** iner (Eğitim, Uyarlama, Uyarılar s
 **M-09b notu (main @ aee9657):** `npm ci` artık çalışıyor — `package-lock.json` senkronize edildi (QA-01). `bun.lockb` hâlâ repoda; kalkması F0-02'de.
 
 ## 6. Sonuç
-1. Lovable'a bağlı hiçbir iş kalmadı. Mockup'ın kalanı (M-09c) uygulama oturumu ile, kitteki `/plan → uygulama oturumu → /gate` döngüsüyle yapılır.
-2. M-09c bitince **M-06 dondurma**: görsel referans + `mockup-freeze` etiketi → F0 başlar.
+1. Lovable'a bağlı hiçbir iş kalmadı. **M-09c tamamlandı** (main @ `48b6788`, 2026-10-06): state v11, 13 sekme, `trainings` koleksiyonu kalktı, `rule_review:*` aksiyon ailesi.
+2. Sıradaki iş **M-06 dondurma**: görsel referans + `mockup-freeze` etiketi → F0 başlar.
 3. F0-02 temizliği büyüdü: `.lovable/`, README, Supabase dosyaları, kullanılmayan paketler, `bun.lockb`, lint, bundle. `package-lock.json` senkronu M-09b'de tamamlandı.
+
+## 7. M-09c sonrası durum (main @ `48b6788`, 2026-10-06)
+- **State:** v10 → v11 (`rabbitqa-demo-state-v11`).
+- **Sekmeler:** proje detayı 13 sekmeye indi. Eğitim/Uyarlama/Uyarılar sekmeleri kalktı; 02/03/04/05 aşama çalışma alanı paneline (`PhaseWorkspaceSheet`), uyarılar başlık rozeti + sağ panele (`ProjectAlertsPanel`) taşındı. "Destek kayıtları" `disabled` + "Faz 2" rozetiyle pasif (kod/veri silinmedi).
+- **Yeni seed projeleri (v11):** `p_lojistik` (`reqdoc_not_shared` örneği — M-09b S2 devri) ve `p_perakende` (Uyarlama aktif örneği, "Mobil" takımı).
+- **RUL-05 kararı (Seçenek A, S2):** Tamamlanmış aşamadaki adımların durumu otomatik kuralla (kurulum tipi, LLM tercihi, takım ekleme) değiştirilmez; bunun yerine CSM'e `rule_review:<stepId>` aksiyonu açılır (`ensureReviewAction`/`cancelReviewAction`, idempotent, A→B→A güvenli). Seçenek B (tamamlanmış aşamayı yeniden açma) seçilmedi.
+- **Store `Ctx`:** 53 → 51 işlem (`addTraining`/`updateTraining`/`saveAdaptation` kalktı, `setAdaptationCheck` eklendi).
+- Değişiklik notu: `docs/changes/feat_m09c-phase-workspaces-tabs.md`. Gate kayıtları: `docs/reviews/feat_m09c-phase-workspaces-tabs/`.

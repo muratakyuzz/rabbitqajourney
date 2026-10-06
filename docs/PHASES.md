@@ -10,7 +10,7 @@ Faz geçişi yalnızca `/phase-close <faz>` → **GO** ile olur.
 
 | Faz | Ad | Nerede | Çıktı | Durum |
 |---|---|---|---|---|
-| M | Mockup tamamlama & dondurma | Claude Code — uygulama oturumu (demo) | M-09 adım tamamlama + çalışma alanları; görsel referans; `mockup-freeze` | 🟡 M-09c + M-06 kaldı |
+| M | Mockup tamamlama & dondurma | Claude Code — uygulama oturumu (demo) | M-09 adım tamamlama + çalışma alanları; görsel referans; `mockup-freeze` | 🟡 M-06 kaldı |
 | F0 | Temizlik, yapı & sözleşme | Claude Code — uygulama oturumu | API sözleşmesi, temiz repo, monorepo, güncel stack, FE veri katmanı (mock adaptör), API iskeleti, test altyapısı, CI | ⬜ |
 | F1 | Veri modeli, çekirdek & yetki | Claude Code — uygulama oturumu | DATA_MODEL, şema, oturum (gerçek giriş), RBAC, audit, soft delete | ⬜ |
 | F2 | Admin konfigürasyonu → API | Claude Code — uygulama oturumu | Kullanıcı, satışçı, modül, şablon, keşif soruları, eşikler | ⬜ |
@@ -37,7 +37,7 @@ Lovable turları (Faz 1–4, AI Insight, akış, uyarı motoru, kapanış) tamam
 |---|---|---|---|
 | M-09a | Adım tamamlama motoru (veri / toplantı / elle), toplantı durumu, "Taahhüt yok", kurulum tipi + LLM Satış Devri'ne | ● | ✅ |
 | M-09b | Aşama çalışma alanı altyapısı + 00 Satış Devri paneli; Satış devri ve Kick-off sekmeleri kalkar | | ✅ |
-| M-09c | Keşif, Erişim, Eğitim, Uyarlama çalışma alanları; uyarı rozeti/paneli; 13 sekmelik son düzen; Destek kayıtları pasif (Faz 2) | ● | ⬜ |
+| M-09c | Keşif, Erişim, Eğitim, Uyarlama çalışma alanları; uyarı rozeti/paneli; 13 sekmelik son düzen; Destek kayıtları pasif (Faz 2) | ● | ✅ |
 | M-06 | **Dondurma:** `/phase-close M` → her ekran × rol görsel referansı (`docs/reviews/M-06/baseline/`), spec kapsaması son kontrol, `mockup-freeze` etiketi | | ⬜ |
 
 Görev metinleri: `docs/plans/M-09-step-completion-workspaces.md` (§0 Bağlam + üç görev; plan hazır, `/plan` gerekmez).
