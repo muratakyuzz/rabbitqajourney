@@ -160,3 +160,43 @@ REV-13 kapatıldı — reviewer, qa-verifier, rules-reviewer hepsi APPROVE. MERG
 
 ### Açık soru
 - RUL-01'in önerdiği gibi, `isAutoStep` kaldırma sapması planner/Murat tarafından onaylanmalı; onaylanırsa yalnızca belge güncellemesi yeterli, onaylanmazsa kod geri eklenmeli.
+
+## Faz M kapanış (round 2-3, main @ dffa61f, 2026-10-06)
+
+Kaynak: `docs/reviews/M-full-review.md` (round 2), `docs/reviews/M-qa-regression.md` (round 3), M-closure round 2 (ab95e9a) tablosu. REV-13 kapandı (fix/m06-insight-step-lock).
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| QA-01 | Low | **Kapandı.** REV-13 ek görseli (`fix_m06-insight-step-lock/screens/…-ac4-status-dropdown.png`) `docs/reviews/M-06/baseline/csm-insights-step-update-edit-dialog-status-open.png` olarak kopyalandı; baseline 37 PNG. | docs/reviews/M-06/baseline/ | Kapandı |
+| REV-14 | Medium | `PhaseDialog` `actualStart` gerekçesiz değişiyor | — | Murat kararı (INV-06 "tarih" kapsamı) → F0-01, F3 |
+| REV-M06-01 / RUL-01 | Medium | Karar `decidedAt` gerekçesiz (reports.ts:52) | — | Aynı Murat kararı → F0-01, F3-05 |
+| REV-15 | Low | Ulaşılamayan `TicketDialog` gerekçesiz durum değişikliği | — | Faz 2 planı + F0-01 notu |
+| REV-02 | Medium | `canViewProject`; URL ile proje detayına/rapora erişim | — | F1-05 (+F3-01) |
+| REV-03 | Medium | `canEditReport` rol kararı | — | F0-01 → F1-05 |
+| REV-04 | Medium | Admin yazma yetkisi (`isAllSeeing`) ve AI onayıyla proje verisi yazması; RBAC.md Karar 1 ile çelişki | store.tsx | Murat kararı (F0-01 öncesi) → F1-05 |
+| REV-05 | Medium | `setStepByKey` kilit kontrolü yapmıyor | store.tsx | Murat kararı (S6, RUL-05/07) → F0-01 notu, F4-01 |
+| REV-06 | Medium | INV-06/08 kontrolleri sözleşmeye ve servis katmanına | — | F0-01 + F1-02 |
+| REV-07 | Low | No-op `support_track` satırı | store.tsx:480 | F0-02 |
+| REV-08 | Low | `reportsSent` tutulsun mu | — | F1-00 |
+| REV-09 | Low | `"system"`/`"auto"` sentinel'leri, takımın adla tutulması | — | F1-00 (DATA_MODEL §9) |
+| REV-10 | Low | `isOpenStep` kopyaları, takvim günü aritmetiği | — | F6-01 |
+| REV-11 | Low | `=== true` fail-closed (INV-12) | reports | F7-02 (rules-reviewer) |
+| REV-12 | Low | AUDIT §5 güncellemesi (denetim rolü); AGENTS.md:28-29 v11/51 işlem (Murat) | docs | Hemen (belge) |
+| PLN-01 | Low | `date_change` dalı `updatePhase` dönüşünü yok sayıyor; `action_update` da aynı | store.tsx:686,707 | F0-01 notu |
+| RUL-02 (m06) | Low | Bayat gerekçe gönderiliyor | Phase3Tabs.tsx:434 | F3-05 |
+| REV-M06-02 / RUL-03 | Low | AC2 testi audit.reason assert etmiyor | Phase3Tabs.RiskDialog.test.tsx:56-67 | F4-01 |
+| REV-M06-03 | Low | Gerekçe store'da trim edilmiyor | store.tsx:509 | F1-02 (servis katmanı) |
+| RUL-04 (m06) | Low | Boş/çift audit/null termin negatif testleri | store.test.tsx | F4-01 |
+| REV-M13-01 / RUL-01 | Med/Low | `isAutoStep` kaldırma sapması — **planner kabul etti**; değişiklik notuna belge | store.tsx:687-692 | Belge (sonraki builder turu) / F0-01 notu |
+| REV-M13-02 / RUL-02, RUL-03 (m13) | Med/Low | AC5/AC17 sahte-yeşil; "Adım bulunamadı" testi yok | store.test.tsx:454-468,530-543 | F4-01 |
+| REV-M13-03 | Low | ApproveDialog seçenek kısıtı (StepDialog `allowed`) | InsightCard.tsx:164 | F3-02 |
+| QA: chunk / lint / e2e | — | 1,22 MB chunk; lint 14 hata; e2e yok | — | F0-02 / F9-03; F0-02; F0-06 |
+
+Önceki bölümlerdeki açık maddelerin hedefleri (round 2 kararıyla): test boşlukları → F4-01; a11y → F9-04; UI kenar durumları → F3-02; RBAC → F1-05; belge tutarsızlıkları (m09b/c REV-13/18, lint iddiaları, satır referansları) → kapatıldı.
+
+### F0-01'den önce Murat kararı gerekenler
+- INV-06 "tarih" kapsamı (REV-14, REV-M06-01)
+- RUL-05/RUL-07 (done aşamada `locked` + `reqdoc_not_shared`), S4, S6, A11
+- m09b REV-07 (otomatik adımda `out_of_scope` onayı) — REV-13 fix'i ile StepDialog'a hizalandı; aksi istenirse geri alınır
+- m09a RUL-07 (held toplantı type/date gerekçesi)
+- REV-04 (Admin yazma yetkisi)
