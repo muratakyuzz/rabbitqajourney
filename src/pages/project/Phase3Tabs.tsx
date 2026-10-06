@@ -353,6 +353,8 @@ function RiskDialog({ project, risk, onClose, onCreate }: { project: Project; ri
   });
   const meetings = state.meetings.filter((m) => m.projectId === project.id).sort((a, b) => b.date.localeCompare(a.date));
   const isRisk = d.kind === "risk";
+  const [reason, setReason] = useState("");
+  const needsReason = !!risk && (d.status !== risk.status || d.due !== risk.due);
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
@@ -416,12 +418,24 @@ function RiskDialog({ project, risk, onClose, onCreate }: { project: Project; ri
             </div>
           </div>
           <label className="flex items-center gap-3 text-sm"><Switch checked={d.isCustomerVisible} onCheckedChange={(c) => setD({ ...d, isCustomerVisible: c })} />Müşteriye görünür</label>
+          {needsReason && (
+            <div className="grid gap-2">
+              <Label htmlFor="risk-dialog-reason">Gerekçe (zorunlu)</Label>
+              <Textarea id="risk-dialog-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Vazgeç</Button>
           <Button onClick={() => {
             if (!d.title.trim()) return toast.error("Başlık zorunlu");
-            if (risk) updateRisk(risk.id, d); else onCreate(d);
+            if (needsReason && !reason.trim()) return toast.error("Gerekçe zorunlu");
+            if (risk) {
+              const err = updateRisk(risk.id, d, reason.trim() || undefined);
+              if (err) return toast.error(err);
+            } else {
+              onCreate(d);
+            }
             toast.success("Kaydedildi");
             onClose();
           }}>Kaydet</Button>

@@ -670,3 +670,44 @@ describe("setInstallChoice — LLM gpu -> own -> gpu, 03 done (AC13, AC19, RUL-0
     expect(result.current.state.audit.length).toBe(auditCountBefore);
   });
 });
+
+describe("updateRisk — status/due reason guard (REV-01, INV-06)", () => {
+  it("rejects a status change without a reason", () => {
+    const { result } = setup();
+    const risk = result.current.state.risks.find((r) => r.id === "r_1")!;
+    expect(risk.status).toBe("open");
+    let err: string | null = null;
+    act(() => { err = result.current.updateRisk(risk.id, { status: "mitigated" }); });
+    expect(err).toBe("Durum veya termin değişikliğinde gerekçe zorunlu");
+    expect(result.current.state.risks.find((r) => r.id === "r_1")!.status).toBe("open");
+  });
+
+  it("rejects a due-date change without a reason", () => {
+    const { result } = setup();
+    const risk = result.current.state.risks.find((r) => r.id === "r_1")!;
+    let err: string | null = null;
+    act(() => { err = result.current.updateRisk(risk.id, { due: "2026-11-01" }); });
+    expect(err).toBe("Durum veya termin değişikliğinde gerekçe zorunlu");
+    expect(result.current.state.risks.find((r) => r.id === "r_1")!.due).toBe(risk.due);
+  });
+
+  it("accepts a status change with a reason, and records it on the audit entry", () => {
+    const { result } = setup();
+    const risk = result.current.state.risks.find((r) => r.id === "r_1")!;
+    let err: string | null = null;
+    act(() => { err = result.current.updateRisk(risk.id, { status: "mitigated" }, "PO'lar haftalık bakım saatini devreye aldı"); });
+    expect(err).toBeNull();
+    expect(result.current.state.risks.find((r) => r.id === "r_1")!.status).toBe("mitigated");
+    const entry = result.current.state.audit.find((a) => a.entityId === risk.id && a.field === "status");
+    expect(entry?.reason).toBe("PO'lar haftalık bakım saatini devreye aldı");
+  });
+
+  it("allows title/description changes without a reason", () => {
+    const { result } = setup();
+    const risk = result.current.state.risks.find((r) => r.id === "r_1")!;
+    let err: string | null = null;
+    act(() => { err = result.current.updateRisk(risk.id, { title: "Güncel başlık" }); });
+    expect(err).toBeNull();
+    expect(result.current.state.risks.find((r) => r.id === "r_1")!.title).toBe("Güncel başlık");
+  });
+});

@@ -76,7 +76,7 @@ interface Ctx {
   markReportSent: (id: string) => string | null;
   addUser: (u: Omit<User, "id" | "active">) => string | null;
   updateUser: (id: string, patch: Partial<Pick<User, "role" | "active" | "name">>) => string | null;
-  updateRisk: (id: string, patch: Partial<RiskDecision>, reason?: string) => void;
+  updateRisk: (id: string, patch: Partial<RiskDecision>, reason?: string) => string | null;
   approveGoLive: (projectId: string, contactId: string, approvedAt: string, reason: string) => string | null;
   setConfig: <K extends "modules" | "questions" | "template" | "integrations" | "salespeople" | "alertThresholds" | "holidays" | "users">(key: K, value: RqState[K], label: string) => void;
   testConnection: (kind: "teams" | "email", override?: IntegrationConfig) => Promise<{ ok: boolean; message: string; channels?: ChatChannel[] }>;
@@ -500,7 +500,15 @@ export function RqProvider({ children }: { children: ReactNode }) {
       return null;
     },
     addRisk: (r) => add<RiskDecision>("risks", { ...r, id: uid("r"), createdAt: new Date().toISOString() }, `${r.kind === "risk" ? "Risk" : "Karar"} eklendi — ${r.title}`),
-    updateRisk: (id, p, reason) => patch<RiskDecision>("risks", id, p, reason),
+    updateRisk: (id, p, reason) => {
+      const old = state.risks.find((x) => x.id === id);
+      if (!old) return "Kayıt bulunamadı";
+      if (((p.status && p.status !== old.status) || (p.due !== undefined && p.due !== old.due)) && !reason?.trim()) {
+        return "Durum veya termin değişikliğinde gerekçe zorunlu";
+      }
+      patch<RiskDecision>("risks", id, p, reason);
+      return null;
+    },
     approveGoLive: (projectId, contactId, approvedAt, reason) => {
       const contact = state.contacts.find((c) => c.id === contactId && c.projectId === projectId);
       if (!contact) return "Onaylayan müşteri kişisini seçin";
