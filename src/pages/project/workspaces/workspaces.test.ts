@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { stepClickTarget } from "./index";
+import { stepClickTarget, workspaceAvailable } from "./index";
 import { highlightField } from "./highlight";
 import { createSeed } from "@/lib/rabbitqa/seed";
+import type { AuthUser } from "@/lib/auth-api";
 
 function step(s: ReturnType<typeof createSeed>, pid: string, key: string) {
   return s.steps.find((x) => x.projectId === pid && x.key === key)!;
@@ -74,10 +75,39 @@ describe("stepClickTarget — decision table (plan §6.3, AC9)", () => {
     expect(stepClickTarget(s, st, { hasWorkspace: false, canManage: true, canEdit: false })).toEqual({ kind: "none" });
   });
 
-  it("Akbank 02 discovery_form (no workspace), manager -> step_dialog", () => {
+  it("Akbank 02 discovery_form — 02 now has a workspace -> workspace + first missing field (discovery:q_teams)", () => {
     const s = createSeed();
     const st = step(s, "p_akbank", "discovery_form");
-    expect(stepClickTarget(s, st, { hasWorkspace: false, canManage: true, canEdit: true })).toEqual({ kind: "step_dialog" });
+    const target = stepClickTarget(s, st, { hasWorkspace: true, canManage: true, canEdit: true });
+    expect(target).toEqual({ kind: "workspace", field: "discovery:q_teams" });
+  });
+});
+
+describe("workspaceAvailable (AC4)", () => {
+  const manager: AuthUser = { id: "u_manager", role: "manager", name: "Manager", email: "manager@virgosol.com" };
+  const csm: AuthUser = { id: "u_deniz", role: "csm", name: "Deniz", email: "deniz.uzun@virgosol.com" };
+  const care: AuthUser = { id: "u_gencay", role: "care", name: "Gençay", email: "gencay.genc@virgosol.com" };
+
+  it("02/04/05 are available to any authenticated user", () => {
+    const s = createSeed();
+    const p = s.projects.find((x) => x.id === "p_garanti")!;
+    expect(workspaceAvailable("02", manager, p)).toBe(true);
+    expect(workspaceAvailable("04", care, p)).toBe(true);
+    expect(workspaceAvailable("05", care, p)).toBe(true);
+  });
+
+  it("03 is available only to canSeeCredentials (csm of the project, or devops)", () => {
+    const s = createSeed();
+    const p = s.projects.find((x) => x.id === "p_garanti")!; // csmId: u_deniz
+    expect(workspaceAvailable("03", csm, p)).toBe(true);
+    expect(workspaceAvailable("03", manager, p)).toBe(false);
+    expect(workspaceAvailable("03", care, p)).toBe(false);
+  });
+
+  it("unknown phase code is never available", () => {
+    const s = createSeed();
+    const p = s.projects.find((x) => x.id === "p_garanti")!;
+    expect(workspaceAvailable("99", manager, p)).toBe(false);
   });
 });
 

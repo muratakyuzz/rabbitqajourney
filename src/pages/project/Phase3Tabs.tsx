@@ -27,7 +27,8 @@ import type {
 } from "@/lib/rabbitqa/types";
 
 /* ── Uyarılar ───────────────────────────────────────────── */
-export function AlertsTab({ project }: { project: Project }) {
+/** Proje uyarı paneli (rozetten açılan Sheet içinde) ve eski "Uyarılar" sekmesi için aynı içerik. */
+export function ProjectAlertsPanel({ project }: { project: Project }) {
   const { state, addAlert } = useRq();
   const { user } = useAuth();
   const all = useAlertViews();
@@ -497,7 +498,7 @@ export function GoLiveTab({ project }: { project: Project }) {
               ))}
             </ul>
           )}
-          <p className="text-xs text-muted-foreground mt-3">Taahhütleri "Satış devri" sekmesinden güncelleyebilirsiniz. Açık taahhüt kalmadığında kontrol adımı otomatik tamamlanır.</p>
+          <p className="text-xs text-muted-foreground mt-3">Taahhütleri "Satış Devri" çalışma alanından güncelleyebilirsiniz. Açık taahhüt kalmadığında kontrol adımı otomatik tamamlanır.</p>
         </CardContent>
       </Card>
 

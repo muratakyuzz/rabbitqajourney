@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { applyStepCompletion, isAutoStep, latestHeldMeeting, manualStatusError, settleAll, settleProject, stepConditionResult, STEP_CONDITIONS } from "./completion";
-import { installChoiceError, applyMeetingHeldRules } from "./rules";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { adaptationCondition, applyStepCompletion, conditionFor, isAutoStep, latestHeldMeeting, manualStatusError, settleAll, settleProject, stepConditionResult, STEP_CONDITIONS } from "./completion";
+import { applyInstallType, applyLlmChoice, cancelReviewAction, ensureReviewAction, installChoiceError, applyMeetingHeldRules } from "./rules";
 import { analyzeText } from "./ai-mock";
 import { computeAlerts } from "./alerts";
+import { addBusinessDays } from "./business-days";
 import { buildFromTemplate, createSeed, PHASE_TEMPLATE } from "./seed";
 import { todayISO } from "./labels";
 import type { AuditEntry, RqState } from "./types";
@@ -465,12 +466,13 @@ describe("reqdoc_not_shared — reads step status, not a project field (AC7, M-0
       steps: s.steps.map((x) => (x.id === reqdoc.id ? { ...x, status: "pending" as const } : x)),
       meetings: s.meetings.map((m) => (m.projectId === "p_garanti" && m.type === "kickoff" ? { ...m, status: "planned" as const } : m)),
     };
-    expect(computeAlerts(open, "2026-10-20").some((a) => a.type === "reqdoc_not_shared")).toBe(false);
+    expect(computeAlerts(open, "2026-10-20").some((a) => a.type === "reqdoc_not_shared" && a.projectId === "p_garanti")).toBe(false);
   });
 
-  it("seed itself never produces reqdoc_not_shared for any project", () => {
+  it("seed produces reqdoc_not_shared only for p_lojistik (S5/AC17)", () => {
     const s = createSeed();
-    expect(computeAlerts(s, "2026-10-20").some((a) => a.type === "reqdoc_not_shared")).toBe(false);
+    const hits = computeAlerts(s, "2026-10-20").filter((a) => a.type === "reqdoc_not_shared");
+    expect(hits.map((a) => a.projectId)).toEqual(["p_lojistik"]);
   });
 });
 
@@ -580,6 +582,12 @@ describe("RUL-09 — meeting step reopen reason", () => {
 });
 
 describe("seed invariants (AC16)", () => {
+  it("PHASE_TEMPLATE'te ve seed'deki hiçbir projede support_track adımı yoktur (S7)", async () => {
+    const { PHASE_TEMPLATE } = await import("./seed");
+    expect(PHASE_TEMPLATE.some((p) => p.steps.some((s) => s.key === "support_track"))).toBe(false);
+    const s = createSeed();
+    expect(s.steps.some((st) => st.key === "support_track")).toBe(false);
+  });
   it("Garanti noCommitments is true", () => {
     const s = createSeed();
     expect(s.projects.find((p) => p.id === "p_garanti")!.noCommitments).toBe(true);
@@ -609,5 +617,385 @@ describe("seed invariants (AC16)", () => {
       (st) => donePhaseIds.has(st.phaseId) && st.status === "done" && st.completion !== "manual" && st.key !== "reqdoc",
     ).filter((st) => !(stepConditionResult(s, st)?.met ?? false));
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("training_plan / training_done conditions (AC5, AC-NEG1)", () => {
+  it("training_plan is met by any non-cancelled training meeting; training_done requires all held", () => {
+    const s = createSeed();
+    const pid = "p_garanti"; // no training meetings yet
+    const planCond = conditionFor("training_plan")!;
+    const doneCond = conditionFor("training_done")!;
+    expect(planCond.check(s, pid).met).toBe(false);
+    expect(doneCond.check(s, pid).met).toBe(false);
+
+    const withPlanned: RqState = {
+      ...s,
+      meetings: [...s.meetings, { id: "m_test_tr1", projectId: pid, type: "training", date: "2026-10-10", internalIds: [], contactIds: [], notes: "", decisions: "", isCustomerVisible: false, status: "planned" }],
+    };
+    expect(planCond.check(withPlanned, pid).met).toBe(true);
+    expect(doneCond.check(withPlanned, pid).met).toBe(false);
+
+    const withHeld: RqState = {
+      ...withPlanned,
+      meetings: withPlanned.meetings.map((m) => (m.id === "m_test_tr1" ? { ...m, status: "held" as const } : m)),
+    };
+    expect(doneCond.check(withHeld, pid).met).toBe(true);
+
+    const withSecondPlanned: RqState = {
+      ...withHeld,
+      meetings: [...withHeld.meetings, { id: "m_test_tr2", projectId: pid, type: "training", date: "2026-10-12", internalIds: [], contactIds: [], notes: "", decisions: "", isCustomerVisible: false, status: "planned" }],
+    };
+    expect(doneCond.check(withSecondPlanned, pid).met).toBe(false); // AC5: reopens when a new planned session is added
+  });
+
+  it("AC-NEG1: only a cancelled training meeting satisfies neither condition; manualStatusError rejects manual done", () => {
+    const s = createSeed();
+    const pid = "p_garanti";
+    const withCancelled: RqState = {
+      ...s,
+      meetings: [...s.meetings, { id: "m_test_trc", projectId: pid, type: "training", date: "2026-10-10", internalIds: [], contactIds: [], notes: "", decisions: "", isCustomerVisible: false, status: "cancelled" }],
+    };
+    expect(conditionFor("training_plan")!.check(withCancelled, pid).met).toBe(false);
+    expect(conditionFor("training_done")!.check(withCancelled, pid).met).toBe(false);
+    const step = s.steps.find((x) => x.projectId === pid && x.key === "training_done")!;
+    expect(manualStatusError(step, "done")).toBe("Bu adım veriyle tamamlanır");
+  });
+});
+
+describe("adaptationCondition / conditionFor('adapt:*') (AC8, AC9, AC-NEG2)", () => {
+  it("no record -> all 5 items unmet; general (teamId null) uses 'adapt:general' label", () => {
+    const s = createSeed();
+    const r = adaptationCondition(s, "p_akbank", null);
+    expect(r.met).toBe(false);
+    expect(r.checks.every((c) => !c.met)).toBe(true);
+    expect(r.checks.map((c) => c.field)).toEqual([
+      "adapt:general:projectCreated", "adapt:general:docsIdentified", "adapt:general:docsUploaded", "adapt:general:aiTrained", "adapt:general:firstSamples",
+    ]);
+    const cond = conditionFor("adapt:general")!;
+    expect(cond.label).toBe("Uyarlama kontrol listesi");
+  });
+
+  it("team-specific record -> field uses team name; label includes team", () => {
+    const s = createSeed();
+    const r = adaptationCondition(s, "p_isyatirim", "Herkese Borsa");
+    expect(r.met).toBe(true); // seed has this team fully checked
+    const cond = conditionFor("adapt:Herkese Borsa")!;
+    expect(cond.label).toBe("Uyarlama kontrol listesi — Herkese Borsa");
+  });
+
+  it("conditionFor falls back to STEP_CONDITIONS for known keys and undefined for unknown ones", () => {
+    expect(conditionFor("csm")).toBe(STEP_CONDITIONS.csm);
+    expect(conditionFor(undefined)).toBeUndefined();
+    expect(conditionFor("not_a_real_key")).toBeUndefined();
+  });
+});
+
+describe("RUL-05 Seçenek A — ensureReviewAction / cancelReviewAction (AC19)", () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  /** p_isyatirim'de 01 done; reqdoc'u seed'in kendi "done" fiat'ından bağımsız, SaaS seçilip
+   * req_doc paylaşılmamış senaryosuna göre out_of_scope'a zorlar (AC19 fixture'ı). */
+  function fixtureWithOutOfScopeReqdoc(): RqState {
+    const s = createSeed();
+    const pid = "p_isyatirim";
+    const reqdoc = s.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    return { ...s, steps: s.steps.map((x) => (x.id === reqdoc.id ? { ...x, status: "out_of_scope" as const } : x)) };
+  }
+
+  it("installType SaaS->On-prem on a done 01 phase: reqdoc stays out_of_scope, one open rule_review action opens with the right due/owner/title", () => {
+    const s = fixtureWithOutOfScopeReqdoc();
+    const pid = "p_isyatirim"; // 01 is done
+    const { mk } = mkMk();
+    const next = applyInstallType(s, pid, "onprem", mk, "gerekçe", "saas");
+    const reqdoc = next.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    expect(reqdoc.status).toBe("out_of_scope");
+    const ph01 = next.phases.find((p) => p.projectId === pid && p.code === "01")!;
+    expect(ph01.status).toBe("done");
+    const actions = next.actions.filter((a) => a.ruleKey === `rule_review:${reqdoc.id}`);
+    expect(actions.length).toBe(1);
+    const a = actions[0];
+    expect(a.status).toBe("open");
+    const project = next.projects.find((p) => p.id === pid)!;
+    expect(a.ownerId).toBe(project.csmId);
+    expect(a.ball).toBe("csm");
+    expect(a.source).toBe("rule");
+    expect(a.isCustomerVisible).toBe(false);
+    expect(a.due).toBe(addBusinessDays(todayISO(), 2));
+    expect(a.title).toContain("Gözden geçir: ");
+    expect(a.title).toContain("Kurulum tipi SaaS→On-prem değişti; 01 Kick-off tamamlanmıştı");
+    const createAudit = next.audit.find((au) => au.entity === "action" && au.entityId === a.id && au.kind === "create");
+    expect(createAudit?.reason).toBe("Otomatik kural: Kurulum tipi SaaS→On-prem değişti; 01 Kick-off tamamlanmıştı");
+    // RUL-07 (m09b r3): review action açıldığı için reqdoc_not_shared üretilmez.
+    expect(computeAlerts(next, todayISO()).some((al) => al.type === "reqdoc_not_shared" && al.projectId === pid)).toBe(false);
+  });
+
+  it("idempotent: calling ensureReviewAction twice directly creates exactly one open action", () => {
+    const s = createSeed();
+    const pid = "p_isyatirim";
+    const { mk } = mkMk();
+    const step = s.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const phase = s.phases.find((p) => p.id === step.phaseId)!;
+    let next = ensureReviewAction(s, pid, step, mk, "test gerekçe");
+    next = ensureReviewAction(next, pid, step, mk, "test gerekçe");
+    expect(next.actions.filter((a) => a.ruleKey === `rule_review:${step.id}`).length).toBe(1);
+  });
+
+  it("A -> B -> A: cancel then reopen reuses the same action id; total open count stays 1", () => {
+    const s = fixtureWithOutOfScopeReqdoc();
+    const pid = "p_isyatirim";
+    const { mk } = mkMk();
+    let next = applyInstallType(s, pid, "onprem", mk, "r1", "saas");
+    const reqdoc = next.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const ruleKey = `rule_review:${reqdoc.id}`;
+    const firstActionId = next.actions.find((a) => a.ruleKey === ruleKey)!.id;
+
+    next = applyInstallType(next, pid, "saas", mk, "r2", "onprem");
+    const cancelled = next.actions.find((a) => a.ruleKey === ruleKey)!;
+    expect(cancelled.id).toBe(firstActionId);
+    expect(cancelled.status).toBe("cancelled");
+
+    next = applyInstallType(next, pid, "onprem", mk, "r3", "saas");
+    const reopened = next.actions.filter((a) => a.ruleKey === ruleKey);
+    expect(reopened.length).toBe(1);
+    expect(reopened[0].id).toBe(firstActionId);
+    expect(reopened[0].status).toBe("open");
+  });
+
+  it("LLM gpu choice on a done 03 phase: model_install stays out_of_scope, a rule_review action opens; non-gpu cancels it", () => {
+    const s = createSeed();
+    const pid = "p_isyatirim"; // 03 is done, model_install out_of_scope, llmChoice starts rabbitqa
+    const { mk } = mkMk();
+    let next = applyLlmChoice(s, pid, "gpu", mk, "gpu gerekçe", "rabbitqa");
+    const model = next.steps.find((x) => x.projectId === pid && x.key === "model_install")!;
+    expect(model.status).toBe("out_of_scope");
+    const ruleKey = `rule_review:${model.id}`;
+    const review = next.actions.find((a) => a.ruleKey === ruleKey)!;
+    expect(review.status).toBe("open");
+    expect(review.title).toContain("LLM tercihi RabbitQA LLM→Müşteri GPU'lu sunucu değişti; 03");
+
+    next = applyLlmChoice(next, pid, "rabbitqa", mk, "geri dönüş", "gpu");
+    expect(next.actions.find((a) => a.ruleKey === ruleKey)!.status).toBe("cancelled");
+  });
+
+  it("out_of_scope phase: triggering the rule does not change step status and does not open an action", () => {
+    const s = createSeed();
+    const pid = "p_isyatirim";
+    const { mk } = mkMk();
+    const reqdoc = s.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const outOfScopePhase = { ...s.phases.find((p) => p.id === reqdoc.phaseId)!, status: "out_of_scope" as const };
+    const scoped: RqState = { ...s, phases: s.phases.map((p) => (p.id === outOfScopePhase.id ? outOfScopePhase : p)) };
+    const next = applyInstallType(scoped, pid, "onprem", mk, "r", "saas");
+    const after = next.steps.find((x) => x.id === reqdoc.id)!;
+    expect(after.status).toBe(reqdoc.status);
+    expect(next.actions.some((a) => a.ruleKey === `rule_review:${reqdoc.id}`)).toBe(false);
+  });
+
+  it("cancelReviewAction is a no-op when no open/in_progress action exists for the ruleKey", () => {
+    const s = createSeed();
+    const { mk } = mkMk();
+    const next = cancelReviewAction(s, "p_isyatirim", "nonexistent_step_id", mk, "reason");
+    expect(next).toBe(s);
+  });
+
+  it("due date lands after the configured business days, skipping weekends/holidays", () => {
+    const s = fixtureWithOutOfScopeReqdoc();
+    const pid = "p_isyatirim";
+    const { mk } = mkMk();
+    const next = applyInstallType(s, pid, "onprem", mk, "r", "saas");
+    const reqdoc = next.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const action = next.actions.find((a) => a.ruleKey === `rule_review:${reqdoc.id}`)!;
+    expect(action.due).toBe(addBusinessDays(todayISO(), 2, s.holidays.filter((h) => !h.halfDay).map((h) => h.date)));
+  });
+
+  it("item_late is produced once the review action's due date has passed (computeAlerts, alerts.ts mechanism reused)", () => {
+    const s = fixtureWithOutOfScopeReqdoc();
+    const pid = "p_isyatirim";
+    const { mk } = mkMk();
+    const next = applyInstallType(s, pid, "onprem", mk, "r", "saas");
+    const reqdoc = next.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const action = next.actions.find((a) => a.ruleKey === `rule_review:${reqdoc.id}`)!;
+    const future = addBusinessDays(action.due!, 3);
+    const alerts = computeAlerts(next, future);
+    expect(alerts.some((a) => a.type === "item_late" && a.entityId === action.id)).toBe(true);
+  });
+
+  it("REV-01/RUL-01: saas_env A->B->A on a done 03 phase — SaaS->On-prem cancels the review action, On-prem->SaaS reopens the same one", () => {
+    const s = createSeed();
+    const pid = "p_isyatirim"; // 03 is done, on-prem, no saas_env step yet
+    const { mk } = mkMk();
+
+    let next = applyInstallType(s, pid, "saas", mk, "r1", "onprem");
+    let saasEnv = next.steps.find((x) => x.projectId === pid && x.key === "saas_env")!;
+    expect(saasEnv.status).toBe("out_of_scope");
+    const ruleKey = `rule_review:${saasEnv.id}`;
+    const firstActionId = next.actions.find((a) => a.ruleKey === ruleKey)!.id;
+    expect(next.actions.find((a) => a.id === firstActionId)!.status).toBe("open");
+
+    next = applyInstallType(next, pid, "onprem", mk, "r2", "saas");
+    const cancelled = next.actions.find((a) => a.ruleKey === ruleKey)!;
+    expect(cancelled.id).toBe(firstActionId);
+    expect(cancelled.status).toBe("cancelled");
+    const cancelAudit = next.audit.find((au) => au.entity === "action" && au.entityId === cancelled.id && au.field === "status" && au.newValue === "cancelled");
+    expect(cancelAudit?.reason).toBe("Otomatik kural: kurulum tipi değişti, gözden geçirme gereksiz");
+    saasEnv = next.steps.find((x) => x.id === saasEnv.id)!;
+    expect(saasEnv.status).toBe("out_of_scope");
+
+    next = applyInstallType(next, pid, "saas", mk, "r3", "onprem");
+    const reopened = next.actions.filter((a) => a.ruleKey === ruleKey);
+    expect(reopened.length).toBe(1);
+    expect(reopened[0].id).toBe(firstActionId);
+    expect(reopened[0].status).toBe("open");
+    expect(next.steps.filter((x) => x.projectId === pid && x.key === "saas_env").length).toBe(1);
+  });
+
+  it("REV-03/RUL-03 (c): retriggering while the action is in_progress does not open a second one", () => {
+    const s = fixtureWithOutOfScopeReqdoc();
+    const pid = "p_isyatirim";
+    const { mk } = mkMk();
+    let next = applyInstallType(s, pid, "onprem", mk, "r1", "saas");
+    const reqdoc = next.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const ruleKey = `rule_review:${reqdoc.id}`;
+    const actionId = next.actions.find((a) => a.ruleKey === ruleKey)!.id;
+    next = { ...next, actions: next.actions.map((a) => (a.id === actionId ? { ...a, status: "in_progress" as const } : a)) };
+
+    next = applyInstallType(next, pid, "onprem", mk, "r2", "saas");
+    const matches = next.actions.filter((a) => a.ruleKey === ruleKey);
+    expect(matches.length).toBe(1);
+    expect(matches[0].id).toBe(actionId);
+    expect(matches[0].status).toBe("in_progress");
+  });
+
+  it("REV-03/RUL-03 (d): retriggering after the action was completed opens a new one; the done record is untouched", () => {
+    const s = fixtureWithOutOfScopeReqdoc();
+    const pid = "p_isyatirim";
+    const { mk } = mkMk();
+    let next = applyInstallType(s, pid, "onprem", mk, "r1", "saas");
+    const reqdoc = next.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const ruleKey = `rule_review:${reqdoc.id}`;
+    const firstActionId = next.actions.find((a) => a.ruleKey === ruleKey)!.id;
+    next = { ...next, actions: next.actions.map((a) => (a.id === firstActionId ? { ...a, status: "done" as const } : a)) };
+
+    next = applyInstallType(next, pid, "onprem", mk, "r2", "saas");
+    const matches = next.actions.filter((a) => a.ruleKey === ruleKey);
+    expect(matches.length).toBe(2);
+    const done = matches.find((a) => a.id === firstActionId)!;
+    expect(done.status).toBe("done");
+    const opened = matches.find((a) => a.id !== firstActionId)!;
+    expect(opened.status).toBe("open");
+  });
+
+  it("REV-03/RUL-03 (e)/(f): reopening a cancelled action refreshes due/ownerId/title with a per-field audit; cancelling logs a status audit", () => {
+    const s = fixtureWithOutOfScopeReqdoc();
+    const pid = "p_isyatirim";
+    const { mk } = mkMk();
+    let next = applyInstallType(s, pid, "onprem", mk, "r1", "saas");
+    const reqdoc = next.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const ruleKey = `rule_review:${reqdoc.id}`;
+    const firstActionId = next.actions.find((a) => a.ruleKey === ruleKey)!.id;
+
+    next = applyInstallType(next, pid, "saas", mk, "r2", "onprem");
+    const cancelled = next.actions.find((a) => a.ruleKey === ruleKey)!;
+    expect(cancelled.status).toBe("cancelled");
+    const cancelAudit = next.audit.find((au) => au.entity === "action" && au.entityId === cancelled.id && au.field === "status" && au.newValue === "cancelled");
+    expect(cancelAudit).toBeTruthy();
+    expect(cancelAudit?.oldValue).toBe("open");
+
+    const otherProject = { ...next.projects.find((p) => p.id === pid)! };
+    const otherCsmId = next.users.find((u) => u.role === "csm" && u.id !== otherProject.csmId)?.id ?? otherProject.csmId;
+    const reassigned: RqState = { ...next, projects: next.projects.map((p) => (p.id === pid ? { ...p, csmId: otherCsmId } : p)) };
+
+    next = applyInstallType(reassigned, pid, "onprem", mk, "r3", "saas");
+    const reopened = next.actions.find((a) => a.id === firstActionId)!;
+    expect(reopened.status).toBe("open");
+    expect(reopened.ownerId).toBe(otherCsmId);
+    expect(reopened.due).toBe(addBusinessDays(todayISO(), 2));
+    expect(reopened.title).toContain("SaaS→On-prem");
+
+    const fieldsChanged = next.audit.filter((au) => au.entity === "action" && au.entityId === firstActionId && au.kind === "update" && au.at === NOW.toISOString());
+    const changedFields = new Set(fieldsChanged.map((a) => a.field));
+    expect(changedFields.has("status")).toBe(true);
+    expect(changedFields.has("ownerId")).toBe(true);
+  });
+
+  it("REV-03/RUL-03 (g): a freshly opened review action is within dueSoonDays and produces action_due_soon", () => {
+    const s = fixtureWithOutOfScopeReqdoc();
+    const pid = "p_isyatirim";
+    const { mk } = mkMk();
+    const next = applyInstallType(s, pid, "onprem", mk, "r", "saas");
+    const reqdoc = next.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
+    const action = next.actions.find((a) => a.ruleKey === `rule_review:${reqdoc.id}`)!;
+    const alerts = computeAlerts(next, todayISO());
+    expect(alerts.some((a) => a.type === "action_due_soon" && a.entityId === action.id)).toBe(true);
+  });
+
+  it("REV-03/RUL-03 (h): the LLM_ACTIONS cancel/reopen loop does not touch an open rule_review:* action", () => {
+    const s = createSeed();
+    const pid = "p_isyatirim"; // 03 is done
+    const { mk } = mkMk();
+    let next = applyLlmChoice(s, pid, "gpu", mk, "gpu gerekçe", "rabbitqa");
+    const model = next.steps.find((x) => x.projectId === pid && x.key === "model_install")!;
+    const ruleKey = `rule_review:${model.id}`;
+    const action = next.actions.find((a) => a.ruleKey === ruleKey)!;
+    expect(action.status).toBe("open");
+
+    // Toggle gpu -> own -> gpu: LLM_ACTIONS members (gpu_req/gpu_model/llm_endpoint/llm_integration) cycle,
+    // but the rule_review:* action must stay exactly as it is (it is not a member of LLM_ACTIONS).
+    next = applyLlmChoice(next, pid, "own", mk, "own gerekçe", "gpu");
+    const afterOwn = next.actions.find((a) => a.ruleKey === ruleKey)!;
+    expect(afterOwn.id).toBe(action.id);
+    expect(afterOwn.status).toBe("cancelled"); // cancelled by the model_install review cancel path, not by LLM_ACTIONS
+
+    next = applyLlmChoice(next, pid, "gpu", mk, "gpu gerekçe 2", "own");
+    const afterGpu = next.actions.filter((a) => a.ruleKey === ruleKey);
+    expect(afterGpu.length).toBe(1);
+    expect(afterGpu[0].id).toBe(action.id);
+    expect(afterGpu[0].status).toBe("open");
+  });
+
+  it("REV-03/RUL-03 (i): a done phase keeps every ONPREM_KEYS step out_of_scope on On-prem->SaaS and opens a review action for each", () => {
+    const s = createSeed();
+    const pid = "p_isyatirim"; // 01 and 03 are done; force the ONPREM_KEYS steps out_of_scope first (AC19 fixture, same shape as fixtureWithOutOfScopeReqdoc)
+    const onpremKeys = ["reqdoc", "vpn_req", "vpn_info", "servers", "devops_handover"];
+    const scoped: RqState = {
+      ...s,
+      steps: s.steps.map((x) => (x.projectId === pid && onpremKeys.includes(x.key) ? { ...x, status: "out_of_scope" as const } : x)),
+    };
+    const { mk } = mkMk();
+    const next = applyInstallType(scoped, pid, "onprem", mk, "r", "saas");
+    for (const key of onpremKeys) {
+      const st = next.steps.find((x) => x.projectId === pid && x.key === key)!;
+      expect(st.status).toBe("out_of_scope");
+      const action = next.actions.find((a) => a.ruleKey === `rule_review:${st.id}`);
+      expect(action).toBeTruthy();
+      expect(action?.status).toBe("open");
+    }
+  });
+});
+
+describe("buildReportSnapshot — p_perakende Uyarlama: Mobil (AC18)", () => {
+  it("a step completed this week via an 'adapt:<team>' audit appears in the completed list; phases 04/05 are present with the right status", async () => {
+    const { buildReportSnapshot } = await import("./reports");
+    const { weekStartOf } = await import("./alerts");
+    const s = createSeed();
+    const pid = "p_perakende";
+    const today = todayISO();
+    const mobilStep = s.steps.find((x) => x.projectId === pid && x.key === "adapt:Mobil")!;
+    const audit: AuditEntry = {
+      id: "au_test_ac18", at: today + "T10:00:00.000Z", userId: "u_deniz", projectId: pid, kind: "update",
+      entity: "step", entityId: mobilStep.id, label: "Uyarlama: Mobil", field: "status", oldValue: "pending", newValue: "done",
+    };
+    const withCompletion: RqState = {
+      ...s,
+      steps: s.steps.map((x) => (x.id === mobilStep.id ? { ...x, status: "done" as const } : x)),
+      audit: [...s.audit, audit],
+    };
+    const snap = buildReportSnapshot(withCompletion, pid, weekStartOf(today), today);
+    expect(snap.completed.some((c) => c.title === "Uyarlama: Mobil")).toBe(true);
+    const ph04 = snap.phases.find((p) => p.code === "04")!;
+    const ph05 = snap.phases.find((p) => p.code === "05")!;
+    expect(ph04.status).toBe("done");
+    expect(ph05.status).toBe("in_progress");
   });
 });

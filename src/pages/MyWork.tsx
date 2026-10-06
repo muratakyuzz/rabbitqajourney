@@ -59,7 +59,7 @@ export default function MyWork() {
         <CardContent className="space-y-2">
           {myAlerts.length === 0 && <p className="text-sm text-muted-foreground">Size ait açık uyarı yok</p>}
           {myAlerts.slice(0, 20).map((a) => (
-            <Link key={a.key} to={`/app/projects/${a.projectId}?tab=alerts`} className="flex items-start justify-between gap-2 rounded-lg border p-3 hover:bg-accent/40">
+            <Link key={a.key} to={`/app/projects/${a.projectId}?panel=alerts`} className="flex items-start justify-between gap-2 rounded-lg border p-3 hover:bg-accent/40">
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{a.title}</p>
                 <p className="text-xs text-muted-foreground">{state.projects.find((p) => p.id === a.projectId)?.customerName} · {a.detail}</p>
@@ -67,7 +67,7 @@ export default function MyWork() {
               <Pill tone={a.level === "red" ? "danger" : "warning"}>{ALERT_LEVEL_LABEL[a.level]}</Pill>
             </Link>
           ))}
-          {myAlerts.length > 20 && <p className="text-xs text-muted-foreground">+{myAlerts.length - 20} uyarı daha — proje sayfalarındaki Uyarılar sekmesine bakın.</p>}
+          {myAlerts.length > 20 && <p className="text-xs text-muted-foreground">+{myAlerts.length - 20} uyarı daha — proje sayfasındaki uyarı rozetine bakın.</p>}
         </CardContent>
       </Card>
       {myAi.length > 0 && (

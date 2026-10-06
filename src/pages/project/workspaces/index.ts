@@ -1,11 +1,30 @@
 import type { ComponentType } from "react";
+import type { AuthUser } from "@/lib/auth-api";
 import { latestHeldMeeting, stepConditionResult } from "@/lib/rabbitqa/completion";
+import { canSeeCredentials } from "@/lib/rabbitqa/perm";
 import type { MeetingType, Phase, Project, RqState, Step } from "@/lib/rabbitqa/types";
 import { HandoverWorkspace } from "./HandoverWorkspace";
+import { DiscoveryWorkspace } from "./DiscoveryWorkspace";
+import { AccessWorkspace } from "./AccessWorkspace";
+import { TrainingWorkspace } from "./TrainingWorkspace";
+import { AdaptationWorkspace } from "./AdaptationWorkspace";
 
 export interface WorkspaceProps { project: Project; phase: Phase; readOnly: boolean; csmEditable: boolean }
 
-export const PHASE_WORKSPACES: Partial<Record<string, ComponentType<WorkspaceProps>>> = { "00": HandoverWorkspace };
+export const PHASE_WORKSPACES: Partial<Record<string, ComponentType<WorkspaceProps>>> = {
+  "00": HandoverWorkspace,
+  "02": DiscoveryWorkspace,
+  "03": AccessWorkspace,
+  "04": TrainingWorkspace,
+  "05": AdaptationWorkspace,
+};
+
+/** Çalışma alanı var mı ve kullanıcı görebilir mi (03 yalnızca canSeeCredentials). */
+export function workspaceAvailable(code: string, user: AuthUser | null, project: Project): boolean {
+  if (!PHASE_WORKSPACES[code]) return false;
+  if (code === "03") return canSeeCredentials(user, project);
+  return true;
+}
 
 export type StepClickTarget =
   | { kind: "workspace"; field: string | null }

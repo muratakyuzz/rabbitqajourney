@@ -153,7 +153,7 @@ function AlertBell() {
         <DropdownMenuSeparator />
         {open.length === 0 && <div className="px-2 py-3 text-sm text-muted-foreground">Açık uyarı yok</div>}
         {open.slice(0, 8).map((a) => (
-          <DropdownMenuItem key={a.key} className="flex items-start gap-2" onClick={() => navigate(`/app/projects/${a.projectId}?tab=alerts`)}>
+          <DropdownMenuItem key={a.key} className="flex items-start gap-2" onClick={() => navigate(`/app/projects/${a.projectId}?panel=alerts`)}>
             <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${a.level === "red" ? "bg-destructive" : "bg-warning"}`} title={ALERT_LEVEL_LABEL[a.level]} />
             <span className="min-w-0">
               <span className="block text-xs text-muted-foreground">{state.projects.find((p) => p.id === a.projectId)?.customerName}</span>

@@ -15,7 +15,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useAuth } from "@/lib/auth-context";
 import { useRq } from "@/lib/rabbitqa/store";
 import { uid } from "@/lib/rabbitqa/seed";
-import { STEP_CONDITIONS } from "@/lib/rabbitqa/completion";
+import { conditionFor } from "@/lib/rabbitqa/completion";
 import { Pill } from "@/components/rq/Badges";
 import { BALL_LABEL, COMPLETION_LABEL, MEETING_TYPE_LABEL, QUESTION_TYPE_LABEL, fmtDateTime } from "@/lib/rabbitqa/labels";
 import { IntegrationsAdmin } from "./admin/IntegrationsAdmin";
@@ -27,7 +27,7 @@ import type { Ball, Dependency, PhaseTpl, StepTpl } from "@/lib/rabbitqa/types";
 function completionText(s: StepTpl) {
   const c = s.completion ?? "manual";
   if (c === "manual") return COMPLETION_LABEL.manual;
-  if (c === "data") return `${COMPLETION_LABEL.data}: ${s.key ? STEP_CONDITIONS[s.key]?.label ?? s.key : ""}`;
+  if (c === "data") return `${COMPLETION_LABEL.data}: ${s.key ? conditionFor(s.key)?.label ?? s.key : ""}`;
   return `${COMPLETION_LABEL.meeting}: ${s.meetingType ? MEETING_TYPE_LABEL[s.meetingType] : ""}`;
 }
 
@@ -109,7 +109,7 @@ function TemplateEditor() {
                   </Select>
                 )}
               </div>
-              {p.code === "05" && <p className="text-xs text-muted-foreground">Takım başına 5 adım: ilk adım bağımsız, diğerleri sıralı; süreler 2-2-3-3-3 iş günü.</p>}
+              {p.code === "05" && <p className="text-xs text-muted-foreground">Takım başına tek adım (bağımsız, 10 iş günü) ve 5 maddelik kontrol listesi. Takım yoksa genel "Uyarlama" adımı.</p>}
               {p.steps.length > 0 && <p className="text-xs text-muted-foreground">İlk adımda "Önceki adım tamamlanınca" = aşama başlayınca açılır.</p>}
               {p.steps.map((s, si) => {
                 const prev = p.steps[si - 1];

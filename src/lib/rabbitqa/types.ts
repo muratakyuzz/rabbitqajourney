@@ -128,6 +128,8 @@ export interface Action {
   isCustomerVisible: boolean;
 }
 
+export interface MeetingTraining { trainerId: string | null; modules: string[]; recordingUrl: string }
+
 export interface Meeting {
   id: string;
   projectId: string;
@@ -140,6 +142,7 @@ export interface Meeting {
   isCustomerVisible: boolean;
   status: MeetingStatus;
   teamId?: string | null;
+  training?: MeetingTraining;
 }
 
 export interface Contact {
@@ -188,25 +191,13 @@ export interface Kpi {
   isCustomerVisible: boolean;
 }
 
-export interface TrainingSession {
-  id: string;
-  projectId: string;
-  date: string;
-  trainerId: string | null;
-  attendees: string;
-  modules: string[];
-  recordingUrl: string;
-  notes: string;
-  status: "planned" | "done";
-}
+export type AdaptationItem = "projectCreated" | "docsIdentified" | "docsUploaded" | "aiTrained" | "firstSamples";
 
-export interface AdaptationSession {
+export interface Adaptation {
   id: string;
   projectId: string;
-  team: string;
-  date: string | null;
-  participants: string;
-  notes: string;
+  teamId: string | null;
+  checklist: Record<AdaptationItem, boolean>;
 }
 
 export interface Credential {
@@ -313,8 +304,7 @@ export interface RqState {
   contacts: Contact[];
   commitments: Commitment[];
   kpis: Kpi[];
-  trainings: TrainingSession[];
-  adaptations: AdaptationSession[];
+  adaptations: Adaptation[];
   credentials: Credential[];
   documents: DocumentRec[];
   alerts: Alert[];

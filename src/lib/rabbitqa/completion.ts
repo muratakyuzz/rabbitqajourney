@@ -1,7 +1,7 @@
 import { addBusinessDays, holidayDates } from "./business-days";
 import { advanceFlow, type MkAudit } from "./flow";
-import { MEETING_TYPE_LABEL } from "./labels";
-import type { AuditEntry, Meeting, MeetingType, RqState, Step, StepStatus } from "./types";
+import { ADAPTATION_ITEM_LABEL, MEETING_TYPE_LABEL } from "./labels";
+import type { AdaptationItem, AuditEntry, Meeting, MeetingType, RqState, Step, StepStatus } from "./types";
 
 export type { MkAudit };
 
@@ -94,7 +94,52 @@ export const STEP_CONDITIONS: Record<string, StepCondition> = {
     label: "VPN erişim bilgisi",
     check: (state, projectId) => fromChecks([{ field: "credential:vpn", label: "VPN erişim bilgisi", met: state.credentials.some((c) => c.projectId === projectId && c.type.trim().toLowerCase() === "vpn") }]),
   },
+  training_plan: {
+    label: "Eğitim session'larının planlanması",
+    check: (state, projectId) => fromChecks([{
+      field: "training:sessions", label: "Planlanmış veya yapılmış Eğitim toplantısı",
+      met: state.meetings.some((m) => m.projectId === projectId && m.type === "training" && m.status !== "cancelled"),
+    }]),
+  },
+  training_done: {
+    label: "Eğitim session'larının yapılması",
+    check: (state, projectId) => {
+      const sessions = state.meetings.filter((m) => m.projectId === projectId && m.type === "training" && m.status !== "cancelled");
+      return fromChecks([
+        { field: "training:sessions", label: "En az bir Eğitim toplantısı", met: sessions.length > 0 },
+        { field: "training:pending", label: "Tüm Eğitim toplantıları Yapıldı", met: sessions.length > 0 && sessions.every((m) => m.status === "held") },
+      ]);
+    },
+  },
 };
+
+/** Takım (veya genel, teamId null) için Uyarlama kontrol listesi koşulu. */
+export function adaptationCondition(state: RqState, projectId: string, teamId: string | null): ConditionResult {
+  const rec = state.adaptations.find((a) => a.projectId === projectId && a.teamId === teamId);
+  const items: AdaptationItem[] = ["projectCreated", "docsIdentified", "docsUploaded", "aiTrained", "firstSamples"];
+  const suffix = teamId ?? "general";
+  return fromChecks(items.map((item) => ({
+    field: `adapt:${suffix}:${item}`,
+    label: ADAPTATION_ITEM_LABEL[item],
+    met: rec?.checklist[item] ?? false,
+  })));
+}
+
+/** STEP_CONDITIONS'ta bulunmayan önekli anahtarlar (adapt:<teamId>) için koşul türetir. */
+export function conditionFor(key: string | undefined): StepCondition | undefined {
+  if (!key) return undefined;
+  const direct = STEP_CONDITIONS[key];
+  if (direct) return direct;
+  if (key.startsWith("adapt:")) {
+    const rest = key.slice(6);
+    const teamId = rest === "general" ? null : rest;
+    return {
+      label: teamId === null ? "Uyarlama kontrol listesi" : `Uyarlama kontrol listesi — ${teamId}`,
+      check: (state, projectId) => adaptationCondition(state, projectId, teamId),
+    };
+  }
+  return undefined;
+}
 
 function meetingCondition(meetingType: MeetingType, state: RqState, projectId: string): ConditionResult {
   const label = `${MEETING_TYPE_LABEL[meetingType]} toplantısı (Yapıldı)`;
@@ -108,7 +153,7 @@ export function stepConditionResult(state: RqState, step: Step): ConditionResult
     if (!step.meetingType) return fromChecks([{ field: "unknown", label: "Tanımsız koşul", met: false }]);
     return meetingCondition(step.meetingType, state, step.projectId);
   }
-  const cond = step.key ? STEP_CONDITIONS[step.key] : undefined;
+  const cond = conditionFor(step.key);
   if (!cond) return fromChecks([{ field: "unknown", label: "Tanımsız koşul", met: false }]);
   return cond.check(state, step.projectId);
 }
@@ -130,7 +175,7 @@ export function applyStepCompletion(state: RqState, projectId: string, mk: MkAud
     const met = result?.met ?? false;
     const cond = step.completion === "meeting"
       ? { label: `${step.meetingType ? MEETING_TYPE_LABEL[step.meetingType] : ""} toplantısı kaydedildi` }
-      : { label: step.key ? STEP_CONDITIONS[step.key]?.label ?? "" : "" };
+      : { label: conditionFor(step.key)?.label ?? "" };
 
     if (step.status !== "done") {
       if (met) {
@@ -146,7 +191,7 @@ export function applyStepCompletion(state: RqState, projectId: string, mk: MkAud
     // step.status === "done"
     if (phase && (phase.status === "done" || phase.status === "out_of_scope")) return;
     if (met) return;
-    const label = step.completion === "meeting" ? (step.meetingType ? MEETING_TYPE_LABEL[step.meetingType] : "") : STEP_CONDITIONS[step.key ?? ""]?.label ?? "";
+    const label = step.completion === "meeting" ? (step.meetingType ? MEETING_TYPE_LABEL[step.meetingType] : "") : conditionFor(step.key)?.label ?? "";
     const reason = step.completion === "meeting"
       ? `Otomatik kural: Yapıldı durumunda ${label} toplantısı kalmadı`
       : `Otomatik kural: veri eksildi — ${label}`;

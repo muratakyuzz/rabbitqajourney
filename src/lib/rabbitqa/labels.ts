@@ -1,5 +1,5 @@
 import type {
-  ActionSource, ActionStatus, Ball, CommitmentStatus, ContactRole, Health, MeetingStatus, MeetingType, PhaseStatus, Priority, Role, StepCompletion, StepStatus,
+  ActionSource, ActionStatus, AdaptationItem, Ball, CommitmentStatus, ContactRole, Health, MeetingStatus, MeetingType, PhaseStatus, Priority, Role, StepCompletion, StepStatus,
 } from "./types";
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -47,6 +47,13 @@ export const ENTITY_LABEL: Record<string, string> = {
   project: "Proje", phase: "Aşama", step: "Adım", action: "Aksiyon", meeting: "Toplantı", contact: "Kişi", commitment: "Taahhüt",
   kpi: "KPI", training: "Eğitim", adaptation: "Uyarlama", credential: "Erişim bilgisi", document: "Doküman",
   alert: "Uyarı", ticket: "Destek kaydı", risk: "Risk/Karar", insight: "AI Insight", integration: "Entegrasyon", report: "Haftalık rapor", config: "Sistem ayarı",
+};
+export const ADAPTATION_ITEM_LABEL: Record<AdaptationItem, string> = {
+  projectCreated: "Proje oluşturuldu",
+  docsIdentified: "Yüklenecek dokümanlar belirlendi",
+  docsUploaded: "Dokümanlar RabbitQA'e yüklendi",
+  aiTrained: "AI eğitildi",
+  firstSamples: "İlk örnekler birlikte yapıldı",
 };
 export const ALERT_SEVERITY_LABEL = { info: "Sarı", warning: "Sarı", critical: "Kırmızı" } as const;
 export const ALERT_STATUS_LABEL = { open: "Açık", resolved: "Kapatıldı" } as const;

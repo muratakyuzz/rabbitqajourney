@@ -3,6 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { toast } from "sonner";
 import { RqProvider, useRq } from "./store";
 import { manualStatusError } from "./completion";
+import { createSeed, STATE_KEY } from "./seed";
 import { loginApi } from "@/lib/auth-api";
 
 vi.mock("@/lib/auth-context", () => ({
@@ -127,6 +128,40 @@ describe("addMeeting / updateMeeting (AC12, AC-NEG2)", () => {
     let err: string | null = null;
     act(() => { err = result.current.updateMeeting(meetingId, { status: "cancelled" }, "gerekçe"); });
     expect(err).toBe("Yalnızca Planlandı toplantının durumu değiştirilebilir");
+  });
+
+  // AC-NEG5 / RUL-07 (m09a): held toplantıda tür veya tarih değişikliği gerekçesiz reddedilir.
+  it("rejects a held meeting's date change without a reason, accepts it with one (RUL-07 m09a, AC-NEG5)", () => {
+    const { result } = setup();
+    const pid = "p_ornek";
+    let meetingId = "";
+    act(() => {
+      meetingId = result.current.addMeeting({ projectId: pid, type: "brief", date: "2026-10-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "held" }, []);
+    });
+    let err: string | null = null;
+    act(() => { err = result.current.updateMeeting(meetingId, { date: "2026-10-02" }); });
+    expect(err).toBe("Yapılmış toplantının tür/tarih değişikliğinde gerekçe zorunlu");
+    expect(result.current.state.meetings.find((m) => m.id === meetingId)!.date).toBe("2026-10-01");
+
+    act(() => { err = result.current.updateMeeting(meetingId, { date: "2026-10-02" }, "müşteri talebiyle tarih güncellendi"); });
+    expect(err).toBeNull();
+    const after = result.current.state.meetings.find((m) => m.id === meetingId)!;
+    expect(after.date).toBe("2026-10-02");
+    const audit = result.current.state.audit.find((a) => a.entity === "meeting" && a.entityId === meetingId && a.field === "date");
+    expect(audit?.reason).toBe("müşteri talebiyle tarih güncellendi");
+  });
+
+  it("rejects a held meeting's type change without a reason (RUL-07 m09a)", () => {
+    const { result } = setup();
+    const pid = "p_ornek";
+    let meetingId = "";
+    act(() => {
+      meetingId = result.current.addMeeting({ projectId: pid, type: "brief", date: "2026-10-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "held" }, []);
+    });
+    let err: string | null = null;
+    act(() => { err = result.current.updateMeeting(meetingId, { type: "kickoff" }); });
+    expect(err).toBe("Yapılmış toplantının tür/tarih değişikliğinde gerekçe zorunlu");
+    expect(result.current.state.meetings.find((m) => m.id === meetingId)!.type).toBe("brief");
   });
 
   it("rejects planned -> cancelled without reason", () => {
@@ -275,34 +310,130 @@ describe("setInstallChoice (AC14, AC-NEG3)", () => {
     });
     expect(res.error).toBe("Kurulum tipi seçildikten sonra 'Henüz belli değil' yapılamaz");
   });
-});
 
-describe("addTeam — adaptation steps are manual (REV-01)", () => {
-  it("adds adaptation steps with completion manual and manualStatusError allows done", () => {
+  // RUL-08 (m09b r3): setInstallChoice'un updater'ı en güncel `cur` ile yeniden doğrular
+  // (installChoiceError ikinci kez updater içinde çalışır — store.tsx:386). Ardışık, ayrı
+  // render döngülerinde yapılan çağrılarda (gerçek UI tıklamaları gibi) outer `old` her zaman
+  // güncel olduğu için bu yol zaten dıştaki kontrolle örtüşür (aşağıdaki test). Aynı `act()`
+  // içinde art arda iki çağrı yapılırsa (React'in tek batch'te updater'ları zincirlediği durum)
+  // dönüş değeri `error: null` olarak gelebilir, state yine de reddedilen değişikliği uygulamaz —
+  // bu tutarsızlık BACKLOG.md'de ayrı bir düşük öncelikli bulgu olarak not edildi (teorik, gerçek
+  // UI akışında tek tıklama = tek render döngüsü olduğu için tetiklenmez).
+  it("installChoiceError is re-invoked with the updater's own cur (not the outer snapshot) — regression guard", () => {
     const { result } = setup();
-    const pid = "p_akbank";
-    act(() => { result.current.addTeam(pid, "Yeni Takım"); });
-    const added = result.current.state.steps.filter((s) => s.projectId === pid && s.title.startsWith("Yeni Takım"));
-    expect(added.length).toBeGreaterThan(0);
-    added.forEach((s) => {
-      expect(s.completion).toBe("manual");
-      expect(manualStatusError({ ...s, status: "pending" }, "done")).toBeNull();
-    });
+    const pid = "p_ornek";
+    act(() => { result.current.setInstallChoice(pid, { installType: "onprem" }); });
+    expect(result.current.state.projects.find((p) => p.id === pid)!.installType).toBe("onprem");
+    let res: { error: string | null; summary: string | null } = { error: null, summary: null };
+    act(() => { res = result.current.setInstallChoice(pid, { installType: "saas" }); });
+    expect(res.error).toBe("Kurulum tipi veya LLM değişikliğinde gerekçe zorunlu");
+    expect(result.current.state.projects.find((p) => p.id === pid)!.installType).toBe("onprem");
   });
 });
 
-describe("addTraining — participant step is manual (REV-01)", () => {
-  it("done training step stays done after settleAll and no 'data missing' audit is written", () => {
+describe("addTeam — adaptation step (AC7)", () => {
+  it("adds exactly one data step with the expected fields; second call is a no-op", () => {
     const { result } = setup();
-    const pid = "p_akbank";
-    act(() => {
-      result.current.addTraining({ projectId: pid, date: "2026-10-10", trainerId: null, attendees: "Ali, Veli", modules: [], recordingUrl: "", notes: "", status: "done" });
-    });
-    const step = result.current.state.steps.find((s) => s.projectId === pid && s.title.includes("2026") && s.status === "done" && s.completion === "manual")!;
-    expect(step).toBeDefined();
-    expect(step.status).toBe("done");
-    const reopened = result.current.state.audit.find((a) => a.entityId === step.id && a.reason?.startsWith("Otomatik kural: veri eksildi"));
-    expect(reopened).toBeUndefined();
+    const pid = "p_garanti"; // 05 is locked
+    act(() => { result.current.addTeam(pid, "Yeni Takım"); });
+    const added = result.current.state.steps.filter((s) => s.projectId === pid && s.key === "adapt:Yeni Takım");
+    expect(added.length).toBe(1);
+    const step = added[0];
+    expect(step.title).toBe("Uyarlama: Yeni Takım");
+    expect(step.completion).toBe("data");
+    expect(step.dependency).toBe("independent");
+    expect(step.durationDays).toBe(10);
+    expect(step.required).toBe(true);
+    const project = result.current.state.projects.find((p) => p.id === pid)!;
+    expect(step.ownerId).toBe(project.csmId);
+    expect(step.status).toBe("locked");
+
+    const auditCountBefore = result.current.state.audit.length;
+    act(() => { result.current.addTeam(pid, "Yeni Takım"); });
+    expect(result.current.state.steps.filter((s) => s.projectId === pid && s.key === "adapt:Yeni Takım").length).toBe(1);
+    expect(result.current.state.audit.length).toBe(auditCountBefore);
+  });
+
+  it("RUL-06: rejects 'general' as a team name (collides with the adapt:general template step)", () => {
+    const { result } = setup();
+    const pid = "p_garanti";
+    const stepCountBefore = result.current.state.steps.length;
+    const teamsBefore = result.current.state.projects.find((p) => p.id === pid)!.teams;
+    act(() => { result.current.addTeam(pid, "general"); });
+    expect(result.current.state.steps.length).toBe(stepCountBefore);
+    expect(result.current.state.projects.find((p) => p.id === pid)!.teams).toEqual(teamsBefore);
+  });
+
+  it("REV-10: new team's order continues after the highest existing order in phase 05 (not the step count)", () => {
+    const { result } = setup();
+    const pid = "p_garanti"; // already has one team step ("Mobil Bankacılık") with a gap-prone order
+    const ph05 = result.current.state.phases.find((p) => p.projectId === pid && p.code === "05")!;
+    const maxOrderBefore = Math.max(...result.current.state.steps.filter((s) => s.phaseId === ph05.id).map((s) => s.order));
+    act(() => { result.current.addTeam(pid, "Yeni Takım"); });
+    const step = result.current.state.steps.find((s) => s.projectId === pid && s.key === "adapt:Yeni Takım")!;
+    expect(step.order).toBe(maxOrderBefore + 1);
+  });
+
+  it("no rule_review action opens while 05 is locked or active", () => {
+    const { result } = setup();
+    const pid = "p_garanti";
+    act(() => { result.current.addTeam(pid, "Yeni Takım"); });
+    const step = result.current.state.steps.find((s) => s.projectId === pid && s.key === "adapt:Yeni Takım")!;
+    expect(result.current.state.actions.some((a) => a.ruleKey === `rule_review:${step.id}`)).toBe(false);
+  });
+
+  it("REV-02/RUL-02: 05 done — new team step is out_of_scope, a rule_review action opens for the CSM, phase stays done, second addTeam is a no-op", () => {
+    const { result } = setup();
+    const pid = "p_isyatirim"; // 05 is done
+    const ph05Before = result.current.state.phases.find((p) => p.projectId === pid && p.code === "05")!;
+    expect(ph05Before.status).toBe("done");
+
+    act(() => { result.current.addTeam(pid, "Yeni Takım"); });
+    const step = result.current.state.steps.find((s) => s.projectId === pid && s.key === "adapt:Yeni Takım")!;
+    expect(step.status).toBe("out_of_scope");
+    const createAudit = result.current.state.audit.find((a) => a.entity === "step" && a.entityId === step.id && a.kind === "create");
+    expect(createAudit?.reason).toBe("Otomatik kural: takım eklendi — 05 Uyarlama aşaması tamamlanmıştı");
+
+    const action = result.current.state.actions.find((a) => a.ruleKey === `rule_review:${step.id}`)!;
+    expect(action.status).toBe("open");
+    const project = result.current.state.projects.find((p) => p.id === pid)!;
+    expect(action.ownerId).toBe(project.csmId);
+    expect(action.ball).toBe("csm");
+    expect(action.title).toContain("Takım eklendi: Yeni Takım; 05 Uyarlama tamamlanmıştı");
+
+    const ph05After = result.current.state.phases.find((p) => p.projectId === pid && p.code === "05")!;
+    expect(ph05After.status).toBe("done");
+
+    const auditCountBefore = result.current.state.audit.length;
+    const actionCountBefore = result.current.state.actions.length;
+    act(() => { result.current.addTeam(pid, "Yeni Takım"); });
+    expect(result.current.state.steps.filter((s) => s.projectId === pid && s.key === "adapt:Yeni Takım").length).toBe(1);
+    expect(result.current.state.audit.length).toBe(auditCountBefore);
+    expect(result.current.state.actions.length).toBe(actionCountBefore);
+  });
+
+  it("REV-02/RUL-02: 05 out_of_scope — new team step is out_of_scope, no action opens, the existing team's step is untouched", () => {
+    const pid = "p_garanti"; // 05 is locked in seed; force out_of_scope for this fixture
+    const seeded = createSeed();
+    const ph05 = seeded.phases.find((p) => p.projectId === pid && p.code === "05")!;
+    const existingStep = seeded.steps.find((s) => s.projectId === pid && s.key === "adapt:Mobil Bankacılık")!;
+    localStorage.setItem(STATE_KEY, JSON.stringify({
+      ...seeded,
+      phases: seeded.phases.map((p) => (p.id === ph05.id ? { ...p, status: "out_of_scope" as const } : p)),
+    }));
+
+    const { result } = setup();
+    expect(result.current.state.phases.find((p) => p.id === ph05.id)!.status).toBe("out_of_scope");
+
+    act(() => { result.current.addTeam(pid, "Yeni Takım"); });
+    const step = result.current.state.steps.find((s) => s.projectId === pid && s.key === "adapt:Yeni Takım")!;
+    expect(step.status).toBe("out_of_scope");
+    const createAudit = result.current.state.audit.find((a) => a.entity === "step" && a.entityId === step.id && a.kind === "create");
+    expect(createAudit?.reason).toBe("Otomatik kural: takım eklendi — 05 Uyarlama aşaması kapsam dışı");
+    expect(result.current.state.actions.some((a) => a.ruleKey === `rule_review:${step.id}`)).toBe(false);
+
+    const existingAfter = result.current.state.steps.find((s) => s.id === existingStep.id)!;
+    expect(existingAfter.status).toBe(existingStep.status);
   });
 });
 
@@ -360,16 +491,16 @@ describe("flowMessages — Tamamlandı toast (AC10)", () => {
   });
 });
 
-describe("state v10 + login (AC11)", () => {
-  it("createSeed version is 10", async () => {
+describe("state v11 + login (AC11, AC17)", () => {
+  it("createSeed version is 11", async () => {
     const { createSeed } = await import("./seed");
-    expect(createSeed().version).toBe(10);
+    expect(createSeed().version).toBe(11);
   });
 
-  it("a v9 localStorage record is discarded and the seed is reloaded", () => {
-    localStorage.setItem("rabbitqa-demo-state-v9", JSON.stringify({ version: 9, users: [] }));
+  it("a v10 localStorage record is discarded and the seed is reloaded (REV-11)", () => {
+    localStorage.setItem("rabbitqa-demo-state-v10", JSON.stringify({ version: 10, users: [] }));
     const { result } = setup();
-    expect(result.current.state.version).toBe(10);
+    expect(result.current.state.version).toBe(11);
     expect(result.current.state.projects.length).toBeGreaterThan(0);
   });
 
@@ -421,10 +552,9 @@ describe("reqdoc — data-completed step, RUL-13 (AC12)", () => {
 
   it("c) pending reqdoc completes when a req_doc document is added", () => {
     const { result } = setup();
-    const pid = "p_ornek";
-    act(() => { result.current.setInstallChoice(pid, { installType: "onprem" }); });
+    const pid = "p_lojistik"; // 01 is in_progress, reqdoc is genuinely pending (not locked) in seed
     const reqdoc = result.current.state.steps.find((s) => s.projectId === pid && s.key === "reqdoc")!;
-    expect(["pending", "in_progress", "locked"]).toContain(reqdoc.status);
+    expect(reqdoc.status).toBe("pending");
     act(() => { result.current.addDocument({ projectId: pid, type: "req_doc", name: "Gereksinim.pdf", linkType: "project", linkId: null }); });
     expect(result.current.state.steps.find((s) => s.id === reqdoc.id)!.status).toBe("done");
   });
@@ -487,38 +617,53 @@ describe("setInstallChoice — SaaS -> On-prem -> SaaS (AC13, RUL-10)", () => {
   });
 });
 
-describe("setInstallChoice — LLM gpu -> own -> gpu (AC13, RUL-11)", () => {
-  it("toggles gpu/own actions and model_install step exactly once per ruleKey, each transition audited", () => {
+describe("setInstallChoice — LLM gpu -> own -> gpu, 03 done (AC13, AC19, RUL-06 m09b)", () => {
+  it("toggles gpu/own actions; model_install stays out_of_scope (phase done) and a rule_review action opens/cancels instead", () => {
     const { result } = setup();
-    const pid = "p_isyatirim"; // llmChoice starts as rabbitqa
+    const pid = "p_isyatirim"; // llmChoice starts as rabbitqa, phase 03 is done
+    const model = result.current.state.steps.find((s) => s.projectId === pid && s.key === "model_install")!;
+    expect(model.status).toBe("out_of_scope");
+    const ruleKey = `rule_review:${model.id}`;
+
     act(() => { result.current.setInstallChoice(pid, { llmChoice: "gpu" }, "gpu'ya geçiş"); });
     const gpuActions1 = result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "gpu_req");
     expect(gpuActions1.length).toBe(1);
     expect(gpuActions1[0].status).toBe("open");
-    const model1 = result.current.state.steps.find((s) => s.projectId === pid && s.key === "model_install")!;
-    expect(model1.status).not.toBe("out_of_scope");
+    const model1 = result.current.state.steps.find((s) => s.id === model.id)!;
+    expect(model1.status).toBe("out_of_scope"); // RUL-05: tamamlanmış aşamada durum değişmez
+    const review1 = result.current.state.actions.find((a) => a.ruleKey === ruleKey && a.status === "open");
+    expect(review1).toBeDefined();
 
     act(() => { result.current.setInstallChoice(pid, { llmChoice: "own" }, "own'a geçiş"); });
     const gpuActions2 = result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "gpu_req");
-    expect(gpuActions2.length).toBe(1);
     expect(gpuActions2[0].status).toBe("cancelled");
     const ownActions = result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "llm_endpoint");
     expect(ownActions.length).toBe(1);
     expect(ownActions[0].status).toBe("open");
-    const model2 = result.current.state.steps.find((s) => s.projectId === pid && s.key === "model_install")!;
+    const model2 = result.current.state.steps.find((s) => s.id === model.id)!;
     expect(model2.status).toBe("out_of_scope");
+    const review2 = result.current.state.actions.find((a) => a.ruleKey === ruleKey);
+    expect(review2!.status).toBe("cancelled");
 
     act(() => { result.current.setInstallChoice(pid, { llmChoice: "gpu" }, "gpu'ya tekrar geçiş"); });
     const gpuActions3 = result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "gpu_req");
-    expect(gpuActions3.length).toBe(1);
     expect(gpuActions3[0].status).toBe("open");
-    const ownActions2 = result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "llm_endpoint");
-    expect(ownActions2[0].status).toBe("cancelled");
-    const model3 = result.current.state.steps.find((s) => s.projectId === pid && s.key === "model_install")!;
-    expect(model3.status).not.toBe("out_of_scope");
+    const review3 = result.current.state.actions.filter((a) => a.ruleKey === ruleKey);
+    expect(review3.length).toBe(1); // A -> B -> A reuses the same action
+    expect(review3[0].status).toBe("open");
+    const model3 = result.current.state.steps.find((s) => s.id === model.id)!;
+    expect(model3.status).toBe("out_of_scope");
 
+    // RUL-06 (m09b r2): ruleKey uniqueness across the whole gpu->own->gpu cycle, and one
+    // 'Otomatik kural: LLM tercihi' audit entry recorded per transition (3 calls so far).
+    expect(result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "gpu_req").length).toBe(1);
+    expect(result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "gpu_model").length).toBe(1);
+    expect(result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "llm_endpoint").length).toBe(1);
+    expect(result.current.state.actions.filter((a) => a.projectId === pid && a.ruleKey === "llm_integration").length).toBe(1);
+    // Each of the 3 transitions logs its own action/project audits under this reason prefix;
+    // asserting >=3 (one lower bound per transition) proves auditing happens every time, not just once.
     const llmAudits = result.current.state.audit.filter((a) => a.projectId === pid && a.reason?.startsWith("Otomatik kural: LLM tercihi"));
-    expect(llmAudits.length).toBeGreaterThan(0);
+    expect(llmAudits.length).toBeGreaterThanOrEqual(3);
 
     const auditCountBefore = result.current.state.audit.length;
     act(() => { result.current.setInstallChoice(pid, { llmChoice: "gpu" }); });

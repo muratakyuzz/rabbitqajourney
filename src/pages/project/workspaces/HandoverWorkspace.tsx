@@ -13,11 +13,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Pill, StepStatusBadge } from "@/components/rq/Badges";
 import { personName, useRq } from "@/lib/rabbitqa/store";
 import { selectableCsms } from "@/lib/rabbitqa/perm";
-import { latestHeldMeeting } from "@/lib/rabbitqa/completion";
-import { COMMIT_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, fmtDate } from "@/lib/rabbitqa/labels";
+import { ACTION_STATUS_LABEL, COMMIT_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, fmtDate } from "@/lib/rabbitqa/labels";
 import type { Commitment, CommitmentStatus, InstallType, LlmChoice } from "@/lib/rabbitqa/types";
-import { MeetingDialog, MeetingDetailDialog } from "../MeetingDialog";
 import { DocumentUploadDialog } from "../Phase2Tabs";
+import { MeetingStepSection } from "./MeetingStepSection";
 import type { WorkspaceProps } from "./index";
 
 const NONE = "__none";
@@ -37,8 +36,8 @@ function ChoiceReasonDialog({ title, onCancel, onSave }: { title: string; onCanc
         <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
         <div className="grid gap-3">
           <div className="grid gap-2">
-            <Label>Gerekçe (zorunlu)</Label>
-            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} />
+            <Label htmlFor="choice-reason-dialog-reason">Gerekçe (zorunlu)</Label>
+            <Textarea id="choice-reason-dialog-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
           <p className="text-xs text-muted-foreground">Eski adımlar silinmez, "Kapsam dışı" yapılır; yeni adım ve aksiyonlar açılır.</p>
         </div>
@@ -52,20 +51,16 @@ function ChoiceReasonDialog({ title, onCancel, onSave }: { title: string; onCanc
 }
 
 export function HandoverWorkspace({ project, phase, readOnly, csmEditable }: WorkspaceProps) {
-  const { state, updateProject, setInstallChoice, addCommitment, updateCommitment, setNoCommitments, updateMeeting } = useRq();
+  const { state, updateProject, setInstallChoice, addCommitment, updateCommitment, setNoCommitments } = useRq();
   const [text, setText] = useState("");
   const [phaseCode, setPhaseCode] = useState("07");
   const [editC, setEditC] = useState<Commitment | null>(null);
   const [reasonDialog, setReasonDialog] = useState<{ field: "installType" | "llmChoice"; value: InstallType | LlmChoice } | null>(null);
   const [docDialog, setDocDialog] = useState<"offer" | "contract" | null>(null);
-  const [meetingFormOpen, setMeetingFormOpen] = useState(false);
-  const [meetingDetailId, setMeetingDetailId] = useState<string | null>(null);
 
   const commitments = state.commitments.filter((c) => c.projectId === project.id);
   const phases = state.phases.filter((p) => p.projectId === project.id).sort((a, b) => a.order - b.order);
-  const ruleActions = state.actions.filter((a) => a.projectId === project.id && a.source === "rule");
-  const briefHeld = latestHeldMeeting(state, project.id, "brief");
-  const briefPlanned = state.meetings.filter((m) => m.projectId === project.id && m.type === "brief" && m.status === "planned").sort((a, b) => b.date.localeCompare(a.date))[0];
+  const ruleActions = state.actions.filter((a) => a.projectId === project.id && a.source === "rule" && !a.ruleKey?.startsWith("rule_review:"));
   const offerStep = state.steps.find((s) => s.phaseId === phase.id && s.key === "offer");
   const contractStep = state.steps.find((s) => s.phaseId === phase.id && s.key === "contract");
   const offerDoc = state.documents.filter((d) => d.projectId === project.id && d.type === "offer").sort((a, b) => b.addedAt.localeCompare(a.addedAt))[0];
@@ -162,7 +157,7 @@ export function HandoverWorkspace({ project, phase, readOnly, csmEditable }: Wor
           {ruleActions.map((a) => (
             <div key={a.id} className="text-sm">
               <span className={a.status === "cancelled" ? "line-through text-muted-foreground" : ""}>{a.title}</span>
-              <span className="text-xs text-muted-foreground ml-2">{personName(state, a.ownerId)} · {a.status === "cancelled" ? "İptal" : a.status === "done" ? "Tamamlandı" : "Açık"}</span>
+              <span className="text-xs text-muted-foreground ml-2">{personName(state, a.ownerId)} · {ACTION_STATUS_LABEL[a.status]}</span>
             </div>
           ))}
         </div>
@@ -241,31 +236,9 @@ export function HandoverWorkspace({ project, phase, readOnly, csmEditable }: Wor
       </section>
 
       {/* e) Satış devri toplantısı */}
-      <section data-field="meeting:brief" className="space-y-3 border-t pt-4">
-        <div className="flex items-center"><h3 className="text-sm font-semibold">Satış devri toplantısı</h3><StepMini phase={phase} stepKey="brief" /></div>
-        {briefHeld ? (
-          <div className="text-sm space-y-1">
-            <p>{fmtDate(briefHeld.date)} · {[...briefHeld.internalIds, ...briefHeld.contactIds].map((i) => personName(state, i)).join(", ") || "—"}</p>
-            <Button size="sm" variant="outline" onClick={() => setMeetingDetailId(briefHeld.id)}>Toplantıyı gör</Button>
-          </div>
-        ) : briefPlanned ? (
-          <div className="text-sm space-y-2">
-            <Pill tone="info">Planlandı · {fmtDate(briefPlanned.date)}</Pill>
-            {!readOnly && (
-              <div>
-                <Button size="sm" variant="outline" onClick={() => {
-                  const err = updateMeeting(briefPlanned.id, { status: "held" });
-                  if (err) toast.error(err);
-                }}>Yapıldı olarak işaretle</Button>
-              </div>
-            )}
-          </div>
-        ) : readOnly ? (
-          <p className="text-sm text-muted-foreground">Henüz kaydedilmedi.</p>
-        ) : (
-          <Button size="sm" variant="outline" onClick={() => setMeetingFormOpen(true)}>Toplantı kaydet</Button>
-        )}
-      </section>
+      <div className="border-t pt-4">
+        <MeetingStepSection project={project} stepKey="brief" type="brief" title="Satış devri toplantısı" readOnly={readOnly} />
+      </div>
 
       {editC && (
         <CommitmentEditDialog c={editC} onClose={() => setEditC(null)} onSave={(p, r) => updateCommitment(editC.id, p, r)} />
@@ -285,8 +258,6 @@ export function HandoverWorkspace({ project, phase, readOnly, csmEditable }: Wor
           onClose={() => setDocDialog(null)}
         />
       )}
-      {meetingFormOpen && <MeetingDialog project={project} defaultType="brief" onClose={() => setMeetingFormOpen(false)} />}
-      {meetingDetailId && <MeetingDetailDialog meetingId={meetingDetailId} onClose={() => setMeetingDetailId(null)} />}
     </div>
   );
 }

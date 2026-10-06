@@ -117,7 +117,7 @@ export default function Projects() {
                     const open = alertViews.filter((a) => a.projectId === p.id && a.status === "open");
                     if (!open.length) return <span className="text-xs text-muted-foreground">—</span>;
                     const red = open.some((a) => a.level === "red");
-                    return <Link to={`/app/projects/${p.id}?tab=alerts`} onClick={(e) => e.stopPropagation()}><Pill tone={red ? "danger" : "warning"}>{open.length}</Pill></Link>;
+                    return <Link to={`/app/projects/${p.id}?panel=alerts`} onClick={(e) => e.stopPropagation()}><Pill tone={red ? "danger" : "warning"}>{open.length}</Pill></Link>;
                   })()}</TableCell>
                   <TableCell>{fmtDate(p.goLiveDate)}</TableCell>
                 </TableRow>

@@ -3,7 +3,7 @@ import { DEFAULT_THRESHOLDS, weekStartOf } from "./alerts";
 import { settleAll } from "./completion";
 import { projectPlan } from "./flow";
 import { buildReportSnapshot } from "./reports";
-import type { AuditEntry, Action, AiInsight, Ball, Contact, IntegrationConfig, Meeting, ProjectIntegrations, UnmatchedEmail, DiscoveryQuestion, Phase, PhaseTpl, Project, RqState, Salesperson, Step, StepTpl, User } from "./types";
+import type { AuditEntry, Action, Adaptation, AiInsight, Ball, Contact, DocumentRec, IntegrationConfig, Kpi, Meeting, ProjectIntegrations, UnmatchedEmail, DiscoveryQuestion, Phase, PhaseTpl, Project, RqState, Salesperson, Step, StepTpl, User } from "./types";
 
 export const SEED_USERS: User[] = [
   { id: "u_deniz", name: "Deniz Uzun", email: "deniz.uzun@virgosol.com", role: "csm", active: true },
@@ -74,13 +74,14 @@ export const PHASE_TEMPLATE: PhaseTpl[] = [
     S("Müşteri hesaplarının açılması ve paylaşılması", "care", true, "Ö", 1),
   ]},
   { code: "04", name: "Eğitim", dependency: "previous", steps: [
-    S("Eğitim session'larının planlanması", "csm", true, "Ö", 3),
-    S("Eğitim session'larının yapılması", "csm", true, "Ö", 10),
+    S("Eğitim session'larının planlanması", "csm", true, "Ö", 3, { key: "training_plan", completion: "data" }),
+    S("Eğitim session'larının yapılması", "csm", true, "Ö", 10, { key: "training_done", completion: "data" }),
   ]},
-  { code: "05", name: "Uyarlama", dependency: "previous", steps: [] },
+  { code: "05", name: "Uyarlama", dependency: "previous", steps: [
+    S("Uyarlama", "csm", true, "Ö", 10, { key: "adapt:general", completion: "data" }),
+  ]},
   { code: "06", name: "Uygulama", dependency: "previous", steps: [
     S("CS check-in toplantıları", "csm", false, "B", 10),
-    S("Destek kayıtlarının takibi", "care", false, "B", 10, { key: "support_track" }),
     S("KPI ölçümleri", "csm", false, "B", 10),
   ]},
   { code: "07", name: "Go-Live", dependency: "previous", steps: [
@@ -112,19 +113,6 @@ export const SEED_INTEGRATIONS: IntegrationConfig = {
   ai: { enabledKinds: ["action_create", "action_update", "step_update", "risk_create", "decision_create", "health_change", "date_change"], minConfidence: 60, excerptMaxChars: 280, autoExpireDays: 14 },
 };
 
-export const ADAPTATION_STEPS = [
-  "Proje oluşturma",
-  "Yüklenecek dokümanların belirlenmesi",
-  "Dokümanların RabbitQA'e yüklenmesi",
-  "AI'ın eğitilmesi",
-  "İlk örneklerin birlikte yapılması",
-];
-/** Takım başına uyarlama adımları: ilk adım bağımsız, diğerleri sıralı. */
-export const ADAPTATION_FLOW: { dependency: "previous" | "independent"; durationDays: number }[] = [
-  { dependency: "independent", durationDays: 2 }, { dependency: "previous", durationDays: 2 }, { dependency: "previous", durationDays: 3 },
-  { dependency: "previous", durationDays: 3 }, { dependency: "previous", durationDays: 3 },
-];
-
 function localToday() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -136,7 +124,7 @@ function prevBusinessDay(iso: string) {
   return d.toISOString().slice(0, 10);
 }
 
-export const STATE_VERSION = 10;
+export const STATE_VERSION = 11;
 export const STATE_KEY = `rabbitqa-demo-state-v${STATE_VERSION}`;
 
 export const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
@@ -162,8 +150,8 @@ export function buildFromTemplate(project: Project, users: User[], planEnds: Rec
     };
     if (end) prevEnd = end;
     phases.push(phase);
-    const tpl = pt.code === "05"
-      ? project.teams.flatMap((t) => ADAPTATION_STEPS.map((s, k): StepTpl => ({ title: `${t} — ${s}`, ball: "csm", required: true, ...ADAPTATION_FLOW[k] })))
+    const tpl = pt.code === "05" && project.teams.length > 0
+      ? project.teams.map((t): StepTpl => ({ title: `Uyarlama: ${t}`, key: `adapt:${t}`, ball: "csm", required: true, dependency: "independent", durationDays: 10, completion: "data" }))
       : pt.steps;
     tpl.forEach((st, j) => {
       steps.push({
@@ -254,6 +242,10 @@ export function createSeed(): RqState {
     { id: "m_1", projectId: project.id, type: "kickoff" as const, date: "2026-08-28", internalIds: ["u_deniz"], contactIds: ["c_1"], notes: "Tanışma ve onboarding planının paylaşılması.", decisions: "Kurulum tipi On-prem olarak belirlendi.", isCustomerVisible: true, status: "held" },
     { id: "m_2", projectId: project.id, type: "discovery" as const, date: "2026-08-28", internalIds: ["u_deniz"], contactIds: ["c_1", "c_2"], notes: "Keşif formu birlikte dolduruldu.", decisions: "İki takım ile başlanacak.", isCustomerVisible: false, status: "held" },
     { id: "m_devops_isy", projectId: project.id, type: "devops_handover" as const, date: "2026-09-02", internalIds: ["u_deniz", "u_cagla"], contactIds: [], notes: "DevOps devir toplantısı.", decisions: "Top DevOps'a geçti.", isCustomerVisible: false, status: "held" },
+    { id: "m_tr_1", projectId: project.id, type: "training" as const, date: "2026-09-08", internalIds: ["u_deniz"], contactIds: ["c_1"], notes: "", decisions: "", isCustomerVisible: false, status: "held", training: { trainerId: "u_deniz", modules: ["TestPilot", "CaseWriter"], recordingUrl: "" } },
+    { id: "m_tr_2", projectId: project.id, type: "training" as const, date: "2026-09-10", internalIds: ["u_deniz"], contactIds: ["c_2"], notes: "", decisions: "", isCustomerVisible: false, status: "held", training: { trainerId: "u_deniz", modules: ["TestPilot", "CaseWriter", "AutoRunner", "DataCrate"], recordingUrl: "" } },
+    { id: "m_ad_1", projectId: project.id, type: "adaptation" as const, date: "2026-09-15", internalIds: ["u_deniz"], contactIds: ["c_1"], notes: "", decisions: "", isCustomerVisible: false, status: "held", teamId: "Herkese Borsa" },
+    { id: "m_ad_2", projectId: project.id, type: "adaptation" as const, date: "2026-09-17", internalIds: ["u_deniz"], contactIds: ["c_2"], notes: "", decisions: "", isCustomerVisible: false, status: "held", teamId: "Trade Master" },
   ];
   const actions: Action[] = [
     { id: "a_1", projectId: project.id, title: "Trade Master için senaryo sayısının netleştirilmesi", ownerId: "c_2", ball: "customer" as const, due: "2026-09-30", priority: "medium" as const, status: "open" as const, source: "meeting" as const, meetingId: "m_2", createdAt: "2026-08-28T12:00:00.000Z", isCustomerVisible: true },
@@ -263,14 +255,19 @@ export function createSeed(): RqState {
   const commitments = [
     { id: "cm_1", projectId: project.id, text: "Mobil kanal için MobileHub demosu yapılacak", targetPhaseCode: "04", status: "open" as const, note: "" },
   ];
+  const documents: DocumentRec[] = [
+    { id: "d_1", projectId: project.id, type: "offer", name: "IsYatirim_Teklif.pdf", linkType: "project", linkId: null, addedAt: "2026-08-22T10:00:00.000Z" },
+    { id: "d_2", projectId: project.id, type: "contract", name: "IsYatirim_Sozlesme.pdf", linkType: "project", linkId: null, addedAt: "2026-08-25T10:00:00.000Z" },
+  ];
+  const kpis: Kpi[] = [
+    { id: "k_1", projectId: project.id, name: "Yüklenen regresyon senaryosu oranı", unit: "%", baseline: 0, target: 100, targetDate: "2026-10-02", measurements: [{ date: "2026-09-18", value: 25 }, { date: "2026-09-25", value: 40 }], isCustomerVisible: true },
+  ];
+  const adaptations: Adaptation[] = [
+    { id: "ad_1", projectId: project.id, teamId: "Herkese Borsa", checklist: { projectCreated: true, docsIdentified: true, docsUploaded: true, aiTrained: true, firstSamples: true } },
+    { id: "ad_2", projectId: project.id, teamId: "Trade Master", checklist: { projectCreated: true, docsIdentified: true, docsUploaded: true, aiTrained: true, firstSamples: true } },
+  ];
 
   const pid = project.id;
-  const trainingSteps: Step[] = ["2026-09-08", "2026-09-10"].map((d, i) => ({
-    id: uid("st"), projectId: pid, phaseId: phases.find((p) => p.code === "04")!.id, title: `Katılımcı girişi — ${d.split("-").reverse().join(".")} session'ı`,
-    required: false, ownerId: "u_deniz", ball: "csm", ballSince: project.createdAt, due: d, status: "done", order: 10 + i,
-    dependency: "independent", durationDays: 2, activatedAt: d + "T09:00:00.000Z", completion: "manual",
-  }));
-  steps.push(...trainingSteps);
 
   // İkinci örnek proje — entegrasyon takibi pasif
   const p2: Project = {
@@ -356,6 +353,16 @@ export function createSeed(): RqState {
   contacts.push({ id: "c_3", projectId: p2.id, name: "Burak Aydın", title: "QA Lead", email: "burak.aydin@garantibbva.com.tr", phone: "", role: "tech" as const });
   contacts.push({ id: "c_4", projectId: p3.id, name: "Elif Yavuz", title: "IT Yöneticisi", email: "elif.yavuz@akbank.com", phone: "", role: "sponsor" as const });
   commitments.push({ id: "cm_2", projectId: p3.id, text: "Lisans genişletme değerlendirilecek", targetPhaseCode: "04", status: "open" as const, note: "" });
+  documents.push(
+    { id: "d_3", projectId: p2.id, type: "offer", name: "Garanti_Teklif.pdf", linkType: "project", linkId: null, addedAt: "2026-09-19T10:00:00.000Z" },
+    { id: "d_4", projectId: p2.id, type: "contract", name: "Garanti_Sozlesme.pdf", linkType: "project", linkId: null, addedAt: "2026-09-20T10:00:00.000Z" },
+    { id: "d_5", projectId: p3.id, type: "offer", name: "Akbank_Teklif.pdf", linkType: "project", linkId: null, addedAt: "2026-09-01T10:00:00.000Z" },
+    { id: "d_6", projectId: p3.id, type: "contract", name: "Akbank_Sozlesme.pdf", linkType: "project", linkId: null, addedAt: "2026-09-02T10:00:00.000Z" },
+  );
+  kpis.push(
+    { id: "k_2", projectId: p2.id, name: "Otomasyon kapsama oranı", unit: "%", baseline: 10, target: null, targetDate: null, measurements: [], isCustomerVisible: true },
+    { id: "k_3", projectId: p2.id, name: "Yüklenen regresyon senaryosu oranı", unit: "%", baseline: 0, target: 100, targetDate: "2026-11-20", measurements: [], isCustomerVisible: true },
+  );
   meetings.push(
     { id: "m_brief_akb", projectId: p3.id, type: "brief" as const, date: "2026-09-02", internalIds: ["u_deniz"], contactIds: [], notes: "Satış devri toplantısı.", decisions: "Satış devri tamamlandı.", isCustomerVisible: false, status: "held" },
     { id: "m_kickoff_akb", projectId: p3.id, type: "kickoff" as const, date: "2026-09-08", internalIds: ["u_deniz"], contactIds: ["c_4"], notes: "Kick-off yapıldı.", decisions: "Kurulum tipi On-prem.", isCustomerVisible: false, status: "held" },
@@ -385,9 +392,107 @@ export function createSeed(): RqState {
   steps.push(...b4.steps);
   meetings.push({ id: "m_brief_ornek", projectId: p4.id, type: "brief" as const, date: addBusinessDays(todayS0, 7), internalIds: ["u_deniz"], contactIds: [], notes: "", decisions: "", isCustomerVisible: false, status: "planned" });
 
+  // Beşinci örnek proje — 01 Kick-off aktif, gereksinim dokümanı paylaşılmadı (reqdoc_not_shared)
+  const reqDocDays = DEFAULT_THRESHOLDS.reqDocDays;
+  const kickoffAgoDate = (() => { let d = localToday(); for (let k = 0; k < reqDocDays + 1; k++) d = prevBusinessDay(d); return d; })();
+  const p5: Project = {
+    id: "p_lojistik", customerName: "Örnek Lojistik A.Ş.", name: "RabbitQA Customer Onboarding", csmId: "u_deniz", salespersonId: "s_2",
+    licenseModel: "Yıllık abonelik", purchasedModules: ["TestPilot", "CaseWriter"], desiredModules: ["TestPilot", "CaseWriter"],
+    startDate: kickoffAgoDate, goLiveDate: addBusinessDays(kickoffAgoDate, 60), health: "green", healthReason: "",
+    teams: [], discoveryAnswers: {}, teamInfo: {}, installType: "onprem", llmChoice: "rabbitqa", createdAt: kickoffAgoDate + "T09:00:00.000Z",
+    integrations: { chat: { provider: "teams", channelId: null, active: false, since: null }, email: { active: false, extraDomains: [], since: null } },
+    noCommitments: true,
+  };
+  const b5 = buildFromTemplate(p5, users, { "00": kickoffAgoDate });
+  b5.phases.forEach((ph) => {
+    const ps = b5.steps.filter((x) => x.phaseId === ph.id);
+    if (ph.code === "00") {
+      ph.status = "done"; ph.actualStart = ph.planStart; ph.actualEnd = ph.planEnd; ph.approvedBy = "u_deniz";
+      ph.approvedAt = (ph.planEnd ?? kickoffAgoDate) + "T16:00:00.000Z"; ph.activatedAt = (ph.planStart ?? kickoffAgoDate) + "T09:00:00.000Z";
+      ps.forEach((x) => { x.status = "done"; x.activatedAt = ph.activatedAt; x.due = ph.planEnd; });
+    }
+    if (ph.code === "01") {
+      ph.status = "in_progress"; ph.actualStart = kickoffAgoDate; ph.activatedAt = kickoffAgoDate + "T09:00:00.000Z";
+      const kickoffStep = ps.find((x) => x.key === "kickoff")!;
+      Object.assign(kickoffStep, { status: "done", activatedAt: ph.activatedAt, due: kickoffAgoDate });
+      const reqdocStep = ps.find((x) => x.key === "reqdoc")!;
+      Object.assign(reqdocStep, { status: "pending", activatedAt: ph.activatedAt, ballSince: ph.activatedAt, due: addBusinessDays(kickoffAgoDate, reqdocStep.durationDays) });
+      const presStep = ps.find((x) => x.key === "presentation");
+      if (presStep) Object.assign(presStep, { status: "pending", activatedAt: ph.activatedAt, ballSince: ph.activatedAt, due: addBusinessDays(kickoffAgoDate, presStep.durationDays) });
+    }
+  });
+  phases.push(...b5.phases);
+  steps.push(...b5.steps);
+  documents.push(
+    { id: "d_lj1", projectId: p5.id, type: "offer", name: "Lojistik_Teklif.pdf", linkType: "project", linkId: null, addedAt: kickoffAgoDate + "T10:00:00.000Z" },
+    { id: "d_lj2", projectId: p5.id, type: "contract", name: "Lojistik_Sozlesme.pdf", linkType: "project", linkId: null, addedAt: kickoffAgoDate + "T10:00:00.000Z" },
+  );
+  contacts.push({ id: "c_5", projectId: p5.id, name: "Kemal Doğan", title: "Operasyon Direktörü", email: "kemal.dogan@ornek-lojistik.com", phone: "", role: "sponsor" as const });
+  meetings.push(
+    { id: "m_brief_lj", projectId: p5.id, type: "brief" as const, date: kickoffAgoDate, internalIds: ["u_deniz"], contactIds: [], notes: "Satış devri toplantısı.", decisions: "Satış devri tamamlandı.", isCustomerVisible: false, status: "held" },
+    { id: "m_kickoff_lj", projectId: p5.id, type: "kickoff" as const, date: kickoffAgoDate, internalIds: ["u_deniz"], contactIds: ["c_5"], notes: "Kick-off yapıldı.", decisions: "Kurulum tipi On-prem.", isCustomerVisible: false, status: "held" },
+  );
+
+  // Altıncı örnek proje — 00-04 tamamlanmış, 05 Uyarlama aktif
+  const p6StartDate = (() => { let d = localToday(); for (let k = 0; k < 40; k++) d = prevBusinessDay(d); return d; })();
+  const p6: Project = {
+    id: "p_perakende", customerName: "Örnek Perakende A.Ş.", name: "RabbitQA Customer Onboarding", csmId: "u_deniz", salespersonId: "s_1",
+    licenseModel: "Yıllık abonelik", purchasedModules: ["TestPilot", "CaseWriter", "MobileHub"], desiredModules: ["TestPilot", "CaseWriter", "MobileHub"],
+    startDate: p6StartDate, goLiveDate: addBusinessDays(p6StartDate, 60), health: "green", healthReason: "",
+    teams: ["Mobil", "Web"],
+    discoveryAnswers: {
+      q_teams: "2 takım: Mobil ve Web.", q_roles: "İş analistleri ve PO'lar", q_channels: "Mobil uygulama ve web portalı",
+      q_regression: "Regresyon seti mevcut, kısmen otomasyonlu.", q_scenarios: "Mobil için 60, Web için 80 test senaryosu mevcut.",
+      q_notes: "", q_kpi: "Regresyon koşum süresinin kısaltılması.",
+    },
+    teamInfo: { "Mobil": { contact: "Aylin Kara", users: null }, "Web": { contact: "Serkan Us", users: null } },
+    installType: "saas", llmChoice: "rabbitqa", createdAt: p6StartDate + "T09:00:00.000Z",
+    integrations: { chat: { provider: "teams", channelId: null, active: false, since: null }, email: { active: false, extraDomains: [], since: null } },
+    noCommitments: true,
+  };
+  const b6 = buildFromTemplate(p6, users, {
+    "00": p6StartDate, "01": addBusinessDays(p6StartDate, 5), "02": addBusinessDays(p6StartDate, 12), "03": addBusinessDays(p6StartDate, 22), "04": addBusinessDays(p6StartDate, 32),
+  });
+  const p6OutOfScopeKeys = new Set(["reqdoc", "vpn_req", "vpn_info", "servers", "devops_handover", "model_install"]);
+  b6.phases.forEach((ph) => {
+    const ps = b6.steps.filter((x) => x.phaseId === ph.id);
+    if (["00", "01", "02", "03", "04"].includes(ph.code)) {
+      ph.status = "done"; ph.actualStart = ph.planStart; ph.actualEnd = ph.planEnd; ph.approvedBy = "u_deniz";
+      ph.approvedAt = (ph.planEnd ?? p6StartDate) + "T16:00:00.000Z"; ph.activatedAt = (ph.planStart ?? p6StartDate) + "T09:00:00.000Z";
+      ps.forEach((x) => { x.status = p6OutOfScopeKeys.has(x.key ?? "") ? "out_of_scope" : "done"; x.activatedAt = ph.activatedAt; x.due = ph.planEnd; });
+    }
+    if (ph.code === "05") {
+      ph.status = "in_progress"; ph.actualStart = localToday(); ph.activatedAt = localToday() + "T09:00:00.000Z";
+      ps.forEach((x) => { x.status = "pending"; x.activatedAt = ph.activatedAt; x.ballSince = ph.activatedAt!; x.due = addBusinessDays(localToday(), x.durationDays); });
+    }
+  });
+  phases.push(...b6.phases);
+  steps.push(...b6.steps);
+  contacts.push({ id: "c_6", projectId: p6.id, name: "Aylin Kara", title: "Mobil Takım Lideri", email: "aylin.kara@ornek-perakende.com", phone: "", role: "pm" as const });
+  contacts.push({ id: "c_7", projectId: p6.id, name: "Serkan Us", title: "Web Takım Lideri", email: "serkan.us@ornek-perakende.com", phone: "", role: "pm" as const });
+  documents.push(
+    { id: "d_pk1", projectId: p6.id, type: "offer", name: "Perakende_Teklif.pdf", linkType: "project", linkId: null, addedAt: p6StartDate + "T10:00:00.000Z" },
+    { id: "d_pk2", projectId: p6.id, type: "contract", name: "Perakende_Sozlesme.pdf", linkType: "project", linkId: null, addedAt: p6StartDate + "T10:00:00.000Z" },
+  );
+  const p6KpiDate = addBusinessDays(p6StartDate, 12);
+  kpis.push({ id: "k_pk1", projectId: p6.id, name: "Regresyon koşum süresi", unit: "dk", baseline: 120, target: 60, targetDate: addBusinessDays(p6StartDate, 60), measurements: [], isCustomerVisible: true });
+  adaptations.push(
+    { id: "ad_pk1", projectId: p6.id, teamId: "Mobil", checklist: { projectCreated: true, docsIdentified: true, docsUploaded: false, aiTrained: false, firstSamples: false } },
+    { id: "ad_pk2", projectId: p6.id, teamId: "Web", checklist: { projectCreated: true, docsIdentified: true, docsUploaded: true, aiTrained: true, firstSamples: true } },
+  );
+  meetings.push(
+    { id: "m_brief_pk", projectId: p6.id, type: "brief" as const, date: p6StartDate, internalIds: ["u_deniz"], contactIds: [], notes: "Satış devri toplantısı.", decisions: "Satış devri tamamlandı.", isCustomerVisible: false, status: "held" },
+    { id: "m_kickoff_pk", projectId: p6.id, type: "kickoff" as const, date: addBusinessDays(p6StartDate, 5), internalIds: ["u_deniz"], contactIds: ["c_6"], notes: "Kick-off yapıldı.", decisions: "Kurulum tipi SaaS.", isCustomerVisible: false, status: "held" },
+    { id: "m_disc_pk", projectId: p6.id, type: "discovery" as const, date: p6KpiDate, internalIds: ["u_deniz"], contactIds: ["c_6", "c_7"], notes: "Keşif toplantısı yapıldı.", decisions: "Mobil ve Web takımları ile başlanacak.", isCustomerVisible: false, status: "held" },
+    { id: "m_tr_pk1", projectId: p6.id, type: "training" as const, date: addBusinessDays(p6StartDate, 32), internalIds: ["u_deniz"], contactIds: ["c_6", "c_7"], notes: "", decisions: "", isCustomerVisible: false, status: "held", training: { trainerId: "u_deniz", modules: ["TestPilot", "CaseWriter"], recordingUrl: "" } },
+    { id: "m_ad_pk1", projectId: p6.id, type: "adaptation" as const, date: addBusinessDays(localToday(), 5), internalIds: ["u_deniz"], contactIds: ["c_6"], notes: "", decisions: "", isCustomerVisible: false, status: "planned", teamId: "Mobil" },
+    { id: "m_ad_pk2", projectId: p6.id, type: "adaptation" as const, date: localToday(), internalIds: ["u_deniz"], contactIds: ["c_6"], notes: "", decisions: "", isCustomerVisible: false, status: "held", teamId: "Mobil" },
+    { id: "m_ad_pk3", projectId: p6.id, type: "adaptation" as const, date: localToday(), internalIds: ["u_deniz"], contactIds: ["c_7"], notes: "", decisions: "", isCustomerVisible: false, status: "held", teamId: "Web" },
+  );
+
   const step = (title: string) => steps.find((x) => x.projectId === pid && x.title.toLowerCase().includes(title.toLowerCase()) && x.status !== "done");
   const stepAny = steps.find((x) => x.projectId === pid && (x.status === "pending" || x.status === "in_progress"));
-  const supportStep = step("Destek") ?? stepAny;
+  const supportStep = step("check-in") ?? stepAny;
   const now = Date.now();
   const ago = (h: number) => new Date(now - h * 3600000).toISOString();
   const base = { reviewedBy: null, reviewedAt: null, reviewNote: "", appliedEntityId: null };
@@ -401,7 +506,7 @@ export function createSeed(): RqState {
       sourceRef: ref("email", "Trade Master senaryo listesi", "mehmet.elitop@isyatirim.com.tr", 5, "Trade Master için senaryo sayısını netleştirdik, listeyi ekte bulabilirsiniz. Bu iş yapıldı.", "in"),
       proposed: { status: "done" }, rationale: "Müşteri senaryo sayısının netleştirildiğini bildirdi.", confidence: 82 },
     { ...base, id: "ai_3", projectId: pid, source: "teams", kind: "step_update", status: "pending", createdAt: ago(8), targetId: supportStep?.id ?? null, current: { status: supportStep?.status ?? "pending" },
-      sourceRef: ref("teams", "Müşteriler › İş Yatırım", "Çağla Kahriman", 8, "Destek kayıtlarının takibi için haftalık kontrol tamamlandı, açık kayıt kalmadı."),
+      sourceRef: ref("teams", "Müşteriler › İş Yatırım", "Çağla Kahriman", 8, "Bu haftaki CS check-in toplantısı tamamlandı, açık konu kalmadı."),
       proposed: { status: "done" }, rationale: `Mesajda "${supportStep?.title ?? "adım"}" adımının tamamlandığı belirtiliyor.`, confidence: 72 },
     { ...base, id: "ai_4", projectId: pid, source: "email", kind: "risk_create", status: "pending", createdAt: ago(20), targetId: null, current: null,
       sourceRef: ref("email", "RE: Regresyon koşumları", "sevcan.vural@isyatirim.com.tr", 20, "Koşum sürelerinin uzaması konusunda endişemiz var, Go-Live öncesi çözülmezse sorun olabilir.", "in"),
@@ -448,37 +553,19 @@ export function createSeed(): RqState {
     salespeople: SEED_SALESPEOPLE,
     modules: SEED_MODULES,
     questions: SEED_QUESTIONS,
-    projects: [project, p2, p3, p4],
+    projects: [project, p2, p3, p4, p5, p6],
     phases,
     steps,
     actions,
     meetings,
     contacts,
     commitments,
-    kpis: [
-      { id: "k_1", projectId: pid, name: "Yüklenen regresyon senaryosu oranı", unit: "%", baseline: 0, target: 100, targetDate: "2026-10-02", measurements: [{ date: "2026-09-18", value: 25 }, { date: "2026-09-25", value: 40 }], isCustomerVisible: true },
-      { id: "k_2", projectId: p2.id, name: "Otomasyon kapsama oranı", unit: "%", baseline: 10, target: null, targetDate: null, measurements: [], isCustomerVisible: true },
-      { id: "k_3", projectId: p2.id, name: "Yüklenen regresyon senaryosu oranı", unit: "%", baseline: 0, target: 100, targetDate: "2026-11-20", measurements: [], isCustomerVisible: true },
-    ],
-    trainings: [
-      { id: "t_1", projectId: pid, date: "2026-09-08", trainerId: "u_deniz", attendees: "Herkese Borsa ekibi (İş analistleri, PO'lar)", modules: ["TestPilot", "CaseWriter"], recordingUrl: "", notes: "", status: "done" },
-      { id: "t_2", projectId: pid, date: "2026-09-10", trainerId: "u_deniz", attendees: "Trade Master ekibi", modules: ["TestPilot", "CaseWriter", "AutoRunner", "DataCrate"], recordingUrl: "", notes: "", status: "done" },
-    ],
-    adaptations: [
-      { id: "ad_1", projectId: pid, team: "Herkese Borsa", date: "2026-09-15", participants: "Sevcan Vural", notes: "" },
-      { id: "ad_2", projectId: pid, team: "Trade Master", date: "2026-09-17", participants: "Ezel Sarıtepe", notes: "" },
-    ],
+    kpis,
+    adaptations,
     credentials: [
       { id: "cr_1", projectId: pid, type: "VPN", provider: "FortiClient", username: "virgosol.rabbitqa", password: "Demo-Sifre-123", validUntil: plusDays(5), note: "Örnek kayıt" },
     ],
-    documents: [
-      { id: "d_1", projectId: pid, type: "offer", name: "IsYatirim_Teklif.pdf", linkType: "project", linkId: null, addedAt: "2026-08-22T10:00:00.000Z" },
-      { id: "d_2", projectId: pid, type: "contract", name: "IsYatirim_Sozlesme.pdf", linkType: "project", linkId: null, addedAt: "2026-08-25T10:00:00.000Z" },
-      { id: "d_3", projectId: p2.id, type: "offer", name: "Garanti_Teklif.pdf", linkType: "project", linkId: null, addedAt: "2026-09-19T10:00:00.000Z" },
-      { id: "d_4", projectId: p2.id, type: "contract", name: "Garanti_Sozlesme.pdf", linkType: "project", linkId: null, addedAt: "2026-09-20T10:00:00.000Z" },
-      { id: "d_5", projectId: p3.id, type: "offer", name: "Akbank_Teklif.pdf", linkType: "project", linkId: null, addedAt: "2026-09-01T10:00:00.000Z" },
-      { id: "d_6", projectId: p3.id, type: "contract", name: "Akbank_Sozlesme.pdf", linkType: "project", linkId: null, addedAt: "2026-09-02T10:00:00.000Z" },
-    ],
+    documents,
     alerts: [
       { id: "al_2", projectId: pid, title: "Go-Live tarihi yaklaşıyor", detail: "Hedef Go-Live: 02.10.2026. Go/No-Go toplantısı planlanmadı.", severity: "critical", status: "open", source: "rule", createdAt: "2026-09-28T08:00:00.000Z", resolvedAt: null, resolvedBy: null },
     ],
@@ -496,6 +583,8 @@ export function createSeed(): RqState {
       { id: "au_seed2", projectId: p2.id, at: p2.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: p2.id, label: "Proje oluşturuldu" },
       { id: "au_seed3", projectId: p3.id, at: p3.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: p3.id, label: "Proje oluşturuldu" },
       { id: "au_seed5", projectId: p4.id, at: p4.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: p4.id, label: "Proje oluşturuldu" },
+      { id: "au_seed6", projectId: p5.id, at: p5.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: p5.id, label: "Proje oluşturuldu" },
+      { id: "au_seed7", projectId: p6.id, at: p6.createdAt, userId: "u_manager", kind: "create", entity: "project", entityId: p6.id, label: "Proje oluşturuldu" },
       { id: "au_seed4", projectId: pid, at: "2026-10-01T10:00:00.000Z", userId: "u_deniz", kind: "update", entity: "alert", entityId: "item_late:a_2", label: "Uyarı kapatıldı — Aksiyon gecikti: Go/No-Go toplantısının planlanması", field: "status", oldValue: "open", newValue: "closed", reason: "Toplantı müşteriyle telefonda planlandı, takvim daveti bekleniyor." },
     ],
     integrations: SEED_INTEGRATIONS,

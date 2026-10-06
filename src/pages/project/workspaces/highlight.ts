@@ -6,7 +6,9 @@ export function highlightField(root: ParentNode, field: string, ms = 2000): bool
   const ringClasses = ["ring-2", "ring-primary", "ring-offset-2", "rounded-md"];
   el.classList.add(...ringClasses);
   setTimeout(() => el.classList.remove(...ringClasses), ms);
-  const focusable = el.querySelector<HTMLElement>('input, textarea, button, [role="radio"], [role="checkbox"], [role="combobox"]');
+  const focusable = el.querySelector<HTMLElement>(
+    'input:not(:disabled):not([data-disabled]), textarea:not(:disabled):not([data-disabled]), button:not(:disabled):not([data-disabled]), [role="radio"]:not(:disabled):not([data-disabled]), [role="checkbox"]:not(:disabled):not([data-disabled]), [role="combobox"]:not(:disabled):not([data-disabled])',
+  );
   focusable?.focus();
   return true;
 }

@@ -65,11 +65,11 @@ export function PhaseWorkspaceSheet({ project, phase, focus, onClose }: {
                   <span className="text-xs text-muted-foreground ml-auto">{personName(state, s.ownerId)}</span>
                 </span>
               );
-              if (!clickable) return <li key={s.id} className="rounded-md px-2 py-1.5">{content}</li>;
-              const field = stepField(state, s);
+              const field = clickable ? stepField(state, s) : null;
+              if (!field) return <li key={s.id} className="rounded-md px-2 py-1.5"><div>{content}</div></li>;
               return (
                 <li key={s.id}>
-                  <button type="button" className="w-full rounded-md px-2 py-1.5 text-left hover:bg-muted/60" onClick={() => field && highlightField(contentRef.current!, field)}>
+                  <button type="button" className="w-full rounded-md px-2 py-1.5 text-left hover:bg-muted/60" onClick={() => highlightField(contentRef.current!, field)}>
                     {content}
                   </button>
                 </li>

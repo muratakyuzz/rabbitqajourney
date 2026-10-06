@@ -5,24 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/EmptyState";
-import { Pill, StepStatusBadge } from "@/components/rq/Badges";
+import { Pill } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
-import { personName, useRq } from "@/lib/rabbitqa/store";
-import { canManageProject, canSeeCredentials, selectableUsers } from "@/lib/rabbitqa/perm";
+import { useRq } from "@/lib/rabbitqa/store";
+import { canManageProject, canSeeCredentials } from "@/lib/rabbitqa/perm";
 import { KpiChart } from "@/components/rq/KpiChart";
 import { VisibleIcon } from "@/components/rq/VisibleIcon";
 import { DOC_TYPE_LABEL, INSTALL_LABEL, LLM_LABEL, MEETING_TYPE_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
 import type { DocType, Project } from "@/lib/rabbitqa/types";
-
-const NONE = "__none";
 
 /* ── KPI ────────────────────────────────────────────────── */
 export function KpiSection({ project }: { project: Project }) {
@@ -123,166 +119,25 @@ export function TeamRow({ project, team }: { project: Project; team: string }) {
   );
 }
 
-/* ── Training ───────────────────────────────────────────── */
-export function TrainingTab({ project }: { project: Project }) {
-  const { state, addTraining, updateTraining } = useRq();
-  const { user } = useAuth();
-  const manage = canManageProject(user, project);
-  const sessions = state.trainings.filter((t) => t.projectId === project.id).sort((a, b) => a.date.localeCompare(b.date));
-  const [open, setOpen] = useState(false);
-  const [f, setF] = useState({ date: todayISO(), trainerId: project.csmId, attendees: "", modules: [] as string[], recordingUrl: "", notes: "", status: "planned" as "planned" | "done" });
-  const done = sessions.filter((s) => s.status === "done").length;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{done}/{sessions.length} session yapıldı</p>
-        {manage && <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" />Session ekle</Button>}
-      </div>
-      {sessions.length === 0 && <Card><EmptyState title="Eğitim session'ı yok" description="İlk eğitim session'ını planlayın." /></Card>}
-      {sessions.map((s) => (
-        <Card key={s.id}>
-          <CardContent className="p-4 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">{fmtDate(s.date)}</span>
-              <Pill tone={s.status === "done" ? "success" : "info"}>{s.status === "done" ? "Yapıldı" : "Planlandı"}</Pill>
-              <span className="text-xs text-muted-foreground">Eğitmen: {personName(state, s.trainerId)}</span>
-              {manage && s.status === "planned" && (
-                <Button size="sm" variant="outline" className="ml-auto" onClick={() => updateTraining(s.id, { status: "done" })}>Yapıldı olarak işaretle</Button>
-              )}
-            </div>
-            <p className="text-sm"><span className="text-muted-foreground">Katılımcılar: </span>{s.attendees || "—"}</p>
-            <div className="flex flex-wrap gap-1">{s.modules.map((m) => <Pill key={m} tone="muted">{m}</Pill>)}</div>
-            {s.recordingUrl && <a href={s.recordingUrl} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">Kayıt linki</a>}
-            {s.notes && <p className="text-sm text-muted-foreground">{s.notes}</p>}
-          </CardContent>
-        </Card>
-      ))}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Eğitim session'ı</DialogTitle></DialogHeader>
-          <div className="grid gap-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2"><Label>Tarih</Label><Input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></div>
-              <div className="grid gap-2">
-                <Label>Eğitmen</Label>
-                <Select value={f.trainerId ?? NONE} onValueChange={(v) => setF({ ...f, trainerId: v === NONE ? null : v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>Seçilmedi</SelectItem>
-                    {selectableUsers(state).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid gap-2"><Label>Katılımcılar</Label><Textarea rows={2} value={f.attendees} onChange={(e) => setF({ ...f, attendees: e.target.value })} /></div>
-            <div className="grid gap-2">
-              <Label>Anlatılan modüller</Label>
-              <div className="grid grid-cols-3 gap-2">{state.modules.map((m) => (
-                <label key={m} className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={f.modules.includes(m)} onCheckedChange={(c) => setF({ ...f, modules: c ? [...f.modules, m] : f.modules.filter((x) => x !== m) })} />{m}
-                </label>
-              ))}</div>
-            </div>
-            <div className="grid gap-2"><Label>Kayıt linki</Label><Input value={f.recordingUrl} onChange={(e) => setF({ ...f, recordingUrl: e.target.value })} /></div>
-            <div className="grid gap-2"><Label>Notlar</Label><Textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
-            <label className="flex items-center gap-3 text-sm"><Switch checked={f.status === "done"} onCheckedChange={(c) => setF({ ...f, status: c ? "done" : "planned" })} />Session yapıldı</label>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => {
-              addTraining({ ...f, projectId: project.id });
-              toast.success("Session eklendi, katılımcı girişi adımı açıldı");
-              setOpen(false);
-              setF({ ...f, attendees: "", modules: [], recordingUrl: "", notes: "" });
-            }}>Kaydet</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-/* ── Adaptation ─────────────────────────────────────────── */
-export function AdaptationTab({ project }: { project: Project }) {
-  const { state, saveAdaptation, updateStep } = useRq();
-  const { user } = useAuth();
-  const manage = canManageProject(user, project);
-  const phase = state.phases.find((p) => p.projectId === project.id && p.code === "05");
-  const teamSteps = (team: string) => state.steps.filter((s) => s.phaseId === phase?.id && s.title.startsWith(`${team} — `)).sort((a, b) => a.order - b.order);
-  const doneTeams = project.teams.filter((t) => { const st = teamSteps(t); return st.length > 0 && st.every((s) => s.status === "done" || s.status === "out_of_scope"); }).length;
-
-  if (project.teams.length === 0) {
-    return <Card><EmptyState title="Takım yok" description="Keşif ve takımlar sekmesinden takım ekleyin; her takım için uyarlama kartı otomatik açılır." /></Card>;
-  }
-  return (
-    <div className="space-y-4">
-      <Card className="p-4 flex items-center gap-4">
-        <span className="text-sm font-medium whitespace-nowrap">Aşama ilerlemesi: {doneTeams}/{project.teams.length} takım</span>
-        <Progress value={(doneTeams / project.teams.length) * 100} className="h-2" />
-      </Card>
-      <div className="grid gap-4 lg:grid-cols-2">
-        {project.teams.map((team) => {
-          const rec = state.adaptations.find((a) => a.projectId === project.id && a.team === team);
-          const steps = teamSteps(team);
-          return (
-            <Card key={team}>
-              <CardHeader className="pb-3"><CardTitle className="text-base">{team}</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1.5">
-                  {steps.map((s) => (
-                    <label key={s.id} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="flex items-center gap-2">
-                        <Checkbox checked={s.status === "done"} disabled={!manage || s.status === "locked"}
-                          onCheckedChange={(c) => updateStep(s.id, { status: c ? "done" : "pending" }, "Uyarlama kartından güncellendi")} />
-                        {s.title.replace(`${team} — `, "")}
-                      </span>
-                      <StepStatusBadge status={s.status} />
-                    </label>
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-2 border-t pt-3">
-                  <div className="grid gap-1"><Label className="text-xs">Session tarihi</Label>
-                    <Input type="date" className="h-8" defaultValue={rec?.date ?? ""} disabled={!manage} onBlur={(e) => saveAdaptation(project.id, team, { date: e.target.value || null })} /></div>
-                  <div className="grid gap-1"><Label className="text-xs">Katılımcılar</Label>
-                    <Input className="h-8" defaultValue={rec?.participants ?? ""} disabled={!manage} onBlur={(e) => saveAdaptation(project.id, team, { participants: e.target.value })} /></div>
-                </div>
-                <div className="grid gap-1"><Label className="text-xs">Notlar</Label>
-                  <Textarea rows={2} defaultValue={rec?.notes ?? ""} disabled={!manage} onBlur={(e) => saveAdaptation(project.id, team, { notes: e.target.value })} /></div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 /* ── Access / credentials ───────────────────────────────── */
-export function AccessTab({ project }: { project: Project }) {
+/** "Kurulum özeti" (salt gösterim, S6) + "Erişim bilgileri" kartları. Sekmede ve 03 çalışma alanı panelinde kullanılır. */
+export function CredentialsSection({ project, layout }: { project: Project; layout: "tab" | "panel" }) {
   const { state, addCredential, logCredentialView } = useRq();
   const { user } = useAuth();
   const [shown, setShown] = useState<Record<string, boolean>>({});
   const [f, setF] = useState({ type: "VPN", provider: "", username: "", password: "", validUntil: "", note: "" });
-  const installSteps = state.steps.filter((s) => s.projectId === project.id && state.phases.find((p) => p.id === s.phaseId)?.code === "03").sort((a, b) => a.order - b.order);
 
   const allowed = canSeeCredentials(user, project);
   const creds = state.credentials.filter((c) => c.projectId === project.id);
   const soon = (d: string | null) => { if (!d) return false; const lim = new Date(); lim.setDate(lim.getDate() + 7); return d <= lim.toISOString().slice(0, 10); };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className={layout === "panel" ? "space-y-4" : "grid gap-4 lg:grid-cols-2"}>
       <Card>
         <CardHeader><CardTitle className="text-base">Kurulum özeti</CardTitle></CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p>Kurulum tipi: <span className="font-medium">{project.installType ? INSTALL_LABEL[project.installType] : "Seçilmedi"}</span></p>
           <p>LLM: <span className="font-medium">{project.llmChoice ? LLM_LABEL[project.llmChoice] : "Seçilmedi"}</span></p>
-          <div className="pt-2 space-y-1.5">
-            {installSteps.map((s) => (
-              <div key={s.id} className={`flex items-center justify-between gap-2 ${s.status === "out_of_scope" ? "opacity-60" : ""}`}>
-                <span>{s.title}</span><StepStatusBadge status={s.status} />
-              </div>
-            ))}
-          </div>
         </CardContent>
       </Card>
 
@@ -313,7 +168,7 @@ export function AccessTab({ project }: { project: Project }) {
                   <p className="text-xs text-muted-foreground">Geçerlilik: {fmtDate(c.validUntil)}{c.note ? ` · ${c.note}` : ""}</p>
                 </div>
               ))}
-              <div className="grid grid-cols-2 gap-2 border-t pt-3">
+              <div data-field="credential:vpn" className="grid grid-cols-2 gap-2 border-t pt-3">
                 <Input placeholder="Tür (VPN, SSH…)" value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })} />
                 <Input placeholder="Sağlayıcı" value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value })} />
                 <Input placeholder="Kullanıcı adı" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
@@ -352,20 +207,20 @@ export function DocumentUploadDialog({ project, lockedType, defaultLink, onClose
         <DialogHeader><DialogTitle>Doküman ekle</DialogTitle></DialogHeader>
         <div className="grid gap-3">
           <div className="grid gap-1">
-            <Label className="text-xs">Dosya</Label>
-            <Input type="file" onChange={(e) => setName(e.target.files?.[0]?.name ?? "")} />
+            <Label className="text-xs" htmlFor="doc-upload-file">Dosya</Label>
+            <Input id="doc-upload-file" type="file" onChange={(e) => setName(e.target.files?.[0]?.name ?? "")} />
           </div>
           <div className="grid gap-1">
-            <Label className="text-xs">Tür</Label>
+            <Label className="text-xs" htmlFor="doc-upload-type">Tür</Label>
             <Select value={type} onValueChange={(v) => setType(v as DocType)} disabled={!!lockedType}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger id="doc-upload-type"><SelectValue /></SelectTrigger>
               <SelectContent>{(Object.keys(DOC_TYPE_LABEL) as DocType[]).map((k) => <SelectItem key={k} value={k}>{DOC_TYPE_LABEL[k]}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="grid gap-1">
-            <Label className="text-xs">Bağla</Label>
+            <Label className="text-xs" htmlFor="doc-upload-link">Bağla</Label>
             <Select value={link} onValueChange={setLink}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger id="doc-upload-link"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="project">Proje</SelectItem>
                 {meetings.map((m) => <SelectItem key={m.id} value={`meeting:${m.id}`}>Toplantı: {MEETING_TYPE_LABEL[m.type]} {fmtDate(m.date)}</SelectItem>)}

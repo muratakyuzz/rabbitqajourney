@@ -63,21 +63,26 @@ export function ActionFields({ d, setD, projectId, showStatus }: { d: ActionDraf
   );
 }
 
-export function MeetingDialog({ project, onClose, defaultType = "checkin", onSaved }: { project: Project; onClose: () => void; defaultType?: MeetingType; onSaved?: (meetingId: string) => void }) {
+export function MeetingDialog({ project, onClose, defaultType = "checkin", defaultStatus, defaultTeamId, onSaved }: {
+  project: Project; onClose: () => void; defaultType?: MeetingType; defaultStatus?: MeetingStatus; defaultTeamId?: string | null; onSaved?: (meetingId: string) => void;
+}) {
   const { state, addMeeting, addDocument } = useRq();
   const [type, setType] = useState<MeetingType>(defaultType);
   const [visible, setVisible] = useState(false);
   const [docs, setDocs] = useState<string[]>([]);
   const [docName, setDocName] = useState("");
   const [date, setDate] = useState(todayISO());
-  const [statusTouched, setStatusTouched] = useState(false);
-  const [status, setStatus] = useState<MeetingStatus>("held"); // default date is today
-  const [teamId, setTeamId] = useState<string | null>(null);
+  const [statusTouched, setStatusTouched] = useState(defaultStatus !== undefined);
+  const [status, setStatus] = useState<MeetingStatus>(defaultStatus ?? "held"); // default date is today
+  const [teamId, setTeamId] = useState<string | null>(defaultTeamId ?? null);
   const [internalIds, setInternalIds] = useState<string[]>(project.csmId ? [project.csmId] : []);
   const [contactIds, setContactIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [decisions, setDecisions] = useState("");
   const [actions, setActions] = useState<ActionDraft[]>([]);
+  const [trainerId, setTrainerId] = useState<string | null>(project.csmId);
+  const [trainingModules, setTrainingModules] = useState<string[]>([]);
+  const [recordingUrl, setRecordingUrl] = useState("");
   const contacts = state.contacts.filter((c) => c.projectId === project.id);
   const toggle = (arr: string[], set: (v: string[]) => void, id: string, on: boolean) => set(on ? [...arr, id] : arr.filter((x) => x !== id));
   const onDateChange = (v: string) => {
@@ -109,6 +114,29 @@ export function MeetingDialog({ project, onClose, defaultType = "checkin", onSav
                   </SelectContent>
                 </Select>
               )}
+            </div>
+          )}
+          {type === "training" && (
+            <div className="grid gap-3 rounded-md border p-3">
+              <div className="grid gap-2">
+                <Label>Eğitmen</Label>
+                <Select value={trainerId ?? NONE} onValueChange={(v) => setTrainerId(v === NONE ? null : v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Seçilmedi</SelectItem>
+                    {selectableUsers(state).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Anlatılan modüller</Label>
+                <div className="grid grid-cols-3 gap-2">{state.modules.map((m) => (
+                  <label key={m} className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={trainingModules.includes(m)} onCheckedChange={(c) => toggle(trainingModules, setTrainingModules, m, !!c)} />{m}
+                  </label>
+                ))}</div>
+              </div>
+              <div className="grid gap-2"><Label>Kayıt linki</Label><Input value={recordingUrl} onChange={(e) => setRecordingUrl(e.target.value)} /></div>
             </div>
           )}
           <div className="grid gap-2">
@@ -151,7 +179,11 @@ export function MeetingDialog({ project, onClose, defaultType = "checkin", onSav
           <Button variant="outline" onClick={onClose}>Vazgeç</Button>
           <Button onClick={() => {
             if (actions.some((a) => !a.title.trim())) return toast.error("Aksiyon başlıkları boş olamaz");
-            const mid = addMeeting({ projectId: project.id, type, date, internalIds, contactIds, notes, decisions, isCustomerVisible: visible, status, teamId: type === "adaptation" ? teamId : null }, actions);
+            const mid = addMeeting({
+              projectId: project.id, type, date, internalIds, contactIds, notes, decisions, isCustomerVisible: visible, status,
+              teamId: type === "adaptation" ? teamId : null,
+              ...(type === "training" ? { training: { trainerId, modules: trainingModules, recordingUrl } } : {}),
+            }, actions);
             docs.forEach((name) => addDocument({ projectId: project.id, type: "other", name, linkType: "meeting", linkId: mid }));
             toast.success(status === "held" ? "Toplantı kaydedildi" : "Toplantı planlandı");
             onSaved?.(mid);
@@ -180,6 +212,14 @@ export function MeetingDetailDialog({ meetingId, onClose }: { meetingId: string;
           <p className="text-sm text-muted-foreground">
             İç: {meeting.internalIds.map((i) => personName(state, i)).join(", ") || "—"} · Müşteri: {meeting.contactIds.map((i) => personName(state, i)).join(", ") || "—"}
           </p>
+          {meeting.type === "adaptation" && meeting.teamId && <p className="text-sm text-muted-foreground">Takım: {meeting.teamId}</p>}
+          {meeting.type === "training" && meeting.training && (
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p>Eğitmen: {personName(state, meeting.training.trainerId)}</p>
+              {meeting.training.modules.length > 0 && <p>Modüller: {meeting.training.modules.join(", ")}</p>}
+              {meeting.training.recordingUrl && <a href={meeting.training.recordingUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">Kayıt linki</a>}
+            </div>
+          )}
           {meeting.notes && <p className="text-sm">{meeting.notes}</p>}
           {meeting.decisions && <p className="text-sm"><span className="font-medium">Kararlar: </span>{meeting.decisions}</p>}
           {acts.length > 0 && (

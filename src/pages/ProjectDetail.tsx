@@ -15,11 +15,14 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/EmptyState";
-import { AccessTab, AdaptationTab, DocumentsTab, KpiSection, TeamRow, TrainingTab } from "./project/Phase2Tabs";
-import { AlertsTab, GoLiveTab, RisksTab, TicketsTab } from "./project/Phase3Tabs";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { AlertTriangle } from "lucide-react";
+import { CredentialsSection, DocumentsTab } from "./project/Phase2Tabs";
+import { GoLiveTab, ProjectAlertsPanel, RisksTab, TicketsTab } from "./project/Phase3Tabs";
 import { ContinuityTab, MeetingExtras } from "./project/ContinuityTab";
+import { DiscoveryTab } from "./project/DiscoveryContent";
 import { ActionFields, type ActionDraft, EnumSelect, MeetingDetailDialog, MeetingDialog, NONE, PersonSelect } from "./project/MeetingDialog";
-import { PHASE_WORKSPACES, stepClickTarget } from "./project/workspaces";
+import { stepClickTarget, workspaceAvailable } from "./project/workspaces";
 import { PhaseWorkspaceSheet } from "./project/workspaces/PhaseWorkspaceSheet";
 import { VisibleIcon } from "@/components/rq/VisibleIcon";
 import { Switch } from "@/components/ui/switch";
@@ -31,9 +34,9 @@ import {
   ActionStatusBadge, HealthBadge, PhaseStatusBadge, Pill, PriorityBadge, StepStatusBadge, isOverdue,
 } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
-import { personName, projectProgress, useComputedAlerts, useRq } from "@/lib/rabbitqa/store";
+import { personName, projectProgress, useAlertViews, useComputedAlerts, useRq } from "@/lib/rabbitqa/store";
 import { derivePhaseStatus } from "@/lib/rabbitqa/alerts";
-import { canEditFlow, canEditItem, canManageProject, selectableUsers } from "@/lib/rabbitqa/perm";
+import { canEditFlow, canEditItem, canManageProject, canSeeCredentials, selectableUsers } from "@/lib/rabbitqa/perm";
 import { isActivePhase, isOpenStep, previousStep } from "@/lib/rabbitqa/flow";
 import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
 import {
@@ -64,6 +67,8 @@ export default function ProjectDetail() {
   const { state } = useRq();
   const { user } = useAuth();
   const project = state.projects.find((p) => p.id === id);
+  const allAlerts = useAlertViews();
+  const [alertsOpen, setAlertsOpen] = useState(() => searchParams.get("panel") === "alerts" || searchParams.get("tab") === "alerts");
 
   if (!project) {
     return <Card><EmptyState title="Proje bulunamadı" description="Bu proje mevcut değil veya erişiminiz yok." /></Card>;
@@ -71,6 +76,7 @@ export default function ProjectDetail() {
   const progress = projectProgress(state, project.id);
   const manage = canManageProject(user, project);
   const pendingAi = state.insights.filter((i) => i.projectId === project.id && effectiveStatus(state, i) === "pending").length;
+  const openAlerts = allAlerts.filter((a) => a.projectId === project.id && a.status === "open");
 
   return (
     <div className="space-y-6">
@@ -82,6 +88,13 @@ export default function ProjectDetail() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex flex-wrap items-center gap-2">{project.customerName}
               {pendingAi > 0 && <Link to={`/app/insights?project=${project.id}`}><Pill tone="info"><Sparkles className="h-3 w-3" />{pendingAi} AI önerisi</Pill></Link>}
+              {openAlerts.length > 0 && (
+                <button type="button" onClick={() => setAlertsOpen(true)}>
+                  <Pill tone={openAlerts.some((a) => a.level === "red") ? "danger" : "warning"}>
+                    <AlertTriangle className="h-3 w-3" />{openAlerts.length} açık uyarı
+                  </Pill>
+                </button>
+              )}
             </h1>
             <p className="text-sm text-muted-foreground">{project.name}</p>
           </div>
@@ -102,15 +115,36 @@ export default function ProjectDetail() {
       </div>
 
       <ProjectTabs project={project} searchParams={searchParams} />
+      <Sheet open={alertsOpen} onOpenChange={setAlertsOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-[640px] overflow-y-auto">
+          <SheetTitle className="sr-only">Uyarılar</SheetTitle>
+          <div className="mt-6">
+            <ProjectAlertsPanel project={project} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
 
+/** Eski `?tab=` parametresini yeni sekme/çalışma alanı adlarına çevirir (plan §6.5 parametre eşlemesi). */
+function legacyTabToWorkspace(raw: string | null): string | null {
+  if (raw === "handover" || raw === "kickoff") return "00";
+  if (raw === "training") return "04";
+  if (raw === "adaptation") return "05";
+  return null;
+}
+
 function ProjectTabs({ project, searchParams }: { project: Project; searchParams: URLSearchParams }) {
+  const { user } = useAuth();
+  const showAccess = canSeeCredentials(user, project);
   const raw = searchParams.get("tab");
-  const legacy = raw === "handover" || raw === "kickoff";
-  const tab = legacy ? "phases" : raw ?? "phases";
-  const ws = legacy ? "00" : searchParams.get("ws");
+  const legacyWs = legacyTabToWorkspace(raw);
+  // Sekme olarak artık var olmayan değerler ("training", "adaptation", "alerts", "handover", "kickoff", "tickets")
+  // ve yetkisiz "access" her zaman "phases"e düşer; geçerli kalan değerler aynen kullanılır.
+  const validTabs = new Set(["phases", "actions", "meetings", "discovery", "documents", "risks", "golive", "continuity", "integrations", "contacts", "history", ...(showAccess ? ["access"] : [])]);
+  const tab = raw && validTabs.has(raw) ? raw : "phases";
+  const ws = legacyWs ?? searchParams.get("ws");
   return (
     <Tabs key={tab} defaultValue={tab}>
       <TabsList className="flex-wrap h-auto">
@@ -118,29 +152,27 @@ function ProjectTabs({ project, searchParams }: { project: Project; searchParams
         <TabsTrigger value="actions">Aksiyonlar</TabsTrigger>
         <TabsTrigger value="meetings">Toplantılar</TabsTrigger>
         <TabsTrigger value="discovery">Keşif ve takımlar</TabsTrigger>
-        <TabsTrigger value="access">Kurulum ve erişim</TabsTrigger>
-        <TabsTrigger value="training">Eğitim</TabsTrigger>
-        <TabsTrigger value="adaptation">Uyarlama</TabsTrigger>
+        {showAccess && <TabsTrigger value="access">Erişim bilgileri</TabsTrigger>}
         <TabsTrigger value="documents">Dokümanlar</TabsTrigger>
-        <TabsTrigger value="alerts">Uyarılar</TabsTrigger>
-        <TabsTrigger value="tickets">Destek kayıtları</TabsTrigger>
         <TabsTrigger value="risks">Riskler ve kararlar</TabsTrigger>
         <TabsTrigger value="golive">Go-Live</TabsTrigger>
         <TabsTrigger value="continuity">Süreklilik</TabsTrigger>
         <TabsTrigger value="integrations">Entegrasyonlar</TabsTrigger>
         <TabsTrigger value="contacts">Müşteri kişileri</TabsTrigger>
         <TabsTrigger value="history">Müşteri geçmişi</TabsTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span><TabsTrigger value="tickets" disabled>Destek kayıtları <Pill tone="muted" className="ml-1">Faz 2</Pill></TabsTrigger></span>
+          </TooltipTrigger>
+          <TooltipContent>Faz 2'de gelecek</TooltipContent>
+        </Tooltip>
       </TabsList>
       <TabsContent value="phases"><PhasesTab project={project} initialWorkspace={ws ?? undefined} /></TabsContent>
       <TabsContent value="actions"><ActionsTab project={project} /></TabsContent>
       <TabsContent value="meetings"><MeetingsTab project={project} /></TabsContent>
       <TabsContent value="discovery"><DiscoveryTab project={project} /></TabsContent>
-      <TabsContent value="access"><AccessTab project={project} /></TabsContent>
-      <TabsContent value="training"><TrainingTab project={project} /></TabsContent>
-      <TabsContent value="adaptation"><AdaptationTab project={project} /></TabsContent>
+      {showAccess && <TabsContent value="access"><CredentialsSection project={project} layout="tab" /></TabsContent>}
       <TabsContent value="documents"><DocumentsTab project={project} /></TabsContent>
-      <TabsContent value="alerts"><AlertsTab project={project} /></TabsContent>
-      <TabsContent value="tickets"><TicketsTab project={project} /></TabsContent>
       <TabsContent value="risks"><RisksTab project={project} /></TabsContent>
       <TabsContent value="golive"><GoLiveTab project={project} /></TabsContent>
       <TabsContent value="continuity"><ContinuityTab project={project} renderCheckinDialog={(close) => <MeetingDialog project={project} onClose={close} defaultType="checkin" />} /></TabsContent>
@@ -234,7 +266,7 @@ function PhasesTab({ project, initialWorkspace }: { project: Project; initialWor
   const [editStep, setEditStep] = useState<Step | null>(null);
   const [editPhase, setEditPhase] = useState<Phase | null>(null);
   const [ws, setWs] = useState<{ phaseId: string; field: string | null; nonce: number } | null>(() => {
-    if (!initialWorkspace) return null;
+    if (!initialWorkspace || !workspaceAvailable(initialWorkspace, user, project)) return null;
     const ph = phases.find((p) => p.code === initialWorkspace);
     return ph ? { phaseId: ph.id, field: null, nonce: 0 } : null;
   });
@@ -243,9 +275,11 @@ function PhasesTab({ project, initialWorkspace }: { project: Project; initialWor
   const activeIds = phases.filter(isActivePhase).map((p) => p.id);
   const today = todayISO();
   const computed = useComputedAlerts();
+  const openAlerts = useAlertViews().filter((a) => a.projectId === project.id && a.status === "open");
+  const alertsFor = (entity: "phase" | "step", entityId: string) => openAlerts.filter((a) => a.entity === entity && a.entityId === entityId);
 
   const onStepClick = (ph: Phase, s: Step) => {
-    const hasWorkspace = !!PHASE_WORKSPACES[ph.code];
+    const hasWorkspace = workspaceAvailable(ph.code, user, project);
     const target = stepClickTarget(state, s, { hasWorkspace, canManage: manage, canEdit: canEditItem(user, project, s.ownerId) });
     if (target.kind === "workspace") setWs((cur) => ({ phaseId: ph.id, field: target.field, nonce: (cur?.phaseId === ph.id ? cur.nonce : 0) + 1 }));
     else if (target.kind === "meeting_form") setMeetingFormType(target.type);
@@ -262,13 +296,24 @@ function PhasesTab({ project, initialWorkspace }: { project: Project; initialWor
           const done = counted.filter((s) => s.status === "done").length;
           const locked = ph.status === "locked";
           const prevPh = phases[idx - 1];
-          const hasWorkspace = !!PHASE_WORKSPACES[ph.code];
+          const hasWorkspace = workspaceAvailable(ph.code, user, project);
+          const phaseAlerts = alertsFor("phase", ph.id);
           return (
             <AccordionItem key={ph.id} value={ph.id} className={`rounded-lg border bg-card px-4 ${locked ? "opacity-80" : ""}`}>
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex flex-1 flex-wrap items-center gap-3 text-left pr-3">
                   <span className="font-mono text-xs text-muted-foreground">{ph.code}</span>
                   <span className="font-semibold">{ph.name}</span>
+                  {phaseAlerts.length > 0 && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span><AlertTriangle className={`h-4 w-4 ${phaseAlerts.some((a) => a.level === "red") ? "text-destructive" : "text-warning"}`} /></span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {phaseAlerts.map((a) => <div key={a.key}>{a.title}</div>)}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                   <PhaseStatusBadge status={derivePhaseStatus(ph, computed)} />
                   {locked && (
                     <span className="text-xs text-muted-foreground font-normal">
@@ -322,6 +367,7 @@ function PhasesTab({ project, initialWorkspace }: { project: Project; initialWor
                         const target = stepClickTarget(state, s, { hasWorkspace, canManage: manage, canEdit: canEditItem(user, project, s.ownerId) });
                         const rowClickable = target.kind !== "none";
                         const titleTooltip = sLocked && (s.completion === "data" || s.completion === "meeting") ? "Sırası gelmedi — veri şimdiden girilebilir" : null;
+                        const stepAlerts = alertsFor("step", s.id);
                         return (
                           <TableRow
                             key={s.id}
@@ -341,6 +387,16 @@ function PhasesTab({ project, initialWorkspace }: { project: Project; initialWor
                               )}
                               {s.required && <span className="text-destructive ml-1" title="Zorunlu">*</span>}
                               {isOpenStep(s) && isNewlyActivated(s.activatedAt) && <Pill tone="info" className="ml-2">Yeni</Pill>}
+                              {stepAlerts.length > 0 && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="inline-flex ml-2"><AlertTriangle className={`h-3.5 w-3.5 ${stepAlerts.some((a) => a.level === "red") ? "text-destructive" : "text-warning"}`} /></span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {stepAlerts.map((a) => <div key={a.key}>{a.title}</div>)}
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
                             </TableCell>
                             <TableCell><DepIcon dep={s.dependency} /></TableCell>
                             <TableCell className="whitespace-nowrap text-xs">{s.durationDays} iş günü</TableCell>
@@ -627,13 +683,30 @@ function MeetingsTab({ project }: { project: Project }) {
   const { state, updateMeeting } = useRq();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const meetings = state.meetings.filter((m) => m.projectId === project.id).sort((a, b) => b.date.localeCompare(a.date));
+  const [fType, setFType] = useState("all");
+  const [fStatus, setFStatus] = useState("all");
+  const meetings = state.meetings
+    .filter((m) => m.projectId === project.id)
+    .filter((m) => (fType === "all" || m.type === fType) && (fStatus === "all" || m.status === fStatus))
+    .sort((a, b) => b.date.localeCompare(a.date));
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={fType} onValueChange={setFType}>
+            <SelectTrigger className="w-44" aria-label="Tür"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="all">Tüm türler</SelectItem>{Object.entries(MEETING_TYPE_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={fStatus} onValueChange={setFStatus}>
+            <SelectTrigger className="w-40" aria-label="Durum"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="all">Tüm durumlar</SelectItem>{Object.entries(MEETING_STATUS_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
         {canManageProject(user, project) && <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" />Toplantı kaydet</Button>}
       </div>
-      {meetings.length === 0 && <Card><EmptyState title="Toplantı yok" description="İlk toplantıyı kaydedin." /></Card>}
+      {meetings.length === 0 && (
+        <Card><EmptyState title={state.meetings.some((m) => m.projectId === project.id) ? "Filtreye uyan toplantı yok" : "Toplantı yok"} description="İlk toplantıyı kaydedin." /></Card>
+      )}
       {meetings.map((m) => {
         const acts = state.actions.filter((a) => a.meetingId === m.id);
         const manage = canManageProject(user, project);
@@ -656,6 +729,12 @@ function MeetingsTab({ project }: { project: Project }) {
                   }}>Yapıldı olarak işaretle</Button>
                 )}
               </div>
+              {m.type === "training" && m.training && (
+                <p className="text-sm text-muted-foreground">
+                  Eğitmen: {personName(state, m.training.trainerId)}{m.training.modules.length > 0 ? ` · Modüller: ${m.training.modules.join(", ")}` : ""}
+                  {m.training.recordingUrl && <> · <a href={m.training.recordingUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">Kayıt linki</a></>}
+                </p>
+              )}
               {m.notes && <p className="text-sm">{m.notes}</p>}
               {m.decisions && <p className="text-sm"><span className="font-medium">Kararlar: </span>{m.decisions}</p>}
               {acts.length > 0 && (
@@ -670,96 +749,6 @@ function MeetingsTab({ project }: { project: Project }) {
         );
       })}
       {open && <MeetingDialog project={project} onClose={() => setOpen(false)} />}
-    </div>
-  );
-}
-
-/* ── Discovery & teams ──────────────────────────────────── */
-function DiscoveryTab({ project }: { project: Project }) {
-  const { state, updateProject, addTeam } = useRq();
-  const { user } = useAuth();
-  const manage = canManageProject(user, project);
-  const [team, setTeam] = useState("");
-  const groups = useMemo(() => {
-    const g: Record<string, typeof state.questions> = {};
-    [...state.questions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).forEach((q) => { (g[q.group] ??= []).push(q); });
-    return g;
-  }, [state.questions]);
-  const mismatch = project.desiredModules.filter((m) => !project.purchasedModules.includes(m));
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      <Card className="lg:col-span-2">
-        <CardHeader><CardTitle className="text-base">Keşif formu</CardTitle></CardHeader>
-        <CardContent className="space-y-5">
-          {Object.entries(groups).map(([g, qs]) => (
-            <div key={g} className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g}</p>
-              {qs.map((q) => (
-                <div key={q.id} className="grid gap-1.5">
-                  <Label className="leading-snug">{q.text}{q.required && <span className="text-destructive ml-1">*</span>}</Label>
-                  {q.type === "modules" ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {state.modules.map((m) => (
-                        <label key={m} className="flex items-center gap-2 text-sm">
-                          <Checkbox disabled={!manage} checked={project.desiredModules.includes(m)} onCheckedChange={(c) => {
-                            const next = c ? [...project.desiredModules, m] : project.desiredModules.filter((x) => x !== m);
-                            updateProject(project.id, { desiredModules: next, discoveryAnswers: { ...project.discoveryAnswers, [q.id]: next.join(", ") } });
-                          }} />{m}
-                        </label>
-                      ))}
-                    </div>
-                  ) : <Textarea
-                    defaultValue={project.discoveryAnswers[q.id] ?? ""} disabled={!manage} rows={2}
-                    className={q.required && !project.discoveryAnswers[q.id] ? "border-warning" : ""}
-                    onBlur={(e) => updateProject(project.id, { discoveryAnswers: { ...project.discoveryAnswers, [q.id]: e.target.value } })}
-                  />}
-                </div>
-              ))}
-            </div>
-          ))}
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Kullanılmak istenen modüller</p>
-            <div className="grid grid-cols-3 gap-2">
-              {state.modules.map((m) => (
-                <label key={m} className="flex items-center gap-2 text-sm">
-                  <Checkbox disabled={!manage} checked={project.desiredModules.includes(m)}
-                    onCheckedChange={(c) => {
-                      const next = c ? [...project.desiredModules, m] : project.desiredModules.filter((x) => x !== m);
-                      const mq = state.questions.filter((q) => q.type === "modules");
-                      updateProject(project.id, { desiredModules: next, ...(mq.length ? { discoveryAnswers: { ...project.discoveryAnswers, ...Object.fromEntries(mq.map((q) => [q.id, next.join(", ")])) } } : {}) });
-                    }} />
-                  {m}
-                </label>
-              ))}
-            </div>
-            {mismatch.length > 0 && (
-              <p className="text-sm text-warning-foreground bg-warning/15 border border-warning/40 rounded-md px-3 py-2">
-                Lisans uyumsuzluğu: {mismatch.join(", ")} satın alınan modüller arasında yok.
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader><CardTitle className="text-base">Takımlar</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          {project.teams.length === 0 && <p className="text-sm text-muted-foreground">Takım tanımlanmadı.</p>}
-          {project.teams.map((t) => <TeamRow key={t} project={project} team={t} />)}
-          {manage && (
-            <div className="flex gap-2 pt-2">
-              <Input placeholder="Takım adı" value={team} onChange={(e) => setTeam(e.target.value)} />
-              <Button onClick={() => {
-                if (!team.trim()) return;
-                addTeam(project.id, team.trim());
-                toast.success("Takım eklendi, Uyarlama aşamasına 5 adım açıldı");
-                setTeam("");
-              }}>Ekle</Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      <KpiSection project={project} />
     </div>
   );
 }
