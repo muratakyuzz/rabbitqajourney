@@ -161,6 +161,7 @@ function ApproveDialog({ insight: i, edit, changed, onClose, onDone }: { insight
     </Select>
   );
   const keys = Object.keys(i.proposed);
+  const stepStatusOptions = Object.fromEntries(Object.entries(STEP_STATUS_LABEL).filter(([k]) => k !== "locked"));
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -185,7 +186,7 @@ function ApproveDialog({ insight: i, edit, changed, onClose, onDone }: { insight
               {keys.includes("priority") && <div className="grid gap-1.5"><Label>Öncelik</Label>{sel("priority", PRIORITY_LABEL)}</div>}
               {keys.includes("impact") && <div className="grid gap-1.5"><Label>Etki</Label>{sel("impact", PRIORITY_LABEL)}</div>}
               {keys.includes("due") && <div className="grid gap-1.5"><Label>Termin</Label><Input type="date" value={v.due ?? ""} onChange={(e) => set("due", e.target.value || null)} /></div>}
-              {keys.includes("status") && <div className="grid gap-1.5"><Label>Durum</Label>{sel("status", i.kind === "step_update" ? STEP_STATUS_LABEL : ACTION_STATUS_LABEL)}</div>}
+              {keys.includes("status") && <div className="grid gap-1.5"><Label>Durum</Label>{sel("status", i.kind === "step_update" ? stepStatusOptions : ACTION_STATUS_LABEL)}</div>}
               {keys.includes("health") && <div className="grid gap-1.5"><Label>Sağlık</Label>{sel("health", HEALTH_LABEL)}</div>}
               {keys.includes("goLiveDate") && <div className="grid gap-1.5"><Label>Go-Live</Label><Input type="date" value={v.goLiveDate ?? ""} onChange={(e) => set("goLiveDate", e.target.value)} /></div>}
               {keys.includes("planEnd") && <div className="grid gap-1.5"><Label>Plan bitiş</Label><Input type="date" value={v.planEnd ?? ""} onChange={(e) => set("planEnd", e.target.value)} /></div>}

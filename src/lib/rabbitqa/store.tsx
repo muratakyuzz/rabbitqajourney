@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { DEFAULT_PROJECT_INTEGRATIONS, STATE_KEY, STATE_VERSION, buildFromTemplate, createSeed, uid } from "./seed";
 import { analyzeText, type IncomingMeta } from "./ai-mock";
 import { matchEmail } from "./email-match";
-import { isAutoStep, manualStatusError, settleAll } from "./completion";
+import { isAutoStep, manualStatusError, settleAll, stepLockError } from "./completion";
 import type {
   AiInsight, ChatChannel, InsightSource, IntegrationConfig, ProjectIntegrations, UnmatchedEmail,
   CustomerReport, User, Action, Adaptation, AdaptationItem, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RiskDecision, RqState, Step, SupportTicket,
@@ -256,10 +256,8 @@ export function RqProvider({ children }: { children: ReactNode }) {
     updateStep: (id, p, reason) => {
       const old = state.steps.find((s) => s.id === id);
       if (!old) return "Adım bulunamadı";
-      if (p.status && p.status !== old.status) {
-        if (old.status === "locked") return "Adımın sırası gelmedi; durumu elle değiştirilemez";
-        if (p.status === "locked") return "\"Sırası gelmedi\" elle seçilemez";
-      }
+      const lockErr = stepLockError(old, p.status);
+      if (lockErr) return lockErr;
       const manualErr = manualStatusError(old, p.status);
       if (manualErr) return manualErr;
       const changes = { ...p };
@@ -688,9 +686,8 @@ export function RqProvider({ children }: { children: ReactNode }) {
         case "action_update": if (ins.targetId) api.updateAction(ins.targetId, v, reason); break;
         case "step_update": {
           if (!ins.targetId) break;
-          const targetStep = state.steps.find((s) => s.id === ins.targetId);
-          if (targetStep && isAutoStep(targetStep)) return "Bu adım veriyle tamamlanır";
-          patch<Step>("steps", ins.targetId, v as Partial<Step>, reason);
+          const err = api.updateStep(ins.targetId, v as Partial<Step>, reason);
+          if (err) return err;
           break;
         }
         case "risk_create":

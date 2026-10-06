@@ -144,3 +144,19 @@ REV-01 (High) kapatıldı — reviewer, qa-verifier, rules-reviewer hepsi APPROV
 
 ### Açık soru
 - INV-06'daki "tarih değişikliği" kararın `decidedAt` alanını da kapsıyor mu? Kapsarsa REV-M06-01/RUL-01 zorunlu hale gelir.
+
+## fix/m06-insight-step-lock (@ 2940e56, 2026-10-06)
+
+REV-13 kapatıldı — reviewer, qa-verifier, rules-reviewer hepsi APPROVE. MERGE'E HAZIR. Kalan Medium/Low bulgular:
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| REV-M13-01 / RUL-01 | Medium/Low | `approveInsight`'ın `step_update` dalından `isAutoStep` erken reddi kaldırıldı (direktif bunun kalmasını istemişti); otomatik adım kuralı artık yalnızca `updateStep` → `manualStatusError`'a dayanıyor (done dışı geçişlerde StepDialog ile hizalı, INV-26'ya aykırı değil) ama değişiklik notunda belgelenmemiş sapma | src/lib/rabbitqa/store.tsx:687-692 | M-06 fix (belge) ya da BACKLOG |
+| REV-M13-02 / RUL-02 | Medium/Low | AC5 ve AC17 testleri `if (!insight) return;` içeriyor; ai-mock otomatik adıma öneri üretmediği için bu testler hiçbir assert çalıştırmadan yeşil geçiyor — isAutoStep guard'ının kaldırıldığını yakalayan gerçek bir test yok | src/lib/rabbitqa/store.test.tsx:454-468,530-543 | M-06 fix |
+| RUL-03 | Low | Geçersiz `targetId`'li `step_update` için "Adım bulunamadı" davranışı (önceden sessiz no-op + approved idi, şimdi düzeldi) hiç test edilmiyor | src/lib/rabbitqa/store.tsx:689-690 | M-06 fix (opsiyonel) |
+| REV-M13-03 | Low | ApproveDialog, StepDialog'daki gibi kilitli/otomatik adım için Durum seçeneklerini kısıtlamıyor; store reddettiği için invariant ihlali yok ama kullanıcı hatayı ancak onay sonrası görüyor | src/components/rq/InsightCard.tsx:164 | Opsiyonel UI iyileştirmesi |
+| — | Low | `action_update` dalı `api.updateAction`'ın hata dönüşünü kontrol etmiyor (pre-existing, REV-13 dışı) | src/lib/rabbitqa/store.tsx:686 | F0-01 (API_CONTRACT) |
+| — | Low | İnsight onayının hedef adımın `projectId`'sini doğrulamadığı (INV-23), `step_update`'in `Partial<Step>`'i olduğu gibi `updateStep`'e geçirip alan beyaz listesi yapmadığı (pre-existing) | src/lib/rabbitqa/store.tsx | F0-01 (API_CONTRACT, zod şeması) |
+
+### Açık soru
+- RUL-01'in önerdiği gibi, `isAutoStep` kaldırma sapması planner/Murat tarafından onaylanmalı; onaylanırsa yalnızca belge güncellemesi yeterli, onaylanmazsa kod geri eklenmeli.

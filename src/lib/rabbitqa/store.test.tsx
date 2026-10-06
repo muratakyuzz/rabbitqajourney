@@ -468,6 +468,80 @@ describe("approveInsight — step_update guard (AC17)", () => {
   });
 });
 
+describe("approveInsight — step_update goes through updateStep's lock rules (REV-13)", () => {
+  function seedWithStepUpdateInsight(targetStatus: "pending" | "in_progress" | "locked", proposed: Record<string, unknown>) {
+    const seeded = createSeed();
+    const pid = "p_ornek";
+    const manualStep = seeded.steps.find((s) => s.projectId === pid && s.completion === "manual" && s.status !== "done")!;
+    const insight = {
+      id: "ai_test_step_update", projectId: pid, source: "teams" as const, kind: "step_update" as const, status: "pending" as const,
+      createdAt: new Date().toISOString(), targetId: manualStep.id, current: { status: manualStep.status },
+      sourceRef: { title: "t", from: "f", at: new Date().toISOString(), excerpt: "x", link: "#" },
+      proposed, rationale: "test", confidence: 90,
+      reviewedBy: null, reviewedAt: null, reviewNote: "", appliedEntityId: null,
+    };
+    localStorage.setItem(STATE_KEY, JSON.stringify({
+      ...seeded,
+      steps: seeded.steps.map((s) => (s.id === manualStep.id ? { ...s, status: targetStatus } : s)),
+      insights: [...seeded.insights, insight],
+    }));
+    return { pid, stepId: manualStep.id, insightId: insight.id };
+  }
+
+  it("AC1: rejects an edited step_update proposing 'locked' on an open manual step — step and insight stay unchanged", () => {
+    const { stepId, insightId } = seedWithStepUpdateInsight("pending", { status: "pending" });
+    const { result } = setup();
+    const auditCountBefore = result.current.state.audit.length;
+    let err: string | null = null;
+    act(() => { err = result.current.approveInsight(insightId, { status: "locked" }); });
+    expect(err).toBe("\"Sırası gelmedi\" elle seçilemez");
+    expect(result.current.state.steps.find((s) => s.id === stepId)!.status).toBe("pending");
+    expect(result.current.state.insights.find((i) => i.id === insightId)!.status).toBe("pending");
+    expect(result.current.state.audit.length).toBe(auditCountBefore);
+  });
+
+  it("AC2: rejects approving (no edit) a step_update whose target step is now locked — step and insight stay unchanged", () => {
+    const { stepId, insightId } = seedWithStepUpdateInsight("locked", { status: "done" });
+    const { result } = setup();
+    const auditCountBefore = result.current.state.audit.length;
+    let err: string | null = null;
+    act(() => { err = result.current.approveInsight(insightId); });
+    expect(err).toBe("Adımın sırası gelmedi; durumu elle değiştirilemez");
+    expect(result.current.state.steps.find((s) => s.id === stepId)!.status).toBe("locked");
+    expect(result.current.state.insights.find((i) => i.id === insightId)!.status).toBe("pending");
+    expect(result.current.state.audit.length).toBe(auditCountBefore);
+  });
+
+  it("AC3 (regression): approves a step_update to 'done' on an open manual step", () => {
+    const { stepId, insightId } = seedWithStepUpdateInsight("pending", { status: "done" });
+    const { result } = setup();
+    let err: string | null = null;
+    act(() => { err = result.current.approveInsight(insightId); });
+    expect(err).toBeNull();
+    const step = result.current.state.steps.find((s) => s.id === stepId)!;
+    expect(step.status).toBe("done");
+    const insight = result.current.state.insights.find((i) => i.id === insightId)!;
+    expect(insight.status).toBe("approved");
+    expect(insight.appliedEntityId).toBe(stepId);
+    const stepAudit = result.current.state.audit.find((a) => a.entity === "step" && a.entityId === stepId);
+    expect(stepAudit?.reason).toMatch(/^AI Insight onaylandı/);
+  });
+
+  it("AC5 (regression): still rejects a step_update insight targeting an auto-completed (data) step", () => {
+    const { result } = setup();
+    const pid = "p_ornek";
+    const dataStep = result.current.state.steps.find((s) => s.projectId === pid && s.completion === "data")!;
+    act(() => {
+      result.current.simulateIncoming(pid, "teams", `${dataStep.title} tamamlandı.`, { title: "t", from: "f" });
+    });
+    const insight = result.current.state.insights.find((i) => i.projectId === pid && i.kind === "step_update" && i.targetId === dataStep.id);
+    if (!insight) return;
+    let err: string | null = null;
+    act(() => { err = result.current.approveInsight(insight.id); });
+    expect(err).toBe("Bu adım veriyle tamamlanır");
+  });
+});
+
 describe("flowMessages — Tamamlandı toast (AC10)", () => {
   it("auto-completing a data step toasts 'Tamamlandı: <title>'", () => {
     const { result } = setup();

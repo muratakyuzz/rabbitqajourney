@@ -235,6 +235,14 @@ export function manualStatusError(step: Step, next: StepStatus | undefined): str
   return null;
 }
 
+/** Adımın durumu elle değiştiriliyorsa kilit kurallarını uygular: kilitli adım değiştirilemez, "Sırası gelmedi" elle seçilemez. */
+export function stepLockError(step: Step, next: StepStatus | undefined): string | null {
+  if (next === undefined || next === step.status) return null;
+  if (step.status === "locked") return "Adımın sırası gelmedi; durumu elle değiştirilemez";
+  if (next === "locked") return "\"Sırası gelmedi\" elle seçilemez";
+  return null;
+}
+
 /** Projede, verilen türde en son tarihli "Yapıldı" toplantı. */
 export function latestHeldMeeting(state: RqState, projectId: string, type: MeetingType): Meeting | null {
   return state.meetings
