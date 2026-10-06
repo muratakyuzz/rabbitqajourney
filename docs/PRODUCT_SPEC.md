@@ -152,7 +152,7 @@ Go-Live sonrası takip modu.
 |---|---|
 | Yeni proje oluşturuldu | Tüm aşamalar ve adımlar şablondan oluşur; "CSM ataması" adımı Manager'a düşer |
 | Kurulum tipi = On-prem | "Gereksinim dokümanı paylaşıldı" adımı ve Kurulum'daki VPN, sunucu ve DevOps devir adımları açılır |
-| Kurulum tipi = SaaS | Bu adımlar "Kapsam dışı" olur; yerine "SaaS ortamının hazırlanması" adımı (DevOps) açılır |
+| Kurulum tipi = SaaS | Bu adımlar (henüz tamamlanmamış: pending/in_progress/locked) "Kapsam dışı" olur; yerine "SaaS ortamının hazırlanması" adımı (DevOps) açılır. Tamamlanmış (`done`) adıma dokunulmaz (ör. `vpn_info` dahil), yapılmış iş silinmez/geri alınmaz (ADR-0004 K6) |
 | LLM = Müşteri GPU'lu sunucu verir | DevOps'a iki aksiyon açılır: "GPU gereksinimlerinin müşteriye iletilmesi" ve "Model kurulumu" |
 | LLM = Müşterinin kendi LLM'i | "LLM endpoint ve erişim bilgisinin alınması" (top: Müşteri) ve "LLM entegrasyonu" (DevOps) aksiyonları açılır |
 | Keşif'te takım eklendi | Uyarlama aşamasında o takım için session ve 5 alt adım oluşur |

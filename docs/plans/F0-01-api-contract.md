@@ -1,7 +1,7 @@
 # F0-01 — API sözleşmesinin dondurulmuş mockup'tan çıkarılması
 
 **Durum:** Onaylandı (M-06 dondurma sonrası başlar)
-**Spec referansı:** docs/PRODUCT_SPEC.md → tümü (Ek A, Ek B dahil) · docs/AUDIT.md
+**Spec referansı:** docs/PRODUCT_SPEC.md → tümü (Ek A, Ek B dahil) · docs/AUDIT.md · docs/adr/0004-f0-pre-decisions.md
 **Branch:** chore/f0-01-api-contract
 **Bağımlılıklar:** M-06 (mockup dondurma)
 
@@ -16,6 +16,7 @@ BE'nin mockup'a göre yazılabilmesi için mockup'ın örtük sözleşmesini aç
 - `perm.ts` → her uç noktanın `authorize()` aksiyonu ve `docs/RBAC.md` satırı
 - `rules.ts` + store içindeki kural mantığı → uç nokta başına tetiklenen kurallar
 - Mockup ile API arasında bilinçli farklar (demo giriş, istemcide hesaplanan uyarılar vb.)
+- ADR-0004 kararları sözleşmeye hedef davranış olarak yazılır; mockup'tan farklar (ör. K2: aşama yeniden açılma) "bilinçli farklar" bölümünde (§4) listelenir.
 
 ### Kapsam dışı
 - Kod, şema dosyası, migration
