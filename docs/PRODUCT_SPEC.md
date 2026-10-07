@@ -158,12 +158,15 @@ Go-Live sonrası takip modu.
 | Keşif'te takım eklendi | Uyarlama aşamasında o takım için session ve 5 alt adım oluşur |
 | Eğitim session'ı eklendi | Session kaydı ve katılımcı girişi adımı oluşur |
 | Toplantıda aksiyon yazıldı | Aksiyon toplantıya bağlı olarak oluşur ve sahibine atanır |
+| Projenin CSM'i değişti | Eski CSM'e ait açık (tamamlanmamış, iptal edilmemiş) adım ve aksiyonların sahibi yeni CSM olur; her aktarım history'ye yazılır (ADR-0005 K17) |
 
 Bir seçim sonradan değişirse (ör. SaaS → On-prem) yeni adımlar açılır, eski adımlar silinmez, "Kapsam dışı" yapılır ve değişiklik gerekçesiyle history'ye yazılır.
 
 Bir aşama, zorunlu adımları tamamlanmadan "Tamamlandı" yapılamaz. Aşama tamamlanırken onaylayan kişi ve tarih kaydedilir.
 
-Tamamlanmış bir aşamadaki adım kurulum tipi / LLM değişikliğiyle yeniden kapsama girerse aşama yeniden açılır. Adım normal akış sırasıyla açılır: öncesindeki zorunlu adımlar tamamsa hemen, değilse sırası gelince (ADR-0004 K2, ADR-0005 K11).
+Tamamlanmış bir aşamadaki adım kurulum tipi / LLM değişikliğiyle yeniden kapsama girerse aşama yeniden açılır. Adım normal akış kuralıyla açılır: bağımsız adım hemen; değilse aynı aşamada kendinden önceki, kapsam dışı olmayan en yakın adım (zorunlu olsun olmasın) tamamlanmışsa ya da böyle bir adım yoksa hemen, aksi halde sırası gelince (ADR-0004 K2, ADR-0005 K11, INV-28).
+
+Tamamlanmış Uyarlama aşamasına Keşif'te takım eklenirse aşama aynı şekilde yeniden açılır; yeni takım adımı aynı akış kuralıyla açılır ve "Gözden geçir" aksiyonu açılmaz. Proje canlıya geçmişse (Go-Live tamamlandı) takım eklenemez (ADR-0005 K16).
 
 ---
 
@@ -319,7 +322,7 @@ Yok sayılan adres/domain'ler çıkarılır → kalan adresler proje kişilerini
 - Şablonda her **aşama** ve **adım** ya **önceki tamamlanınca** ya da **bağımsız** başlar. Her adımın **süresi** iş günü olarak tanımlanır (varsayılan 2).
 - Proje açılınca tüm aşama ve adımlar **"Sırası gelmedi" (kilitli)** oluşur; ilk aşama, bağımsız aşamalar ve bunlardaki ilk/bağımsız adımlar hemen açılır.
 - Adım açıldığında termin = açıldığı gün + süre (iş günü; hafta sonu ve resmi tatil hariç). Termini geçen açık adım "Geciken" olur.
-- Önceki adım/aşama "Kapsam dışı" ise geçilmiş sayılır. Açılmış adım, önceki adım sonradan tekrar açılsa da kilitlenmez.
+- Önceki adım/aşama "Kapsam dışı" ise geçilmiş sayılır. Açılmış adım, önceki adım sonradan tekrar açılsa da kilitlenmez. **Tek istisna:** daha önce açılmış bir aşama "Kapsam dışı"ndan geri alınırsa aşama "Sırası gelmedi" olur ve içindeki açık adımlar da kilitlenir; sırası gelince aşama ve adımları yeniden açılır, adım terminleri açıldığı güne göre yeniden hesaplanır (ADR-0005 K19).
 - **Kilitli adım iş sayılmaz:** Bana atananlar'a, gecikmeye, müşteride beklemeye ve uyarılara girmez; durumu elle değiştirilemez.
 - Aşama zorunlu adımları bitince proje CSM'ine "Aşama onayı bekliyor" aksiyonu açılır; aşama yalnızca onayla tamamlanır. Onayı CSM verir; Manager ve Administrator da onaylayabilir (ADR-0005 K8, ADR-0004 K3).
 - Proje açılışında aşama plan tarihleri şablondaki sürelerden tahmin edilir; baseline yalnızca boşsa yazılır.

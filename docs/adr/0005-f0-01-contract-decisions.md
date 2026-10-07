@@ -1,4 +1,4 @@
-# ADR-0005: F0-01 gate sonrası Murat kararları (K8–K18)
+# ADR-0005: F0-01 gate sonrası Murat kararları (K8–K19)
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-10-06
@@ -12,6 +12,8 @@ Mockup dondurulmuştur ve değişmez (ADR-0004 bağlamı). Aşağıdaki kararlar
 Numaralama: K8–K11 Murat'ın verdiği numaralardır. "K3 türevleri" bu ADR'de **K12**, "S8" de **K13** olarak numaralandı. Böylece BACKLOG'dan tek kimlikle referans verilebilir.
 
 **Round 2 eki (2026-10-06):** Gate round 2 (@ 1d8f4d2) REV-F017 ile, sözleşmede "Murat onayı" dayanağı olmadan kapatılmış S10, S13, S15, S17 ve S18'i işaretledi. Murat bunları **K14–K18** olarak karara bağladı (aşağıda). Numaralar Murat'ındır.
+
+**Round 3 eki (2026-10-07):** Gate round 3 (@ 4563ca2, MERGE'E HAZIR) iki denetçinin bağımsız bulduğu tek Medium bulguyu (REV-F023 = RR-F027) Murat kararına bıraktı. Murat seçenek (a)'yı seçti: **K19** (aşağıda). Aynı turun denetim oturumu işleri (REV-F026, REV-F027 / RR-F031) de bu ADR'de ve PRODUCT_SPEC'te kapatıldı.
 
 ---
 
@@ -139,7 +141,7 @@ K1'in oluşturma istisnası geçerlidir: kayıt oluşturulurken girilen ilk değ
 
 **Sonuçlar:**
 - Olumlu: Mockup davranışı; §4'te fark yok.
-- Olumsuz / kabul edilen risk: Yeniden açılan taahhüt `commit_check` üzerinden görünmez. Go-Live'da açık taahhüt kontrolü #38'de ayrıca yapılır (S23 güvenli varsayımı).
+- Olumsuz / kabul edilen risk: Yeniden açılan taahhüt `commit_check` üzerinden görünmez. Go-Live'da açık taahhüt kontrolü #38'de ayrıca yapılır (mockup davranışı, store.tsx:517-518). `commit_check`'in açık taahhüt varken elle `done` yapılması API_CONTRACT §5 S22'dedir (S23 açılmadı, S22'ye katıldı; aşağıda "Açık kalanlar").
 - Takip: API_CONTRACT §5 S10 dayanağı "ADR-0005 K14" olur (builder `/fix`).
 
 **Etkilenen BACKLOG / bulgu:** REV-F017 (S10).
@@ -215,6 +217,45 @@ K1'in oluşturma istisnası geçerlidir: kayıt oluşturulurken girilen ilk değ
 
 ---
 
+## K19 — REV-F023 / RR-F027: Daha önce açılmış aşamanın kapsam dışından geri alınması
+
+**Bağlam:** Round 2'de (REV-F013, RR-F020) `out_of_scope`'tan elle kapsama dönen aşamanın doğrudan açılmaması, `locked` olup akış motoruyla açılması kararlaştırıldı (API_CONTRACT §1, #3). Bu kural, daha önce açılmış (`activatedAt` dolu) bir aşamada yan etki üretiyor. Aşama `locked` olurken içindeki açık (`pending`/`in_progress`) adımlar açık kalıyor. Bu adımlar uyarı üretiyor ve iş listelerinde görünüyor, ama aşaması kilitli olduğu için sahipleri adımı elle değiştiremiyor (INV-25). Gate round 3 iki seçenek sundu (`docs/reviews/chore_f0-01-api-contract/SUMMARY.md`):
+- **(a)** reviewer önerisi: aşama `locked` olur, içindeki açık adımlar da `locked` olur.
+- **(b)** rules-reviewer önerisi: `activatedAt` dolu aşama doğrudan `in_progress` olur; `activatedAt` boş aşama `locked` olur ve akışla açılır.
+
+**Karar (Murat, 2026-10-07): seçenek (a).** Daha önce açılmış (`activatedAt` dolu) aşama `out_of_scope`'tan elle kapsama dönünce (#3 `out_of_scope → in_progress`):
+- Aşama `locked` olur.
+- Aşamadaki açık (`pending`/`in_progress`; flow.ts:7 `isOpenStep`) adımlar aynı transaction'da `locked` olur. Adımların `activatedAt` ve `due` alanları temizlenir; eski değerler alan başına audit'te kalır (INV-03/INV-04). Gerekçe sistemce, `Otomatik kural:` önekiyle yazılır.
+- `done` ve `out_of_scope` adımlar değişmez.
+- Akış motoru aynı transaction'da, proje kilidi altında (INV-08) normal yüklemiyle çalışır: önceki aşama yoksa, aşama `independent` ise ya da önceki aşama geçilmişse (`done`/`out_of_scope`) aşamayı hemen açar (flow.ts:37; REV-F028b). Değilse aşama `locked` kalır ve sırası gelince açılır.
+- **Yeniden açılış** akış motorunun normal açılışıdır, ayrı bir dal yoktur:
+  - Aşama: `activatedAt = now`. `actualStart` korunur (flow.ts:38).
+  - Adımlar: K11 ile aynı mekanizma. Adım normal akış kuralıyla açılır, `activatedAt = now` olur, `due` akış motorunun iş günü kuralıyla yeniden hesaplanır (taban `max(startDate, bugün)`, `durationDays || 1`; flow.ts:50, 61-62; INV-13). Eski `due` geri gelmez.
+- `activatedAt` boş (hiç açılmamış) aşamada davranış değişmez: aşama `locked` olur ve akışla açılır. Adımları zaten `locked` ya da `out_of_scope`'tur.
+
+**Reddedilen alternatif — (b) "doğrudan `in_progress`":**
+- Aşama sırası atlanırdı. Önceki aşama açıkken, yalnızca geçmişte açılmış olduğu için aşama yeniden açılırdı. Bu, INV-25'in "adım/aşama yalnızca akış motoru açar (bağlılık)" ilkesiyle çelişir.
+- Kapsama dönüş iki mekanizmayla işlerdi (`activatedAt`'e göre dal). Adımda (RR-F002, K11) ve hiç açılmamış aşamada kural "`locked` + akış"tır; (b) aşama için ayrı bir yol açardı.
+- Adımlar eski `due` ile açık kalırdı. Aşama kapsam dışındayken geçen süre gecikme sayılır, dönüş anında "Geciken" ve uyarı üretilirdi.
+- (b)'nin artıları kabul edildi ama belirleyici bulunmadı: INV-25 "açılmış adım tekrar kilitlenmez" ilkesine istisnasız uyum, completion.ts:198-206 emsali ve spec B.1'in değişmemesi.
+
+**Sonuçlar:**
+- Olumlu: REV-F023 / RR-F027 kapanır. Kilitli aşamada açık adım kalmaz. Kilitli adım iş sayılmadığı için (INV-25) uyarı, gecikme ve Bana Atananlar kaydı oluşmaz. "Elle değiştirilemeyen ama iş sayılan adım" çelişkisi kalkar. Aşama ve adımın kapsama dönüşü tek mekanizmayla (`locked` + akış) işler.
+- Olumsuz / kabul edilen risk:
+  - INV-25'in "açılmış adım tekrar kilitlenmez" ilkesine **tek istisna** gelir. Spec B.1 (:322) buna göre güncellendi.
+  - Adımların eski `activatedAt`/`due` değerleri kaybolur (audit'te kalır). Yeniden açılan adımın termini, açıldığı güne göre yeniden hesaplanır.
+  - **Mockup'tan bilinçli fark:** mockup aşamayı doğrudan `in_progress` yapar ve adımlara dokunmaz (store.tsx:236-245). Yalnızca API'de uygulanır; mockup değişmez.
+  - Sonraki aşamalar geri kilitlenmez (ör. 03 geri alınınca, 03'ün `out_of_scope` olmasıyla açılmış 04 açık kalır). Bu bilinçli tercih F3-02 planına yazılır.
+  - Kapsamda kalmayan iki konu bu kararın dışındadır: ters yön (aşama `in_progress → out_of_scope` olunca içindeki açık adımlar, alerts.ts:50, 61; F6 öncesi açık soru) ve aşama `out_of_scope` olunca açık `phase_approval` aksiyonunun kapanması (RR-F032, açık).
+- Takip:
+  - INV-25'e istisna eklendi. PRODUCT_SPEC B.1 güncellendi.
+  - API_CONTRACT §1 (:22), #3 (:74) ve §4 (:228) bu karara göre builder takip turunda yazılır. Yüklemde "önceki aşama yoksa" dalı yer alır (REV-F028b). #3 Doğrulama notu: 03 açıkken `vpn_req` `pending` → 03 `out_of_scope` → 02 K10 ile açılır → 03 geri alınır → 03 ve `vpn_req` `locked`, uyarı ve Bana Atananlar kaydı yok; 02 geçilince `vpn_req` yeni `activatedAt` ve iş günü termini ile `pending` olur. Ek: 00 geri alınınca hemen açılır.
+  - Uygulama F3-02 (akış motoru).
+
+**Etkilenen BACKLOG / bulgu:** REV-F023 / RR-F027, REV-F028b (yüklem kısmı).
+
+---
+
 ## Bu ADR ile birlikte yapılan değişmez kural netleştirmeleri
 
 Bunlar yeni karar değildir. Gate bulgularının mevcut kurallara göre netleştirilmesidir.
@@ -231,11 +272,16 @@ Bunlar yeni karar değildir. Gate bulgularının mevcut kurallara göre netleşt
 ## RBAC.md'ye eklenen satırlar (Murat onayladı, 2026-10-06)
 Mockup davranışından türetilen beş satır onaylandı: elle uyarı ekleme (S5); keşif cevapları, takımlar, takım bilgisi (S6); uyarlama kontrol listesi (S6); Go-Live müşteri onayı (S7); oturum öncesi uçlar (S16). Ayrıntı: `docs/RBAC.md` Karar 9.
 
-## Açık kalanlar (API_CONTRACT §5'te güvenli varsayımla)
-- **`gonogo` adımının hedefi (RR-F008):** Adım meeting-completion mı olmalı, yoksa manual ve tek yönlü mü kalmalı? Güvenli varsayım: mockup gibi manual ve tek yönlü.
-- **Kuralla atanan adım sahibi (RR-F012):** "Projenin DevOps'u" mu, yoksa "null + CSM'e atama aksiyonu" mu? Güvenli varsayım: null + CSM'e atama aksiyonu. Her durumda yalnızca aktif kullanıcı atanır.
-- **REV-F004 (INV-06 durum geçişi istisnası):** `completePhase`, `markReportSent`, `updateUser.active` ve `noCommitments` geçişlerinin gerekçesiz olması henüz karara bağlanmadı. Sözleşmede §5 maddesi olarak kalır.
+## Açık kalanlar (API_CONTRACT §5.1'de güvenli varsayımla)
+Numaralar API_CONTRACT §5.1 ile aynıdır (REV-F026 ile hizalandı, 2026-10-07).
+- **S20 — Kuralla atanan adım/aksiyon sahibi (RR-F012):** "Projenin DevOps'u" mu, yoksa "null + CSM'e atama aksiyonu" mu? Güvenli varsayım: `ownerId: null` + CSM'e "Sahip ata" aksiyonu. Her durumda yalnızca aktif kullanıcı atanır.
+- **S21 — INV-06 durum geçişi istisnası (REV-F004, REV-F016):** Şu sekiz geçişin gerekçesiz olması henüz karara bağlanmadı: #4 `completePhase`, #34 `markReportSent`, #36 `updateUser.active`, #13 `noCommitments`, #41 `disconnect`, #43 takip `active` aç/kapa, #45/#46 öneri reddi, #48 eşleşmeyen e-posta `→ ignored`.
+- **S22 — Go-Live manuel adımlarının hedefi (RR-F008, RR-F022):** `gonogo`: mockup gibi manual ve tek yönlü. `customer_approval`: yalnızca #38 ile `done`; elle `done` → `409`, `out_of_scope` serbest. `commit_check`: açık taahhüt varken elle `done` → `409`.
 - **K10 kapsamı dışı:** `done` aşamanın elle `not_started` ya da `out_of_scope` yapılması. Güvenli varsayım: `409` (Murat bu varsayımı onayladı, 2026-10-06; ayrı karar gerekirse yeniden açılır).
+
+**S-maddesi numaralandırma kaydı (Murat, 2026-10-06, F0-01 `/fix` oturumu; kaynak `docs/changes/chore_f0-01-api-contract.md:23`):**
+- **S23** (RR-F022, gate round 2'de ayrılmıştı) açılmadı, S22'ye katıldı. Madde kapanmadı; S22'de güvenli varsayımla açık.
+- **S25** (`not_started` elle seçilemez) açılmadı. INV-25'in sonucu olarak #3'e yazıldı (`409`).
 
 ## API_CONTRACT'a yansıtılacaklar (builder `/fix`, `docs/API_CONTRACT.md`)
 Bu liste gate direktifinin (`SUMMARY.md`) ilgili maddelerini **geçersiz kılar**:

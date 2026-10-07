@@ -250,7 +250,7 @@ Round 1'deki 29 bulgunun 28'i kapandı (REV-F003 kısmen → REV-F014). Yukarıd
 |---|---|---|---|---|
 | REV-F015 / RR-F019 | Medium | K10 yeniden açma "done adımlar done kalır" ↔ INV-26 geri açma çelişkisi | docs/API_CONTRACT.md:74, :87; INVARIANTS.md INV-28 | **Karar verildi → INV-28 (ADR-0005 round 2 netleştirmesi, Murat 2026-10-06)**: "done kalır" yalnızca açma anı, INV-26 aynı transaction'da çalışır, termin eski `due`. Sözleşme metni F0-01 fix (S24 §5.2) |
 | RR-F021 / REV-F018 | Medium | Açık aşamada manuel adım `out_of_scope→done` hedefi yok | docs/API_CONTRACT.md:22, :76 | F0-01 fix |
-| RR-F022 | Medium | `customer_approval` / `commit_check` elle `done` ile Go-Live onayı/taahhüt kontrolü atlanıyor | docs/API_CONTRACT.md:109, :256 | F0-01 fix (S23) |
+| RR-F022 | Medium | `customer_approval` / `commit_check` elle `done` ile Go-Live onayı/taahhüt kontrolü atlanıyor | docs/API_CONTRACT.md:109, :256 | F0-01 fix (S22; S23 açılmadı, S22'ye katıldı — ADR-0005 numaralandırma kaydı) |
 | REV-F014 | Medium | Proje kapsamlı kanal listesi başka projelere bağlı kanal adlarını (= müşteri adı) sızdırıyor | docs/API_CONTRACT.md:177, :242 | F0-01 fix |
 | REV-F016 | Medium | S21 INV-06 istisna listesi eksik (#41, #43, #45/#46, #48) | docs/API_CONTRACT.md:255 | F0-01 fix |
 | REV-F017 | Medium | S10/S13/S15/S17/S18 Murat onayı olmadan "kapandı" tablosunda | docs/API_CONTRACT.md:270-282 | **Karar verildi → ADR-0005 K14 (S10), K15 (S13), K16 (S15), K17 (S17), K18 (S18)**; sözleşme metni F0-01 fix (S15/S17 hedef davranış + §4) |
@@ -277,7 +277,7 @@ Round 2'deki 19 bulgunun hepsi kapandı (yukarıdaki round 2 tablosu tarihsel). 
 
 | ID | Severity | Özet | Dosya | Hedef faz |
 |---|---|---|---|---|
-| REV-F023 / RR-F027 | Medium | Kapsama dönen, daha önce açılmış aşama yeniden `locked` oluyor; içinde açık adımlar ve `phase_approval` kalıyor (uyarı/iş listesi, elle değiştirilemez). Yüklemde "önceki aşama yok" (00) dalı eksik (REV-F028b) | docs/API_CONTRACT.md:22, :74, :228 | **Murat kararı** ((a) adımları da kilitle / (b) `activatedAt` doluysa `in_progress`) → F0-01 takip ya da F3 planından önce |
+| REV-F023 / RR-F027 | Medium | Kapsama dönen, daha önce açılmış aşama yeniden `locked` oluyor; içinde açık adımlar ve `phase_approval` kalıyor (uyarı/iş listesi, elle değiştirilemez). Yüklemde "önceki aşama yok" (00) dalı eksik (REV-F028b) | docs/API_CONTRACT.md:22, :74, :228 | **Karar verildi → ADR-0005 K19 (Murat, 2026-10-07, seçenek (a))**; INV-25 istisnası ve PRODUCT_SPEC B.1 yazıldı. Sözleşme metni (§1, #3, §4 + REV-F028b yüklemi) → F0-01 takip / F3-02 |
 | RR-F032 | Low | Aşama `out_of_scope` olunca açık `phase_approval` aksiyonu kapanmıyor | docs/API_CONTRACT.md:74 | F0-01 takip (ops.) / F3 |
 | RR-F029 | Low | `customer_approval` K10 sonrası elle `done→pending` yapılırsa yeniden `done` olamıyor (çıkmaz) | docs/API_CONTRACT.md:76, :109 | F0-01 takip (ops.) / F5-05 |
 | RR-F030 | Low | `out_of_scope → in_progress` isteğinin sonuç durumu (`pending`/`in_progress`) yazılmamış | docs/API_CONTRACT.md:22, :76 | F0-01 takip (ops.) / F3 |
@@ -286,8 +286,8 @@ Round 2'deki 19 bulgunun hepsi kapandı (yukarıdaki round 2 tablosu tarihsel). 
 | REV-F024 | Low | §1.1 `session:authenticated` "RBAC.md satırı" sütunu hâlâ "—" | docs/API_CONTRACT.md:58 | F0-01 takip (ops.) |
 | REV-F028a | Low | :17 yazım (virgül, #14 K16) | docs/API_CONTRACT.md:17 | F0-01 takip (ops.) |
 | QA3-F001 | Low | Değişiklik notu REV-F019(a) ve AC5 satırı 4563ca2'yi yansıtmıyor | docs/changes/chore_f0-01-api-contract.md | F0-01 takip (ops.) |
-| REV-F026 / RR-F031 | Low | ADR-0005 :142 var olmayan S23'e atıf; "Açık kalanlar" §5.1 ile hizasız; S23→S22 ve S25 kararı ADR'de yok | docs/adr/0005-f0-01-contract-decisions.md:142, :235, :237 | Denetim oturumu |
-| REV-F027 / RR-F031 | Low | PRODUCT_SPEC :166 ve ADR-0004 :37 eski K11 yüklemi ("zorunlu adımlar"); spec'te K16/K17 yok | docs/PRODUCT_SPEC.md:166, :172; docs/adr/0004-f0-pre-decisions.md:37 | Denetim oturumu (F4-01 öncesi) |
+| REV-F026 / RR-F031 | Low | ADR-0005 :142 var olmayan S23'e atıf; "Açık kalanlar" §5.1 ile hizasız; S23→S22 ve S25 kararı ADR'de yok | docs/adr/0005-f0-01-contract-decisions.md:142, :235, :237 | **Düzeltildi (denetim oturumu, 2026-10-07):** :142 S23 atfı → mockup #38 + §5 S22; "Açık kalanlar" S20–S22 ile hizalandı; S23/S25 numaralandırma kaydı ADR-0005'e eklendi; BACKLOG RR-F022 satırı güncellendi |
+| REV-F027 / RR-F031 | Low | PRODUCT_SPEC :166 ve ADR-0004 :37 eski K11 yüklemi ("zorunlu adımlar"); spec'te K16/K17 yok | docs/PRODUCT_SPEC.md:166, :172; docs/adr/0004-f0-pre-decisions.md:37 | **Düzeltildi (denetim oturumu, 2026-10-07):** spec :166 ve ADR-0004 :37 yüklemi akış motoru kuralına (INV-28) göre; spec'e K16 (05'e takım ekleme) ve K17 (CSM değişince aktarım) eklendi. İsteğe bağlı :172 notu yapılmadı |
 
 ### Açık sorular (round 3)
 - Canlı projede (07 `done`) K2 kurulum tipi değişikliği 03'ü yeniden açıyor; K16 benzeri 409 koruması yok (Murat).

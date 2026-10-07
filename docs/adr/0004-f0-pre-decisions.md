@@ -34,7 +34,7 @@ Bu ADR yedi kararı (K1–K7) tek yerde toplar. Her karar aşağıda kendi bağl
 **Karar:** İleri yön (adım kapsama giriyor) mockup'tan **bilinçli olarak farklı** hedef davranışla API'de uygulanır:
 - Aşama `done` → `in_progress`'e döner (yeniden açılır).
 - Adım `pending` olur (`locked` değil); `reqdoc_not_shared` uyarısı bu adım için normal çalışır.
-  > **K11 ile netleştirildi (ADR-0005, 2026-10-06):** Kapsama yeniden giren adım normal akış kuralını izler. Öncesindeki zorunlu adımlar tamamsa `pending` olur (`activatedAt`, `due` iş günüyle), değilse `locked` olur. Aşama açık olduğu için akış motoru adımı sırası gelince açar. Uyarılar adım açıldığında normal çalışır.
+  > **K11 ile netleştirildi (ADR-0005, 2026-10-06):** Kapsama yeniden giren adım normal akış kuralını izler: `independent` adım hemen; değilse aynı aşamada kendinden önceki, `out_of_scope` olmayan en yakın adım (zorunlu olsun olmasın) `done` ise ya da böyle bir adım yoksa `pending` olur (`activatedAt`, `due` iş günüyle), aksi halde `locked` olur (K11 netleştirmesi, RR-F023; bağlayıcı metin INV-28). Aşama açık olduğu için akış motoru adımı sırası gelince açar. Uyarılar adım açıldığında normal çalışır.
 - Aşamanın tamamlanma onayı/tarihi temizlenir; eski değerler audit'te kalır (silinmez, INV-03/INV-04). Audit gerekçesi sistem tarafından otomatik yazılır: "Kurulum tipi değişti: X→Y, `<adım>` kapsama girdi".
 - Sonraki aşamaların durumu değişmez (geri kilitlenmez) — INV-25'teki "açılmış adım tekrar kilitlenmez" ilkesiyle tutarlı.
 

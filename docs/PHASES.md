@@ -45,16 +45,16 @@ Görev metinleri: `docs/plans/M-09-step-completion-workspaces.md` (§0 Bağlam +
 Faz M kapandı: `/phase-close M` round 3 → GO (2026-10-06, main @ dffa61f, `docs/reviews/M-closure.md`); etiket `mockup-freeze`.
 
 ## F0 — Temizlik, yapı & sözleşme
-| Kod | Görev | Kural |
-|---|---|---|
-| F0-01 | **API sözleşmesi çıkarımı:** dondurulmuş mockup'ın store `Ctx` işlemleri (M-09 sonrası) + `types.ts` + saf iş mantığı dosyaları (`flow.ts`, `completion.ts`, `rules.ts`, `alerts.ts`, `reports.ts`) + ekranlar → `docs/API_CONTRACT.md` (endpoint, girdi/çıktı şeması, rol, audit/gerekçe, tetiklenen kurallar). Kod değişmez | ● |
-| F0-02 | **Temizlik:** tek kilit dosyası (npm; bun dosyaları silinir, `npm ci` çalışır), kullanılmayan paketler (`xlsx`, `@supabase/supabase-js` + `src/integrations/supabase` + `supabase/`, `canvas-confetti`, `@lovable.dev/mcp-js`, `lovable-tagger`), `.lovable/` klasörü, README'deki Lovable metni, `.env` repodan çıkar + `.env.example`, `.gitignore`, TS `strict: true`, lint hataları (16), code-split (bundle 1,16 MB). **package-lock senkronu M-09b'de yapıldı (QA-01, main @ aee9657); kalan F0-02 işleri:** `bun.lockb` silinir, lint, `npm audit`, kullanılmayan paketler (xlsx vb.) | |
-| F0-03 | **Monorepo + yükseltme:** `apps/web` (mevcut kod), `apps/api` (boş), `packages/shared`; React 19, Vite 8 + plugin-react v6, Tailwind 4, react-router 7, recharts 3, date-fns 4 + @date-fns/tz. **Kabul:** M-06 görsel referansına göre fark yok (qa-verifier karşılaştırır) | |
-| F0-04 | **FE veri erişim katmanı:** `packages/shared` zod şemaları (types.ts'ten), modül bazlı TanStack Query hook'ları, `DataSource` arayüzü; mevcut store → `mock` adaptörü; modül başına `VITE_DATA_<MODÜL>=mock|http` anahtarı; ekranlar `useRq()` yerine hook'ları kullanır. **Kabul:** görsel referansa göre fark yok, tüm akışlar aynı | ● |
-| F0-05 | **API + işçi iskeleti:** `apps/api` ve boş `apps/worker` (ADR-0003), Express 5, katmanlar, hata/validasyon middleware'i, helmet/cors/rate-limit, `db/` (pgmem\|pg), migration runner (`schema_migrations` + checksum, `--pg-only`), seed (mock seed ile aynı veri), dev snapshot | ● |
-| F0-06 | **Test altyapısı:** Vitest (tüm workspace'ler), supertest, pg-mem test DB, fabrikalar, sabit saat, sözleşme testi yardımcısı; Playwright (`webServer`, rol oturumları, axe, görsel karşılaştırma script'i) | |
-| F0-07 | **CI:** `app`, `parity`, `secrets`; branch koruması | |
-| F0-08 | **Lokal geliştirme:** `npm run dev` (API + web), `.env.example`, Azure Blob dev modu | |
+| Kod | Görev | Kural | Durum |
+|---|---|---|---|
+| F0-01 | **API sözleşmesi çıkarımı:** dondurulmuş mockup'ın store `Ctx` işlemleri (M-09 sonrası) + `types.ts` + saf iş mantığı dosyaları (`flow.ts`, `completion.ts`, `rules.ts`, `alerts.ts`, `reports.ts`) + ekranlar → `docs/API_CONTRACT.md` (endpoint, girdi/çıktı şeması, rol, audit/gerekçe, tetiklenen kurallar). Kod değişmez | ● | ✅ |
+| F0-02 | **Temizlik:** tek kilit dosyası (npm; bun dosyaları silinir, `npm ci` çalışır), kullanılmayan paketler (`xlsx`, `@supabase/supabase-js` + `src/integrations/supabase` + `supabase/`, `canvas-confetti`, `@lovable.dev/mcp-js`, `lovable-tagger`), `.lovable/` klasörü, README'deki Lovable metni, `.env` repodan çıkar + `.env.example`, `.gitignore`, TS `strict: true`, lint hataları (16), code-split (bundle 1,16 MB). **package-lock senkronu M-09b'de yapıldı (QA-01, main @ aee9657); kalan F0-02 işleri:** `bun.lockb` silinir, lint, `npm audit`, kullanılmayan paketler (xlsx vb.) | | |
+| F0-03 | **Monorepo + yükseltme:** `apps/web` (mevcut kod), `apps/api` (boş), `packages/shared`; React 19, Vite 8 + plugin-react v6, Tailwind 4, react-router 7, recharts 3, date-fns 4 + @date-fns/tz. **Kabul:** M-06 görsel referansına göre fark yok (qa-verifier karşılaştırır) | | |
+| F0-04 | **FE veri erişim katmanı:** `packages/shared` zod şemaları (types.ts'ten), modül bazlı TanStack Query hook'ları, `DataSource` arayüzü; mevcut store → `mock` adaptörü; modül başına `VITE_DATA_<MODÜL>=mock|http` anahtarı; ekranlar `useRq()` yerine hook'ları kullanır. **Kabul:** görsel referansa göre fark yok, tüm akışlar aynı | ● | |
+| F0-05 | **API + işçi iskeleti:** `apps/api` ve boş `apps/worker` (ADR-0003), Express 5, katmanlar, hata/validasyon middleware'i, helmet/cors/rate-limit, `db/` (pgmem\|pg), migration runner (`schema_migrations` + checksum, `--pg-only`), seed (mock seed ile aynı veri), dev snapshot | ● | |
+| F0-06 | **Test altyapısı:** Vitest (tüm workspace'ler), supertest, pg-mem test DB, fabrikalar, sabit saat, sözleşme testi yardımcısı; Playwright (`webServer`, rol oturumları, axe, görsel karşılaştırma script'i) | | |
+| F0-07 | **CI:** `app`, `parity`, `secrets`; branch koruması | | |
+| F0-08 | **Lokal geliştirme:** `npm run dev` (API + web), `.env.example`, Azure Blob dev modu | | |
 
 ## F1 — Veri modeli, çekirdek & yetki
 | Kod | Görev | Kural |
