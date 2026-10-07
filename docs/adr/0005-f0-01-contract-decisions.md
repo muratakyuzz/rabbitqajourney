@@ -1,4 +1,4 @@
-# ADR-0005: F0-01 gate sonrası Murat kararları (K8–K19)
+# ADR-0005: F0-01 gate sonrası Murat kararları (K8–K20)
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-10-06
@@ -13,7 +13,7 @@ Numaralama: K8–K11 Murat'ın verdiği numaralardır. "K3 türevleri" bu ADR'de
 
 **Round 2 eki (2026-10-06):** Gate round 2 (@ 1d8f4d2) REV-F017 ile, sözleşmede "Murat onayı" dayanağı olmadan kapatılmış S10, S13, S15, S17 ve S18'i işaretledi. Murat bunları **K14–K18** olarak karara bağladı (aşağıda). Numaralar Murat'ındır.
 
-**Round 3 eki (2026-10-07):** Gate round 3 (@ 4563ca2, MERGE'E HAZIR) iki denetçinin bağımsız bulduğu tek Medium bulguyu (REV-F023 = RR-F027) Murat kararına bıraktı. Murat seçenek (a)'yı seçti: **K19** (aşağıda). Aynı turun denetim oturumu işleri (REV-F026, REV-F027 / RR-F031) de bu ADR'de ve PRODUCT_SPEC'te kapatıldı.
+**Round 3 eki (2026-10-07):** Gate round 3 (@ 4563ca2, MERGE'E HAZIR) iki denetçinin bağımsız bulduğu tek Medium bulguyu (REV-F023 = RR-F027) Murat kararına bıraktı. Murat seçenek (a)'yı seçti: **K19** (aşağıda). Aynı turun denetim oturumu işleri (REV-F026, REV-F027 / RR-F031) de bu ADR'de ve PRODUCT_SPEC'te kapatıldı. F0-02 planında (2026-10-07) Murat round 3 Low'u RR-F032'yi hedef davranış olarak onayladı: **K20**.
 
 ---
 
@@ -246,13 +246,38 @@ K1'in oluşturma istisnası geçerlidir: kayıt oluşturulurken girilen ilk değ
   - Adımların eski `activatedAt`/`due` değerleri kaybolur (audit'te kalır). Yeniden açılan adımın termini, açıldığı güne göre yeniden hesaplanır.
   - **Mockup'tan bilinçli fark:** mockup aşamayı doğrudan `in_progress` yapar ve adımlara dokunmaz (store.tsx:236-245). Yalnızca API'de uygulanır; mockup değişmez.
   - Sonraki aşamalar geri kilitlenmez (ör. 03 geri alınınca, 03'ün `out_of_scope` olmasıyla açılmış 04 açık kalır). Bu bilinçli tercih F3-02 planına yazılır.
-  - Kapsamda kalmayan iki konu bu kararın dışındadır: ters yön (aşama `in_progress → out_of_scope` olunca içindeki açık adımlar, alerts.ts:50, 61; F6 öncesi açık soru) ve aşama `out_of_scope` olunca açık `phase_approval` aksiyonunun kapanması (RR-F032, açık).
+  - Kapsamda kalmayan iki konu bu kararın dışındadır: ters yön (aşama `in_progress → out_of_scope` olunca içindeki açık adımlar, alerts.ts:50, 61; F6 öncesi açık soru) ve aşama `out_of_scope` olunca açık `phase_approval` aksiyonunun kapanması (RR-F032 → K20).
 - Takip:
   - INV-25'e istisna eklendi. PRODUCT_SPEC B.1 güncellendi.
   - API_CONTRACT §1 (:22), #3 (:74) ve §4 (:228) bu karara göre builder takip turunda yazılır. Yüklemde "önceki aşama yoksa" dalı yer alır (REV-F028b). #3 Doğrulama notu: 03 açıkken `vpn_req` `pending` → 03 `out_of_scope` → 02 K10 ile açılır → 03 geri alınır → 03 ve `vpn_req` `locked`, uyarı ve Bana Atananlar kaydı yok; 02 geçilince `vpn_req` yeni `activatedAt` ve iş günü termini ile `pending` olur. Ek: 00 geri alınınca hemen açılır.
   - Uygulama F3-02 (akış motoru).
 
 **Etkilenen BACKLOG / bulgu:** REV-F023 / RR-F027, REV-F028b (yüklem kısmı).
+
+---
+
+## K20 — RR-F032: Aşama kapsam dışı olunca açık "Aşama onayı bekliyor" aksiyonu
+
+**Bağlam:** Akış motoru, zorunlu adımları tamamlanan açık aşama için CSM'e `phase_approval:<phaseId>` ("Aşama onayı bekliyor") aksiyonu açar. Bu aksiyonu yalnızca iki durumda kapatır: aşama `done` olunca (`done`) ya da aşama açıkken zorunlu bir adım yeniden açılınca (`cancelled`) (flow.ts:83-84). Hazır bir aşama elle `out_of_scope` yapılınca bu iki koşul da tetiklenmez. Aşama artık aktif değildir (`isActivePhase` false), bu yüzden aksiyon `open` kalır (flow.ts:83-85; API_CONTRACT #3). Sonuç: kapsam dışı aşama için onay bekleyen bir aksiyon CSM'in iş listesinde, uyarılarda ve gecikmelerde görünmeye devam eder. K19 bu maddeyi kapsamı dışında bırakmıştı (RR-F032, gate round 3 Low).
+
+**Karar (Murat, 2026-10-07):** Aşama `out_of_scope` yapılınca (#3 `→ out_of_scope`) aşamanın açık (`open`/`in_progress`) `phase_approval:<phaseId>` aksiyonu aynı transaction'da `cancelled` olur.
+- Gerekçe sistemce yazılır: `Otomatik kural: aşama kapsam dışı`.
+- Audit alan başına yazılır (`status`: eski → `cancelled`; INV-05).
+- Proje kilidi altında yapılır (INV-08; #3 zaten kilit listesinde).
+- Aşama daha sonra kapsama döner ve yeniden hazır olursa iptal edilen aksiyon geri açılmaz. Akış motoru **yeni** bir aksiyon açar (`ruleKey` ile idempotent; API_CONTRACT #3 RR-F025 ile aynı kural).
+- `done` ya da `cancelled` olan `phase_approval` aksiyonlarına dokunulmaz.
+
+**Sonuçlar:**
+- Olumlu: RR-F032 kapanır. Kapsam dışı aşama için iş listesinde, uyarıda ve gecikmede onay işi kalmaz (INV-25 "iş sayılmaz" ilkesiyle tutarlı). K19 ile birlikte kapsam dışına çıkış ve kapsama dönüş, `phase_approval` açısından kendi içinde tutarlı olur: dönüşte aşama `locked` olur, aksiyon zaten kapanmıştır, aşama yeniden hazır olunca yeni aksiyon açılır.
+- Olumsuz / kabul edilen risk: **Mockup'tan bilinçli fark** (mockup aksiyonu açık bırakır, flow.ts:83-85). Yalnızca API'de uygulanır; mockup değişmez. İptal edilen aksiyonun elle verilmiş termin/sahip bilgisi yeni aksiyona taşınmaz (eski kayıt ve audit'te kalır).
+- Kapsam dışı (ayrı açık soru): aşama `out_of_scope` olunca içindeki açık **adımların** durumu (alerts.ts:50, 61; F6 öncesi). Bu karar yalnızca `phase_approval` aksiyonunu kapsar.
+
+**Takip:**
+- API_CONTRACT #3 (`→ out_of_scope` hedef davranışı + Doğrulama) ve §4 (mockup farkı satırı). Dayanak "ADR-0005 K20 (Murat onayı, 2026-10-07)". Builder F0-02 Bölüm C'de yazar; §5.1'de S26 açılmaz.
+- Doğrulama (BE): hazır aşama (zorunlu adımlar tamam, `phase_approval` açık) `out_of_scope` yapılır → aksiyon `cancelled`, audit gerekçesi `Otomatik kural: aşama kapsam dışı`. Aşama geri alınıp yeniden hazır olunca yeni `phase_approval` açılır, iptal edilen `cancelled` kalır.
+- Uygulama F3-02 (akış motoru).
+
+**Etkilenen BACKLOG / bulgu:** RR-F032 (chore/f0-01-api-contract round 3), K19 "Sonuçlar" maddesindeki "(RR-F032, açık)".
 
 ---
 
