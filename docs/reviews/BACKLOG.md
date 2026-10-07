@@ -32,7 +32,7 @@ REV-01, REV-02, REV-03, REV-04, REV-06, RUL-01, RUL-02, RUL-03, RUL-08 round 2'd
 - SaaS geçişinde done `vpn_info` adımı "Tamamlandı" kalıyor, spec "Kapsam dışı" diyor — done adımlar kural dışı mı? (rules-reviewer Açık soru 3)
 - S4: Planlandı→Yapıldı gerekçesiz — plan varsayımı onay bekliyor (rules-reviewer Açık soru 4)
 - `reqdoc` adımı `manual` kaldı, fiilen veriye dayalı (rules-reviewer Açık soru 6)
-- Locked aşamada pending adım olabiliyor, INV-25'e yakın boşluk — F1 servis katmanında kapatılmalı (rules-reviewer Açık soru 7)
+- Locked aşamada pending adım olabiliyor, INV-25'e yakın boşluk — F1 servis katmanında kapatılmalı (rules-reviewer Açık soru 7) **Karar verildi → ADR-0005 (INV-25 netleştirmesi, RR-F002)**
 - Plan dosyasının `main` yerine branch üzerinden gelmesi (2bf2de9) — iş akışı onayı gerekiyor (reviewer notu)
 - `package-lock.json` main'de de `npm ci` ile senkron değil (pre-existing, bu PR'a özgü değil) — ayrı kapsam dışı commit önerilir (qa-verifier notu)
 
@@ -68,7 +68,7 @@ REV-01, REV-02 (RUL-10 yarısı), REV-03, REV-04, REV-05, RUL-01 round 2'de (@ 6
 | REV-16 | Low | Kural aksiyon durum etiketi satır içi yazılmış, `ACTION_STATUS_LABEL` kullanılmıyor (`in_progress` → "Açık" gösteriliyor) | src/pages/project/workspaces/HandoverWorkspace.tsx:165 | M-09c |
 
 ### Açık sorular (round 2, Murat kararı gerekiyor)
-- RUL-05: `done`/`out_of_scope` aşamadaki adımların kural motorunca `locked`'a çevrilip çevrilmeyeceği netleşmeli.
+- RUL-05: `done`/`out_of_scope` aşamadaki adımların kural motorunca `locked`'a çevrilip çevrilmeyeceği netleşmeli. **Karar verildi → ADR-0004 K2, ADR-0005 K11**
 
 ## feat/m09b-phase-workspace-handover (@ 4d67bd3, 2026-10-05 — round 3)
 
@@ -104,7 +104,7 @@ High bulgular (REV-01/02/03, RUL-01/02/03) `/fix`'e gönderildi, backlog'a alın
 | RUL-06 | Low | `addTeam(pid,"general")` `adapt:general` şablon adımıyla çakışıyor; adım hiç tamamlanamayabilir | store.tsx:331-339; completion.ts:134-136 | M-09c fix / F1 D15 |
 
 ### Açık sorular (round 1, Murat kararı gerekiyor)
-- `canSeeCredentials` her DevOps kullanıcısına tüm projelerin erişim bilgisini gösteriyor; RBAC.md "atanmış DevOps" diyor — bu PR'da değişmedi (S4 kararı), 03 paneli yeni giriş noktası ekliyor. F1 RBAC matrisinde ele alınmalı.
+- `canSeeCredentials` her DevOps kullanıcısına tüm projelerin erişim bilgisini gösteriyor; RBAC.md "atanmış DevOps" diyor — bu PR'da değişmedi (S4 kararı), 03 paneli yeni giriş noktası ekliyor. F1 RBAC matrisinde ele alınmalı. **Karar verildi → ADR-0005 K9** (DevOps yalnızca atandığı projede görür/oluşturur/günceller)
 - Admin `isAllSeeing` üzerinden 02/04/05 panellerini düzenleyebiliyor; RBAC.md admin'e salt okuma veriyor — bilinen açık soru (plan §5), F1'e bırakıldı. **Karar verildi → ADR-0004 K3**
 - RUL-05 aksiyonu 2 iş günlük termin + `dueSoonDays≥2` nedeniyle açıldığı anda sarı `action_due_soon` üretiyor — istenen davranış mı, netleşmeli.
 - `todayISO()` tarayıcı yerel saatini kullanıyor, Europe/Istanbul değil (pre-existing, bu PR'a özgü değil) — F1'de `packages/shared/business-days`'te çözülmeli.
@@ -172,7 +172,7 @@ Kaynak: `docs/reviews/M-full-review.md` (round 2), `docs/reviews/M-qa-regression
 | REV-M06-01 / RUL-01 | Medium | Karar `decidedAt` gerekçesiz (reports.ts:52) | — | **Karar verildi → ADR-0004 K1** → F0-01, F3-05 |
 | REV-15 | Low | Ulaşılamayan `TicketDialog` gerekçesiz durum değişikliği | — | Faz 2 planı + F0-01 notu |
 | REV-02 | Medium | `canViewProject`; URL ile proje detayına/rapora erişim | — | F1-05 (+F3-01) |
-| REV-03 | Medium | `canEditReport` rol kararı | — | F0-01 → F1-05 |
+| REV-03 | Medium | `canEditReport` rol kararı | — | **Karar verildi → ADR-0005 K8 (Manager), K12 (Admin)** → F1-05 |
 | REV-04 | Medium | Admin yazma yetkisi (`isAllSeeing`) ve AI onayıyla proje verisi yazması; RBAC.md Karar 1 ile çelişki | store.tsx | **Karar verildi → ADR-0004 K3** → F1-05 |
 | REV-05 | Medium | `setStepByKey` kilit kontrolü yapmıyor | store.tsx | **Karar verildi → ADR-0004 K5** → F0-01 notu, F4-01 |
 | REV-06 | Medium | INV-06/08 kontrolleri sözleşmeye ve servis katmanına | — | F0-01 + F1-02 |
@@ -203,3 +203,95 @@ Kaynak: `docs/reviews/M-full-review.md` (round 2), `docs/reviews/M-qa-regression
 - m09b REV-07 (otomatik adımda `out_of_scope` onayı) — REV-13 fix'i ile StepDialog'a hizalandı; aksi istenirse geri alınır — **Karar verildi → ADR-0004 K7**
 - m09a RUL-07 (held toplantı type/date gerekçesi) — **Karar verildi → ADR-0004 K4**
 - REV-04 (Admin yazma yetkisi) — **Karar verildi → ADR-0004 K3**
+
+## chore/f0-01-api-contract (@ d9e7644, 2026-10-06 — round 1)
+
+Gate kararı DÜZELTME GEREKLİ. Medium maddeler `/fix` direktifinde (SUMMARY.md madde 4–19); fix turunda kapanmazsa burada kalır. Low maddeler opsiyonel.
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| REV-F002 | Medium | #5 `step:update` + `flow:update` birlikte aranıyor; Manager akış ayarı yapamaz → alan bazında yetki | docs/API_CONTRACT.md:30, :69 | F0-01 fix (ADR-0005 K8 ile Manager `step:update`'e de sahip; alan bazında yetki yine geçerli) |
+| REV-F003 | Medium | `GET /integrations/channels` iki authorize; kapsam dışı müşteri adı sızıyor (409 mesajı dahil) | docs/API_CONTRACT.md:114, :169, :187 | F0-01 fix |
+| REV-F004 / RR-F007 | Medium | Durum geçişlerinde (#4, #34, #36, #13) gerekçesizlik INV-06 istisnası olarak yazılmamış; done aşamanın elle yeniden açılması tanımsız | docs/API_CONTRACT.md:67-68, :77, :98, :100 | RR-F007: **Karar verildi → ADR-0005 K10** (409 değil, gerekçeli yeniden açma). REV-F004: açık (§5 maddesi). F0-01 fix |
+| REV-F005 | Medium | Go-Live / 00 çalışma alanında DevOps/Care davranışı (403 mü, alan filtresi mi) tanımsız | docs/API_CONTRACT.md:167, :174, :255 | F0-01 fix |
+| REV-F006 | Medium | Config PUT (keşif soruları, tatiller) kaldırma semantiği tanımsız; RBAC "silme yok" | docs/API_CONTRACT.md:105, :108, :224 | F0-01 fix |
+| REV-F007 | Medium | `{ item, effects }` zarf kuralı ile kural tetikleyen satırların yanıt şeması tutarsız | docs/API_CONTRACT.md:15 | F0-01 fix |
+| REV-F008 | Medium | AI insight onayında tür başına alan beyaz listesi yok (flow alanları sızabilir) | docs/API_CONTRACT.md:115 | F0-01 fix |
+| RR-F003 | Medium | Ters yön kurulum/LLM kuralı metni koddan farklı (aksiyon açılmaz) | docs/API_CONTRACT.md:80, :212 | INV-28 ve ADR-0004 K2 metni düzeltildi (ADR-0005); sözleşme metni F0-01 fix |
+| RR-F004 | Medium | K2 hedefi eksik (due/activatedAt, kapsam, gerekçe, A→B→A, bağlılık) | docs/API_CONTRACT.md:80, :212 | Bağlılık: **Karar verildi → ADR-0005 K11** (§5 maddesi açılmaz). Kalan ayrıntılar F0-01 fix |
+| RR-F005 / REV-F009 | Medium | `setStepByKey` yolları `out_of_scope` adımı eziyor; §2.2'de hedef yok | docs/API_CONTRACT.md:124-135 | F0-01 fix |
+| RR-F006 / REV-F012 | Medium | `approveGoLive`: 07 locked/done/tekrar çağrı davranışı ve alan başına audit eksik | docs/API_CONTRACT.md:102, :175 | F0-01 fix |
+| RR-F008 | Medium | `gonogo` tek yönlü/manual; #19 "geri açılır" genellemesi yanlış | docs/API_CONTRACT.md:83, :132-133 | F0-01 fix; hedef (meeting-completion mı) açık, §5 güvenli varsayım (ADR-0005 "Açık kalanlar") |
+| RR-F009 | Medium | Insight health/date onayında `note` zorunluluğu (Spec A.2) yok | docs/API_CONTRACT.md:115, :209 | F0-01 fix |
+| RR-F010 | Medium | Kontrol-sonra-yaz yarışları için koşullu update / tekil kısıt yazılmamış | docs/API_CONTRACT.md §1, :96-100, :114-117 | F0-01 fix; kısıtlar F1-00 |
+| RR-F011 | Medium | Insight üretiminde INV-23/INV-24 hedefleri yok | docs/API_CONTRACT.md:118, :120, :121 | F0-01 fix |
+| RR-F012 | Medium | Kuralla otomatik sahip ataması pasif kullanıcı / rastgele DevOps seçebilir | docs/API_CONTRACT.md:61, :80 | F0-01 fix; sahip seçimi açık, §5 güvenli varsayım (ADR-0005 "Açık kalanlar") |
+| REV-F010 | Low | `*Patch` gövdeler PUT ile; `:projectId`/`:id` tutarsız; #16 400↔409 | docs/API_CONTRACT.md:77, :79, :80, :85 | F0-01 fix (ops.) / F0-04 |
+| REV-F011 | Low | "oturum" katalogda aksiyon değil; `/audit?scope=system` kapsamı tanımsız | docs/API_CONTRACT.md:141, :150-151, :192 | F0-01 fix (ops.) / F1-05 |
+| RR-F013 | Low | #16 LLM ayrıntıları (`required`, iptal edilen aksiyonun yeniden açılması, `saas_env` locked) | docs/API_CONTRACT.md:80 | F0-01 fix (ops.) |
+| RR-F014 | Low | #47 "proje verisi değişmez" ifadesi `addAsContact` ile çelişiyor | docs/API_CONTRACT.md:118 | F0-01 fix (ops.) |
+| RR-F015 | Low | red→yellow→red ikinci kritik uyarı açıyor; tekilleştirme hedefi yok | docs/API_CONTRACT.md:62 | F0-01 fix (ops.) / F5 |
+| RR-F016 | Low | Credential/secret görüntüleme audit'inin aynı transaction'da olduğu yazılmamış; #1 kopya audit'i belirsiz | docs/API_CONTRACT.md:61, :87, :113 | F0-01 fix (ops.) |
+| RR-F017 | Low | #4 oos aşamayı reddetmiyor; #5 kilitli adımda `due` değişebiliyor | docs/API_CONTRACT.md:68, :69 | F0-01 fix (ops.) |
+| QA-F001 | Bilgi | Lint 14 error (main'den miras) | src/** | F0-02 |
+
+### Denetim oturumu / Murat
+- ADR-0004 K4 "Sonuçlar" metni eskimiş (kod gerekçeyi zaten zorluyor, store.tsx:286-288) — ADR'ye not. **Kapandı → ADR-0004 K4 düzeltildi (ADR-0005)**
+- ADR-0004 K2 ve INV-28 ters yön cümlesi koda göre yanlış (RR-F003); INV-28 ↔ INV-25 bağlılık çatışması (RR-F004) — planner + Murat. **Kapandı → ters yön metni düzeltildi (ADR-0005); bağlılık: Karar verildi → ADR-0005 K11**
+- RBAC.md satırları: S5, S6, S7, S16 + DevOps credential oluşturma (REV-F001); INV-06 kapsamı: S8 + REV-F004 — F1-05 öncesi. **Kapandı (REV-F004 hariç):** S5/S6/S7/S16 satırları RBAC.md'ye eklendi (Karar 9); REV-F001 → **Karar verildi → ADR-0005 K9**; S8 → **Karar verildi → ADR-0005 K13**. REV-F004 (durum geçişi istisnası) açık.
+- AGENTS.md:29 "state v8, `Ctx` 52 işlem" → state v11, 51 işlem (Murat).
+- ADR-0005'in API_CONTRACT'a etkisi: gate `SUMMARY.md` direktif #1 (DevOps credential), #9 (done aşama 409) ve #14 (bağlılık §5 maddesi) ADR-0005 K9/K10/K11 ile geçersizleşti; builder `/fix` ADR-0005 "API_CONTRACT'a yansıtılacaklar" bölümünü esas alır.
+
+## chore/f0-01-api-contract (@ 1d8f4d2, 2026-10-06 — round 2)
+
+Round 1'deki 29 bulgunun 28'i kapandı (REV-F003 kısmen → REV-F014). Yukarıdaki round 1 tablosu tarihsel; açık olanlar yalnızca aşağıdakiler. Gate kararı DÜZELTME GEREKLİ — Medium maddeler `/fix` direktifinde (SUMMARY.md madde 3–8).
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| REV-F015 / RR-F019 | Medium | K10 yeniden açma "done adımlar done kalır" ↔ INV-26 geri açma çelişkisi | docs/API_CONTRACT.md:74, :87; INVARIANTS.md INV-28 | **Karar verildi → INV-28 (ADR-0005 round 2 netleştirmesi, Murat 2026-10-06)**: "done kalır" yalnızca açma anı, INV-26 aynı transaction'da çalışır, termin eski `due`. Sözleşme metni F0-01 fix (S24 §5.2) |
+| RR-F021 / REV-F018 | Medium | Açık aşamada manuel adım `out_of_scope→done` hedefi yok | docs/API_CONTRACT.md:22, :76 | F0-01 fix |
+| RR-F022 | Medium | `customer_approval` / `commit_check` elle `done` ile Go-Live onayı/taahhüt kontrolü atlanıyor | docs/API_CONTRACT.md:109, :256 | F0-01 fix (S23) |
+| REV-F014 | Medium | Proje kapsamlı kanal listesi başka projelere bağlı kanal adlarını (= müşteri adı) sızdırıyor | docs/API_CONTRACT.md:177, :242 | F0-01 fix |
+| REV-F016 | Medium | S21 INV-06 istisna listesi eksik (#41, #43, #45/#46, #48) | docs/API_CONTRACT.md:255 | F0-01 fix |
+| REV-F017 | Medium | S10/S13/S15/S17/S18 Murat onayı olmadan "kapandı" tablosunda | docs/API_CONTRACT.md:270-282 | **Karar verildi → ADR-0005 K14 (S10), K15 (S13), K16 (S15), K17 (S17), K18 (S18)**; sözleşme metni F0-01 fix (S15/S17 hedef davranış + §4) |
+| REV-F019 | Low | (a) `session:authenticated` RBAC.md satırı yok; (b) `adaptation:read` katalogda yok | docs/API_CONTRACT.md:58, :186; RBAC.md | (a) **Denetim oturumunda yapıldı (2026-10-06)** → RBAC.md "Oturumlu, kaynağa bağlı olmayan uçlar" satırı (`session:authenticated`); (b) F0-01 fix (ops.) / F1-05 |
+| REV-F020 | Low | #2c `csmId` doğrulaması (aktif, `role=csm`, null) yok | docs/API_CONTRACT.md:71 | F0-01 fix (ops.) / F2 |
+| REV-F021 | Low | Değişiklik notu AC5 ve "§5 19 nokta" ifadeleri eskimiş | docs/changes/chore_f0-01-api-contract.md:16, :31 | F0-01 fix (ops.) |
+| REV-F022 | Low | CLAUDE.md:24 denetim yazma listesi ↔ uygulama; PRODUCT_SPEC guard'da yok; normatif dokümanlar branch merge'üne bağlı | CLAUDE.md:24; .claude/hooks/guard.mjs:44-47 | Merge kısmı: **Karar verildi → ADR-0005 (süreç notu, REV-F022)**, bu branch'le merge. CLAUDE.md:24 / guard PRODUCT_SPEC kısmı → **F0-02** (Murat, 2026-10-06) |
+| RR-F023 | Low | K11 yüklemi ("zorunlu adımlar tamamsa") akış motoru kuralından farklı; iki yol iki mekanizma gibi yazılmış | docs/API_CONTRACT.md:87, :220; INV-28; ADR-0005 K11 | **Karar verildi → ADR-0005 K11 netleştirmesi, INV-28** (yüklem = akış motoru kuralı). Sözleşme metni F0-01 fix |
+| RR-F024 | Low | Kilit altında yeniden okuma/ön koşul kuralı; #2a kilit listesi; #39c kilit sırası | docs/API_CONTRACT.md:17, :19, :69, :112 | F0-01 fix (ops.) / F1-02 |
+| RR-F025 | Low | K10 ayrıntıları (`phase_approval` yeni/eski, `actualEnd` istekte, kilitli adımların açılması) | docs/API_CONTRACT.md:74 | F0-01 fix (ops.) / F3 |
+| RR-F026 | Low | §2 "Hedef" farklarından altısı §4'te yok | docs/API_CONTRACT.md:204-246 | F0-01 fix (ops.) / F9 (INV-20 geçişi) |
+| QA-F001 | Bilgi | Lint 14 error (main'den miras, round 2'de yeniden doğrulandı) | src/** | F0-02 |
+
+### Açık sorular (round 2)
+- `gonogo` `out_of_scope` iken #38 hep 409 → Go-Live onayı kaydedilemez (S22 ile, Murat).
+- Öneri oluştuktan sonra tür kapatılırsa / hedef değişirse onay ucu davranışı (Spec A.2).
+- #32 `ON CONFLICT`, #43 kısmi tekil index → pg-mem desteği F1-00 / ADR-0002 parity listesi.
+- `step_update.ownerId` / `action_update.ownerId` DevOps/Care onayıyla değişebiliyor (RBAC Karar 5) → F8-03 planı.
+- `docs/agents/reviewer.md` kontrol listesi "INV-01…27" diyor, INV-28 eksik (kit güncellemesi, denetim).
+
+## chore/f0-01-api-contract (@ 4563ca2, 2026-10-07 — round 3)
+
+Round 2'deki 19 bulgunun hepsi kapandı (yukarıdaki round 2 tablosu tarihsel). Gate kararı **MERGE'E HAZIR**. Açık olanlar yalnızca aşağıdakiler; düzeltme sırası SUMMARY.md direktifinde.
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| REV-F023 / RR-F027 | Medium | Kapsama dönen, daha önce açılmış aşama yeniden `locked` oluyor; içinde açık adımlar ve `phase_approval` kalıyor (uyarı/iş listesi, elle değiştirilemez). Yüklemde "önceki aşama yok" (00) dalı eksik (REV-F028b) | docs/API_CONTRACT.md:22, :74, :228 | **Murat kararı** ((a) adımları da kilitle / (b) `activatedAt` doluysa `in_progress`) → F0-01 takip ya da F3 planından önce |
+| RR-F032 | Low | Aşama `out_of_scope` olunca açık `phase_approval` aksiyonu kapanmıyor | docs/API_CONTRACT.md:74 | F0-01 takip (ops.) / F3 |
+| RR-F029 | Low | `customer_approval` K10 sonrası elle `done→pending` yapılırsa yeniden `done` olamıyor (çıkmaz) | docs/API_CONTRACT.md:76, :109 | F0-01 takip (ops.) / F5-05 |
+| RR-F030 | Low | `out_of_scope → in_progress` isteğinin sonuç durumu (`pending`/`in_progress`) yazılmamış | docs/API_CONTRACT.md:22, :76 | F0-01 takip (ops.) / F3 |
+| RR-F028 | Low | #14 `addTeam`, 07 `done` iken `409` kapsamı (05'in durumundan bağımsız mı) belirsiz | docs/API_CONTRACT.md:85; INVARIANTS.md:36; ADR-0005:172 | F0-01 takip (ops.) |
+| REV-F025 | Low | `401 UNAUTHENTICATED` hata kodu ve oturumsuz `/auth/me` yanıtı tanımsız | docs/API_CONTRACT.md:12, :158 | F0-01 takip (ops.) / F1-01 |
+| REV-F024 | Low | §1.1 `session:authenticated` "RBAC.md satırı" sütunu hâlâ "—" | docs/API_CONTRACT.md:58 | F0-01 takip (ops.) |
+| REV-F028a | Low | :17 yazım (virgül, #14 K16) | docs/API_CONTRACT.md:17 | F0-01 takip (ops.) |
+| QA3-F001 | Low | Değişiklik notu REV-F019(a) ve AC5 satırı 4563ca2'yi yansıtmıyor | docs/changes/chore_f0-01-api-contract.md | F0-01 takip (ops.) |
+| REV-F026 / RR-F031 | Low | ADR-0005 :142 var olmayan S23'e atıf; "Açık kalanlar" §5.1 ile hizasız; S23→S22 ve S25 kararı ADR'de yok | docs/adr/0005-f0-01-contract-decisions.md:142, :235, :237 | Denetim oturumu |
+| REV-F027 / RR-F031 | Low | PRODUCT_SPEC :166 ve ADR-0004 :37 eski K11 yüklemi ("zorunlu adımlar"); spec'te K16/K17 yok | docs/PRODUCT_SPEC.md:166, :172; docs/adr/0004-f0-pre-decisions.md:37 | Denetim oturumu (F4-01 öncesi) |
+
+### Açık sorular (round 3)
+- Canlı projede (07 `done`) K2 kurulum tipi değişikliği 03'ü yeniden açıyor; K16 benzeri 409 koruması yok (Murat).
+- "Onaysız Go-Live": `customer_approval` `out_of_scope` + `gonogo` `out_of_scope` iken #38 hep 409 (S22, Murat).
+- Kapsam dışı aşamanın açık adımları iş sayılıyor (alerts.ts:50, 61) — INV-25 kapsamı, F6 öncesi.
+- Kapsama dönen 03 `locked` olunca 04 açık kalıyor — F3-02 planında bilinçli tercih olarak yazılmalı.
+- `customer_approval` "`out_of_scope` serbest" ↔ RR-F018 önceliği — F5-05 planı.

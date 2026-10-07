@@ -15,10 +15,10 @@ Uygulamayı yalnızca iç ekip kullanır, müşteri giriş yapmaz. Kullanıcıla
 | Rol | Yetki |
 |---|---|
 | Customer Success Manager (CSM) | Birden fazla CSM var. Her müşterinin tek bir CSM sahibi olur. CSM kendi müşterilerinin tüm aşamalarını yönetir; toplantı, adım, aksiyon ve taahhütleri girer, raporları üretir. |
-| DevOps Specialist | Kurulum ve teknik süreci yürütür. Kendisine atanan adım ve aksiyonları görür ve günceller. VPN bilgilerini görebilir. |
+| DevOps Specialist | Kurulum ve teknik süreci yürütür. Kendisine atanan adım ve aksiyonları görür ve günceller. Atandığı projede VPN ve diğer erişim bilgilerini görebilir, ekleyebilir ve güncelleyebilir; her işlem history'ye yazılır (ADR-0005 K9). |
 | Customer Care | Kurulum sonrası platform testlerini ve hesap açılışlarını yapar. Kendisine atanan adım ve aksiyonları görür ve günceller. |
-| Manager | Tüm CSM'lerin süreçlerini ve tüm müşterileri görür. Müşteriye CSM atar. İç yönetim raporunu görür. |
-| Administrator | Tüm konfigürasyonu yapar: kullanıcılar ve roller, satışçı listesi, modül listesi, aşama/adım şablonu, keşif soruları, uyarı eşikleri. |
+| Manager | Tüm CSM'lerin süreçlerini ve tüm müşterileri görür. Müşteriye CSM atar. İç yönetim raporunu görür. Projelerde CSM ile aynı proje verisini yazabilir; erişim bilgileri hariçtir (ADR-0005 K8). |
+| Administrator | Tüm konfigürasyonu yapar: kullanıcılar ve roller, satışçı listesi, modül listesi, aşama/adım şablonu, keşif soruları, uyarı eşikleri. Proje verisinde tam yazma yetkisi vardır: CSM ataması, haftalık müşteri raporu, iç yönetim raporu ve erişim bilgileri dahil. Yazmaları history'de "admin" olarak işaretlenir (ADR-0004 K3, ADR-0005 K12). |
 
 Satışçılar uygulamayı kullanmaz. Administrator'ın yönettiği bir satışçı listesi olur ve satış devrinde bu listeden seçilir.
 
@@ -101,7 +101,7 @@ Adımlar sırasıyla ve topun kimde olduğu ile takip edilir:
 
 Adım 7, 8 ve 9 ayrı aksiyonlar olarak takip edilir.
 
-VPN ve diğer erişim bilgileri (tür, sağlayıcı, kullanıcı adı, şifre, geçerlilik tarihi, not) şifreli saklanır. Yalnızca o müşterinin CSM'i ve DevOps görebilir. Her görüntüleme history'ye yazılır.
+VPN ve diğer erişim bilgileri (tür, sağlayıcı, kullanıcı adı, şifre, geçerlilik tarihi, not) şifreli saklanır. Yalnızca o müşterinin CSM'i, projeye atanmış DevOps ve Administrator görebilir, ekleyebilir ve güncelleyebilir. Her ekleme, güncelleme ve görüntüleme history'ye yazılır (ADR-0005 K9).
 
 **Tamamlanma:** Müşteri hesapları açıldı ve müşteriyle paylaşıldı.
 
@@ -163,13 +163,17 @@ Bir seçim sonradan değişirse (ör. SaaS → On-prem) yeni adımlar açılır,
 
 Bir aşama, zorunlu adımları tamamlanmadan "Tamamlandı" yapılamaz. Aşama tamamlanırken onaylayan kişi ve tarih kaydedilir.
 
+Tamamlanmış bir aşamadaki adım kurulum tipi / LLM değişikliğiyle yeniden kapsama girerse aşama yeniden açılır. Adım normal akış sırasıyla açılır: öncesindeki zorunlu adımlar tamamsa hemen, değilse sırası gelince (ADR-0004 K2, ADR-0005 K11).
+
 ---
 
 ## Aşama durumu ve proje sağlığı
 
-Aşama durumları: Başlamadı, Devam ediyor, Risk altında, Gecikti, Tamamlandı, Kapsam dışı. Her aşamanın plan başlangıç/bitiş ve gerçekleşen başlangıç/bitiş tarihleri vardır. Hedef tarih değiştirilirken gerekçe zorunludur; ilk plan (baseline) korunur.
+Aşama durumları: Başlamadı, Devam ediyor, Risk altında, Gecikti, Tamamlandı, Kapsam dışı. Her aşamanın plan başlangıç/bitiş ve gerçekleşen başlangıç/bitiş tarihleri vardır. Hedef tarih değiştirilirken gerekçe zorunludur; ilk plan (baseline) korunur. Plan başlangıç/bitiş, gerçekleşen başlangıç/bitiş ve projenin Go-Live tarihi değişikliği de gerekçe ister (ADR-0005 K13).
 
-Proje sağlığı: Yeşil, Sarı, Kırmızı. CSM günceller ve gerekçesini yazar.
+Tamamlanmış bir aşama CSM, Manager veya Administrator tarafından gerekçeyle yeniden açılabilir. Bu durumda aşamanın onayı ve tamamlanma tarihi temizlenir (history'de kalır), sonraki aşamalar değişmez ve aşama yeniden onayla tamamlanır (ADR-0005 K10).
+
+Proje sağlığı: Yeşil, Sarı, Kırmızı. CSM günceller ve gerekçesini yazar; her sağlık değişikliği gerekçe ister (ADR-0005 K13).
 
 ---
 
@@ -200,7 +204,7 @@ Uyarılar yalnızca uygulama içinde gösterilir (e-posta/Slack yok). Uyarı ert
 
 - Her oluşturma, güncelleme ve silme işlemi kaydedilir: kim, ne zaman, hangi kayıt, hangi alan, eski değer → yeni değer.
 - Kayıtlar fiziksel olarak silinmez; history kayıtları değiştirilemez ve silinemez.
-- Tarih değişikliği, durum değişikliği, uyarı kapatma ve kurulum/LLM seçimi değişikliğinde gerekçe zorunludur.
+- Tarih değişikliği (plan, gerçekleşen, termin, Go-Live, karar tarihi), sağlık değişikliği, durum değişikliği, uyarı kapatma ve kurulum/LLM seçimi değişikliğinde gerekçe zorunludur. Kayıt oluşturulurken girilen ilk değer gerekçe istemez (ADR-0004 K1, ADR-0005 K13).
 - Topun el değiştirmesi history'ye yazılır.
 - Her müşteri için toplantılar (tür, tarih, katılımcılar) ve tüm değişiklikler tek bir müşteri geçmişinde, tarih sırasıyla görülebilir; kayıt türüne, kullanıcıya ve tarihe göre filtrelenebilir.
 
@@ -317,7 +321,7 @@ Yok sayılan adres/domain'ler çıkarılır → kalan adresler proje kişilerini
 - Adım açıldığında termin = açıldığı gün + süre (iş günü; hafta sonu ve resmi tatil hariç). Termini geçen açık adım "Geciken" olur.
 - Önceki adım/aşama "Kapsam dışı" ise geçilmiş sayılır. Açılmış adım, önceki adım sonradan tekrar açılsa da kilitlenmez.
 - **Kilitli adım iş sayılmaz:** Bana atananlar'a, gecikmeye, müşteride beklemeye ve uyarılara girmez; durumu elle değiştirilemez.
-- Aşama zorunlu adımları bitince proje CSM'ine "Aşama onayı bekliyor" aksiyonu açılır; aşama yalnızca CSM onayıyla tamamlanır.
+- Aşama zorunlu adımları bitince proje CSM'ine "Aşama onayı bekliyor" aksiyonu açılır; aşama yalnızca onayla tamamlanır. Onayı CSM verir; Manager ve Administrator da onaylayabilir (ADR-0005 K8, ADR-0004 K3).
 - Proje açılışında aşama plan tarihleri şablondaki sürelerden tahmin edilir; baseline yalnızca boşsa yazılır.
 
 ## B.2 Adım tamamlama tipleri (M-09)

@@ -1,6 +1,6 @@
 # ADR-0004: F0-01 öncesi Murat kararları (K1–K7)
 
-**Durum:** Kabul edildi
+**Durum:** Kabul edildi · K2 ADR-0005 K11 ile netleştirildi; K2, K4, K5 metinleri 2026-10-06'da düzeltildi (ADR-0005)
 **Tarih:** 2026-10-06
 **Hazırlayan:** planner · **Onaylayan:** Murat
 
@@ -34,10 +34,12 @@ Bu ADR yedi kararı (K1–K7) tek yerde toplar. Her karar aşağıda kendi bağl
 **Karar:** İleri yön (adım kapsama giriyor) mockup'tan **bilinçli olarak farklı** hedef davranışla API'de uygulanır:
 - Aşama `done` → `in_progress`'e döner (yeniden açılır).
 - Adım `pending` olur (`locked` değil); `reqdoc_not_shared` uyarısı bu adım için normal çalışır.
+  > **K11 ile netleştirildi (ADR-0005, 2026-10-06):** Kapsama yeniden giren adım normal akış kuralını izler. Öncesindeki zorunlu adımlar tamamsa `pending` olur (`activatedAt`, `due` iş günüyle), değilse `locked` olur. Aşama açık olduğu için akış motoru adımı sırası gelince açar. Uyarılar adım açıldığında normal çalışır.
 - Aşamanın tamamlanma onayı/tarihi temizlenir; eski değerler audit'te kalır (silinmez, INV-03/INV-04). Audit gerekçesi sistem tarafından otomatik yazılır: "Kurulum tipi değişti: X→Y, `<adım>` kapsama girdi".
 - Sonraki aşamaların durumu değişmez (geri kilitlenmez) — INV-25'teki "açılmış adım tekrar kilitlenmez" ilkesiyle tutarlı.
 
-Ters yön (adım kapsamdan çıkıyor) **değişmez**: mockup'taki "Seçenek A" davranışı kalır — tamamlanmış aşamaya dokunulmaz, CSM'e `rule_review:<stepId>` ile "Gözden geçir" aksiyonu açılır.
+Ters yön (adım kapsamdan çıkıyor) **değişmez**: mockup'taki davranış kalır — `done` aşamaya ve `done` adıma dokunulmaz, aksiyon açılmaz.
+> **Düzeltme (2026-10-06, ADR-0005, RR-F003):** Önceki metin "CSM'e `rule_review:<stepId>` ile 'Gözden geçir' aksiyonu açılır" diyordu. Bu mockup'ın davranışını yanlış anlatıyordu. Kodda `rule_review` yalnızca ileri yönde açılıyor; ters yönde açık bir review aksiyonu varsa yalnızca iptal ediliyor (`rules.ts:89-96, 134-138`). API'de ileri yön K2 ile aşamayı yeniden açtığı için kurulum/LLM kuralları `rule_review` üretmez.
 
 **Sonuçlar:**
 - Olumlu: INV-08 adayı açık kapatılır; `reqdoc_not_shared` boşluğu (RUL-07) kapanır; davranış INV-25/INV-26'nın "koşul bozulunca adım geri açılır" ilkesiyle hizalanır.
@@ -73,7 +75,8 @@ Ters yön (adım kapsamdan çıkıyor) **değişmez**: mockup'taki "Seçenek A" 
 
 **Sonuçlar:**
 - Olumlu: RUL-07 boşluğu kapanır; INV-06'nın "durum değişikliği" ve "tarih değişikliği" ayrımı toplantılar için netleşir.
-- Olumsuz / kabul edilen risk: Mockup bugün gerekçe istemiyor (RUL-07 bulgusu); API'de bu kontrol eklenmesi mockup'tan bilinçli bir farktır, §4'e not edilir.
+- Olumsuz / kabul edilen risk: Yok. Mockup store bu kontrolü zaten zorluyor (`store.tsx:286-288`, testler `store.test.tsx:134, 154`). RUL-07 bulgusu kontrol eklenmeden önceki koda aitti. API_CONTRACT §4'te "fark yok" olarak yazılır.
+  > **Düzeltme (2026-10-06, ADR-0005):** Önceki metin "Mockup bugün gerekçe istemiyor; API'de bilinçli fark" diyordu. Bu ifade koddan geride kalmıştı (gate round 1 reviewer/rules-reviewer notu).
 - Takip edilecek işler: `docs/INVARIANTS.md` INV-06 satırına (veya ek satıra) toplantı tarih/tür değişikliği eklenir; F1/F3 (toplantı servis katmanı) uygular.
 
 **Etkilenen BACKLOG ID'leri:** RUL-07 (m09a round 1).
@@ -89,8 +92,8 @@ Ters yön (adım kapsamdan çıkıyor) **değişmez**: mockup'taki "Seçenek A" 
 
 **Sonuçlar:**
 - Olumlu: S6 açık sorusu kapanır; INV-25 ("kilitli adımın durumu elle değişmez") ile INV-26 ("veriyle tamamlanan adım") arasındaki sınır API sözleşmesinde açık yazılır.
-- Olumsuz / kabul edilen risk: `setStepByKey`'in hangi çağrı yollarının "veriye dayalı" sayılacağı F0-01'de fonksiyon bazında (`addDocument`, `setKickoff` vb.) tek tek işaretlenmeli; aksi halde ayrım belirsiz kalır.
-- Takip edilecek işler: `docs/INVARIANTS.md`'ye INV-25/INV-26'ya ek açıklama veya yeni INV satırı ("kilit yalnızca elle değişikliği engeller, veriye dayalı otomatik tamamlamayı engellemez"); F0-01'de REV-05 notu; RUL-13 (m09a round 2: `addDocument`/`setKickoff` reqdoc'u `out_of_scope` kontrolü olmadan done yazıyor) bu ayrımla birlikte ele alınır.
+- Olumsuz / kabul edilen risk: Hangi tamamlama yollarının "veriye dayalı" sayılacağı F0-01'de fonksiyon bazında tek tek işaretlenmeli, yoksa ayrım belirsiz kalır. Bu yollar şunlardır: `addDocument` (`applyStepCompletion` üzerinden); `setStepByKey`'i çağıran `updateCommitment`, `approveGoLive`, `applyMeetingHeldRules` (`addMeeting`/`updateMeeting`), `addTeam`, `addTicket`, `applyInstallType`/`applyLlmChoice`. Tam liste API_CONTRACT §2.2'dedir. *(Düzeltme 2026-10-06, ADR-0005: önceki metin `setKickoff`'u anıyordu. Bu fonksiyon M-09b ile `Ctx`'ten kalktı.)*
+- Takip edilecek işler: `docs/INVARIANTS.md`'ye INV-25/INV-26'ya ek açıklama veya yeni INV satırı ("kilit yalnızca elle değişikliği engeller, veriye dayalı otomatik tamamlamayı engellemez"); F0-01'de REV-05 notu; RUL-13 (m09a round 2: `addDocument`/`setKickoff` reqdoc'u `out_of_scope` kontrolü olmadan done yazıyor) bu ayrımla birlikte ele alınır. Bugün `setKickoff` yoktur. `addDocument` tamamlamayı `applyStepCompletion` ile yapar ve `out_of_scope` adımı atlar (`completion.ts:170`).
 
 **Etkilenen BACKLOG ID'leri:** REV-05 (Faz M kapanış), RUL-13 (m09a round 2), m09b round 1 açık soru (S6), m09b round 1 açık soru ("Locked aşamada pending adım olabiliyor, INV-25'e yakın boşluk").
 **Hedef faz/görev:** F0-01 (not + sözleşme) → F4-01 (`setStepByKey`).
