@@ -43,8 +43,10 @@ const APP_PATHS = [
 // Uygulama oturumunun yazamadığı yollar (denetim çıktıları, kurallar, kit)
 const AUDIT_PATHS = [
   /^docs\/plans\//, /^docs\/reviews\//, /^docs\/INVARIANTS\.md$/, /^docs\/RBAC\.md$/,
+  /^docs\/PRODUCT_SPEC\.md$/, // tek doğruluk kaynağı; yalnızca denetim (Murat onayıyla) — REV-F022
   /^docs\/agents\//, /^docs\/adr\//, /^AGENTS\.md$/, /^CLAUDE\.md$/, /^\.claude\//,
-  /^\.env/, /^\.github\/workflows\//,
+  /^\.env(?!\.example$)/, // .env.example'ı uygulama yazar (değer içermez); .env ve diğer .env.* korumalı — F0-02 D11
+  /^\.github\/workflows\//,
 ];
 
 const PROTECTED = ROLE === "builder" ? AUDIT_PATHS : APP_PATHS;

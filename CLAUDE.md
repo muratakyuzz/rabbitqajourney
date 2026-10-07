@@ -21,4 +21,16 @@ Claude Code bu projede **iki rolle** çalışır. Rol `.claude/role` dosyasında
 Komutlar — denetim: `/plan <görev>`, `/gate <branch>`, `/phase-close <faz>` (Faz M dahil) · uygulama: `/build <plan>`, `/fix <branch>`
 Referanslar: `docs/AUDIT.md`, `docs/API_CONTRACT.md`, `docs/INVARIANTS.md`, `docs/RBAC.md`, `docs/DATA_MODEL.md`, `docs/TEST_STRATEGY.md`, `docs/WORKFLOW.md`, `docs/PHASES.md`, `docs/adr/` (0001 stack, 0002 pg-mem, 0003 AI/entegrasyon)
 
-Denetim rolü yalnızca `docs/plans/`, `docs/reviews/`, `docs/adr/`, `docs/DATA_MODEL.md`, `docs/AUDIT.md` ve `docs/PHASES.md` dosyalarını yazar.
+Yazma yetkileri (REV-F022). "guard" satırlarını `.claude/hooks/guard.mjs` zorlar; "kural" satırları rol talimatıdır, gate denetler.
+
+| Dosya / klasör | Denetim | Uygulama | Zorlayan |
+|---|---|---|---|
+| `docs/plans/`, `docs/reviews/`, `docs/adr/` | ✔ | — | guard |
+| `docs/INVARIANTS.md`, `docs/RBAC.md`, `docs/PRODUCT_SPEC.md` | ✔ (Murat onayıyla) | — | guard |
+| `AGENTS.md`, `CLAUDE.md`, `docs/agents/`, `.claude/` (`.claude/role` hariç) | ✔ (yalnızca Murat'ın istediği kit değişikliği) | — | guard |
+| `docs/DATA_MODEL.md`, `docs/AUDIT.md`, `docs/PHASES.md` | ✔ | yalnızca plan gerektiriyorsa | kural |
+| `docs/API_CONTRACT.md`, `docs/changes/` | — (sözleşmeyi uygulama rolü yazar, gate denetler) | ✔ | kural |
+| `docs/TEST_STRATEGY.md`, `docs/WORKFLOW.md` | ✔ | yalnızca plan gerektiriyorsa | kural |
+| Uygulama kodu, paket/konfig dosyaları | — | ✔ | guard |
+| `.env` / `.env.example` | — / — | — / ✔ | guard |
+| `.github/workflows/`, `.claude/role` | — (Murat) | — (Murat) | guard |
