@@ -51,4 +51,4 @@ Express **5** · katmanlar: `routes → controller → service → repository` +
 ## Sonuçlar
 - Olumlu: güncel ve desteklenen sürümler; FE/BE arasında şema ve kural paylaşımı (`packages/shared`); bilinen açıklı bağımlılık yok.
 - Olumsuz: Lovable iskeletinin React 19 / Tailwind 4 / Router 7'ye taşınması F0'da iş çıkarır.
-- Takip: F0-02 yükseltme ve yeniden yapılandırma görevi.
+- Takip: F0-03 yükseltme ve yeniden yapılandırma görevi (ADR-0006; F0-03a yükseltme, F0-03b monorepo).

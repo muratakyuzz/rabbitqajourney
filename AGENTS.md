@@ -22,7 +22,7 @@ Roller: `csm`, `devops`, `care`, `manager`, `admin` (enum değerleri mockup'taki
 - Enum değerleri değiştirilmez/yeniden adlandırılmaz; yalnızca yeni değer eklenir. Model değişirse state sürümü +1 ve store KEY aynı sürüme.
 - Akış yalnızca `flow.ts` (`advanceFlow`, `isOpenStep`); adım tamamlama yalnızca `completion.ts` (M-09a); uyarılar yalnızca `alerts.ts`; iş günü yalnızca `business-days.ts`; rapor snapshot'ı yalnızca `reports.ts`.
 - Yetki yalnızca `perm.ts`; bileşende rol karşılaştırması yok (Overview'daki role göre içerik hariç).
-- Yeni npm paketi yok. Arayüz Türkçe, tarih `gg.aa.yyyy`, mevcut AppShell/tema/shadcn.
+- Yeni npm paketi yok (F0-03 hariç: yalnızca ADR-0006 K4 izin listesi). Arayüz Türkçe, tarih `gg.aa.yyyy`, mevcut AppShell/tema/shadcn.
 - Kilitli ("Sırası gelmedi") adım iş sayılmaz.
 
 ### Mockup yapısı (main @ 4bfa4cb)
