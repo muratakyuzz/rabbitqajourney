@@ -302,11 +302,11 @@ Gate kararı **MERGE'E HAZIR** (koşullu: CI GitHub'da kontrol edilmeli, `gh` yo
 
 | ID | Severity | Özet | Dosya | Hedef faz |
 |---|---|---|---|---|
-| REV-01 | Low | `tailwindcss-animate` → `devDependencies` plan dışı (84eeac9); `--omit=dev --audit-level=high` yeşilinin bir nedeni bu sınıflandırma. Builder işi yok | package.json:82 | Murat — M7 (PHASES/AUDIT F0-02 kaydı) |
+| REV-01 | Low | `tailwindcss-animate` → `devDependencies` plan dışı (3e08fe1 (squash; branch commit 84eeac9)); `--omit=dev --audit-level=high` yeşilinin bir nedeni bu sınıflandırma. Builder işi yok | package.json:82 | **Kapandı (M7, Murat 2026-10-09)** → PHASES F0-02 kapanış kaydı: yalnızca build-time, sürüm ve CSS aynı |
 | REV-02 | Low | Değişiklik notunda şablonun "Mockup ↔ API" ve "Ekran görüntüleri" başlıkları yok | docs/changes/chore_f0-02-cleanup.md:266-289 | F0-02 fix (ops.) |
 | REV-03 | Low | API_CONTRACT v1.3 geçmiş satırı C2 maddelerini C1 commit'inde önceden listeliyor; tek C2 revert'ünde tarihçe tutarsız kalır | docs/API_CONTRACT.md:315 | F0-02 fix (ops.) |
 | RUL-01 | Low | Sözleşme #29 ve §2.2 hâlâ kaldırılmış `support_track` kuralını anıyor | docs/API_CONTRACT.md:100, :138 | F0-02 fix (ops.) / sonraki sözleşme turu |
-| RUL-02 | Low | INV-28 (c) "05 `out_of_scope` + 07 `done`" için sözleşmeyle (D8 = (a), `409`) farklı okunuyor; M8 yapılmadı | docs/INVARIANTS.md:36 | Denetim / Murat (M8), F4-03 öncesi |
+| RUL-02 | Low | INV-28 (c) "05 `out_of_scope` + 07 `done`" için sözleşmeyle (D8 = (a), `409`) farklı okunuyor; M8 yapılmadı | docs/INVARIANTS.md:36 | **Karar verildi (M8, Murat 2026-10-09)** → INV-28 (c): 07 `done` ise `addTeam` 05'in durumundan bağımsız `409` (D8 = (a), ADR-0005 K16) |
 | QA-01 | Low | AC14 mutasyon kanıtı gate'te yeniden üretilemedi: guard.mjs auditor rolünde geçici yazmayı (scratchpad kopya dahil) engelliyor | .claude/hooks/guard.mjs | Kit (Murat kararı) |
 | QA-03 | Info | Go-Live "Müşteri onayı kaydedildi" başarı dalı toast'ı ekranda doğrulanmadı (hata dalı doğrulandı) | src/pages/project/Phase3Tabs.tsx:545 | F0-04 L5b turu |
 
@@ -324,13 +324,22 @@ Gate kararı **MERGE'E HAZIR** (CI run #57 yeşil, Murat doğruladı). Round 1'd
 
 | ID | Severity | Özet | Dosya | Hedef faz |
 |---|---|---|---|---|
-| RUL2-02 | Medium | Haftalık rapor `weekEnd = addBusinessDays(weekStart, 4)`: cumartesi/pazar kayıtları hiçbir rapora girmiyor; tam gün tatilli haftada `weekEnd` sonraki pazartesiye kayıyor (2026-10-26 → 11-02), o günün kaydı iki raporda. Snapshot dondurulduğu için (INV-27) kalıcı. Branch öncesinden kalma; pazartesi Date sabitlemesi artık gizliyor | src/lib/rabbitqa/reports.ts:28-29 | F7-02 öncesi (hafta tanımı kararı: Murat/planner) |
-| RUL2-01 | Low | `report_not_sent` uyarısının (cuma/hafta sonu, `sent` rapor, 07 `done`, seed snooze anahtarı) hiç testi yok; açık `today` ile tarih matrisi testi gerekli | src/lib/rabbitqa/alerts.ts:148-155 | F0-04 / F6-03 |
-| RUL2-03 | Low | TEST_STRATEGY §3 tek sabit saat (`2026-09-01T09:00:00+03:00`) yazıyor; mockup testleri `2026-10-05T09:00:00` yerel kullanıyor ve sabit iki dosyada ayrı tanımlı. §3'e mockup/API ayrımı + "haftanın gününe bağlı kurallar açık `today` ile test edilir" eklenmeli; ortak `MOCKUP_NOW` | docs/TEST_STRATEGY.md:49 | Denetim (Murat onayıyla) / test altyapısı işi |
-| REV2-02 | Low | (RUL2-03 ile aynı konu, reviewer bakışı) "Gerçek saate bağlı test yok" ilkesi fb253e1'e kadar ihlal ediliyordu | docs/TEST_STRATEGY.md:49 | RUL2-03 ile birlikte |
-| REV2-01 | Low | API_CONTRACT v1.3 geçmiş satırı `support_track` kuralının kaldırılmasını (RUL-01, d419000) anmıyor | docs/API_CONTRACT.md:315 | Sonraki sözleşme turu (ops.) |
+| RUL2-02 | Medium | Haftalık rapor `weekEnd = addBusinessDays(weekStart, 4)`: cumartesi/pazar kayıtları hiçbir rapora girmiyor; tam gün tatilli haftada `weekEnd` sonraki pazartesiye kayıyor (2026-10-26 → 11-02), o günün kaydı iki raporda. Snapshot dondurulduğu için (INV-27) kalıcı. Branch öncesinden kalma; pazartesi Date sabitlemesi artık gizliyor | src/lib/rabbitqa/reports.ts:28-29 | **Karar verildi → ADR-0005 K21 (Murat, 2026-10-09)**: takvim haftası Pzt 00:00 – Paz 23:59 Europe/Istanbul; INV-27 ve PRODUCT_SPEC güncellendi. Uygulama F7-02 (yalnızca API) |
+| RUL2-01 | Low | `report_not_sent` uyarısının (cuma/hafta sonu, `sent` rapor, 07 `done`, seed snooze anahtarı) hiç testi yok; açık `today` ile tarih matrisi testi gerekli | src/lib/rabbitqa/alerts.ts:113-119 | F4-01 (Murat, 2026-10-09) |
+| RUL2-03 | Low | TEST_STRATEGY §3 tek sabit saat (`2026-09-01T09:00:00+03:00`) yazıyor; mockup testleri `2026-10-05T09:00:00` yerel kullanıyor ve sabit iki dosyada ayrı tanımlı. §3'e mockup/API ayrımı + "haftanın gününe bağlı kurallar açık `today` ile test edilir" eklenmeli; ortak `MOCKUP_NOW` | docs/TEST_STRATEGY.md:49 | **Kapandı (2026-10-09)** → TEST_STRATEGY §3: API/mockup referans tarihleri + "tarih/uyarı/termin içeren testler zamanı sabitler" kuralı. Ortak `MOCKUP_NOW` → F0-06 |
+| REV2-02 | Low | (RUL2-03 ile aynı konu, reviewer bakışı) "Gerçek saate bağlı test yok" ilkesi fb253e1'e kadar ihlal ediliyordu | docs/TEST_STRATEGY.md:49 | **Kapandı** (RUL2-03 ile) |
+| REV2-01 | Low | API_CONTRACT v1.3 geçmiş satırı `support_track` kuralının kaldırılmasını (RUL-01, d419000) anmıyor | docs/API_CONTRACT.md:315 | F0-03 (Murat, 2026-10-09) |
+| QA-F02-FLAKY | Low | Flaky adayı (paralel yük): `HandoverWorkspace.test.tsx` AC1 ve `HandoverWorkspace.toast-router.test.tsx` QA-02 yalnızca 3 suite paralel koşarken kırmızı (yük/zaman aşımı); tek başına ve sabitlemesiz yeşil (F0-02 değişiklik notu :347) | src/pages/project/workspaces/HandoverWorkspace.test.tsx; HandoverWorkspace.toast-router.test.tsx | F4-01 |
 
 ### Öneriler (round 2)
 - §2.2 tablosundaki üstü çizili `support_track` satırı tablodan çıkarılıp altına not olarak yazılabilir (tablo başı cümlesiyle çelişmesin) — sonraki sözleşme turu.
 - "seed produces reqdoc_not_shared only for p_lojistik" testine `computeAlerts(s, "2026-10-05")` assert'i eklensin (iddiayı seed anında sınasın).
 - Dondurulmuş sahte Date: `ProjectDetail.tabs.test.tsx`'e ileride zaman damgası sıralaması assert'i eklenirse `shouldAdvanceTime` gerekir.
+
+## F0-02 kapanış (main @ 3e08fe1, 2026-10-09)
+
+Merge sonrası denetim oturumu (Murat talimatı):
+- **Kapandı / karar verildi:** REV-01 (M7 → PHASES F0-02 kaydı), RUL-02 (M8 → INV-28 (c)), RUL2-02 (→ ADR-0005 K21, INV-27, PRODUCT_SPEC), RUL2-03 + REV2-02 (→ TEST_STRATEGY §3).
+- **Yeniden hedeflendi:** RUL2-01 `report_not_sent` testi → F4-01; HandoverWorkspace AC1 / toast-router QA-02 flaky adayı → F4-01; REV2-01 → F0-03.
+- **Açık kalan (round 1):** QA-01 (guard.mjs, kit — Murat kararı), QA-03 (F0-04 L5b).
+- CI: `ci.yml` job seviyesindeki `hashFiles()` hatası Murat tarafından düzeltildi (5c41bd2); önceki 55 koşu geçersiz, ilk yeşil run #57.

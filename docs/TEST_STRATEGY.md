@@ -46,7 +46,10 @@ Kural: bir AC'yi E2E ile test etmeden önce L1–L3'te test edilip edilemeyeceğ
 ## 3. Test verisi
 - Deterministik seed: `apps/api/src/db/seed.ts` (spec "Başlangıç verisi": modüller, 3 kullanıcı + manager + admin, İş Yatırım projesi).
 - Test fabrikaları: `apps/api/test/factories/` — `makeProject({ installType: 'on_prem' })` gibi; testler seed'e değil fabrikaya dayanır.
-- Sabit saat: `vi.setSystemTime(new Date('2026-09-01T09:00:00+03:00'))`. Gerçek saate bağlı test yok.
+- Sabit saat (referans tarihler):
+  - **API testleri** (`apps/api`, seed `2026-09-01`): `vi.setSystemTime(new Date('2026-09-01T09:00:00+03:00'))`.
+  - **Mockup testleri** (`src/`, mockup seed'i): `vi.setSystemTime(new Date('2026-10-05T09:00:00'))` (Pazartesi). Sabit bugün `completion.test.ts` ve `ProjectDetail.tabs.test.tsx`'te ayrı ayrı tanımlı; F0-06 test altyapısında ortak `MOCKUP_NOW` sabitine taşınır (RUL2-03).
+- **Kural:** Tarih, uyarı, termin, iş günü ya da hafta içeren her test zamanı sabitler (`vi.useFakeTimers` + `vi.setSystemTime`). Haftanın gününe bağlı kurallar (ör. `report_not_sent`, rapor haftası, iş günü termini) sistem saatine değil, açık bir `today` parametresine ve tarih matrisine (hafta içi, Cuma, Cumartesi/Pazar, tatil arifesi, tatil) karşı test edilir. Gerçek saate bağlı test yok.
 - E2E'de her rol için giriş bir kez yapılır, oturum `playwright/.auth/<rol>.json`'a kaydedilir (git'e girmez — oturum token'ı içerir).
 
 ## 4. Kritik E2E akışları (fazlarla büyür)

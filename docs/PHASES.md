@@ -48,13 +48,17 @@ Faz M kapandı: `/phase-close M` round 3 → GO (2026-10-06, main @ dffa61f, `do
 | Kod | Görev | Kural | Durum |
 |---|---|---|---|
 | F0-01 | **API sözleşmesi çıkarımı:** dondurulmuş mockup'ın store `Ctx` işlemleri (M-09 sonrası) + `types.ts` + saf iş mantığı dosyaları (`flow.ts`, `completion.ts`, `rules.ts`, `alerts.ts`, `reports.ts`) + ekranlar → `docs/API_CONTRACT.md` (endpoint, girdi/çıktı şeması, rol, audit/gerekçe, tetiklenen kurallar). Kod değişmez | ● | ✅ |
-| F0-02 | **Temizlik:** tek kilit dosyası (npm; bun dosyaları silinir, `npm ci` çalışır), kullanılmayan paketler (`xlsx`, `@supabase/supabase-js` + `src/integrations/supabase` + `supabase/`, `canvas-confetti`, `@lovable.dev/mcp-js`, `lovable-tagger`), `.lovable/` klasörü, README'deki Lovable metni, `.env` repodan çıkar + `.env.example`, `.gitignore`, TS `strict: true`, lint hataları (16), code-split (bundle 1,16 MB). **package-lock senkronu M-09b'de yapıldı (QA-01, main @ aee9657); kalan F0-02 işleri:** `bun.lockb` silinir, lint, `npm audit`, kullanılmayan paketler (xlsx vb.) | | |
+| F0-02 | **Temizlik:** tek kilit dosyası (npm; bun dosyaları silinir, `npm ci` çalışır), kullanılmayan paketler (`xlsx`, `@supabase/supabase-js` + `src/integrations/supabase` + `supabase/`, `canvas-confetti`, `@lovable.dev/mcp-js`, `lovable-tagger`), `.lovable/` klasörü, README'deki Lovable metni, `.env` repodan çıkar + `.env.example`, `.gitignore`, TS `strict: true`, lint hataları (16), code-split (bundle 1,16 MB). **package-lock senkronu M-09b'de yapıldı (QA-01, main @ aee9657); kalan F0-02 işleri:** `bun.lockb` silinir, lint, `npm audit`, kullanılmayan paketler (xlsx vb.) | | ✅ |
 | F0-03 | **Monorepo + yükseltme:** `apps/web` (mevcut kod), `apps/api` (boş), `packages/shared`; React 19, Vite 8 + plugin-react v6, Tailwind 4, react-router 7, recharts 3, date-fns 4 + @date-fns/tz. **Kabul:** M-06 görsel referansına göre fark yok (qa-verifier karşılaştırır) | | |
 | F0-04 | **FE veri erişim katmanı:** `packages/shared` zod şemaları (types.ts'ten), modül bazlı TanStack Query hook'ları, `DataSource` arayüzü; mevcut store → `mock` adaptörü; modül başına `VITE_DATA_<MODÜL>=mock|http` anahtarı; ekranlar `useRq()` yerine hook'ları kullanır. **Kabul:** görsel referansa göre fark yok, tüm akışlar aynı | ● | |
 | F0-05 | **API + işçi iskeleti:** `apps/api` ve boş `apps/worker` (ADR-0003), Express 5, katmanlar, hata/validasyon middleware'i, helmet/cors/rate-limit, `db/` (pgmem\|pg), migration runner (`schema_migrations` + checksum, `--pg-only`), seed (mock seed ile aynı veri), dev snapshot | ● | |
 | F0-06 | **Test altyapısı:** Vitest (tüm workspace'ler), supertest, pg-mem test DB, fabrikalar, sabit saat, sözleşme testi yardımcısı; Playwright (`webServer`, rol oturumları, axe, görsel karşılaştırma script'i) | | |
 | F0-07 | **CI:** `app`, `parity`, `secrets`; branch koruması | | |
 | F0-08 | **Lokal geliştirme:** `npm run dev` (API + web), `.env.example`, Azure Blob dev modu | | |
+
+**F0-02 kapanışı (2026-10-09, main @ 3e08fe1):** `/gate` round 2 (@ b936fb7) → MERGE'E HAZIR (`docs/reviews/chore_f0-02-cleanup/SUMMARY.md`).
+- **CI:** `ci.yml`'deki job seviyesindeki `if: hashFiles(...)` ifadesi workflow'u geçersiz kılıyordu; önceki 55 koşu geçersizdi. Murat kontrolü step seviyesine taşıyarak düzeltti (5c41bd2). İlk yeşil CI: run #57.
+- **`tailwindcss-animate` → `devDependencies` (3e08fe1 (squash; branch commit 84eeac9), Murat kararı; REV-01 / M7):** paket yalnızca build-time kullanılır (Tailwind eklentisi, çıktı CSS'e derlenir). Sürüm ve üretilen CSS değişmedi. `npm audit --omit=dev` sonucunun 0 olmasının bir nedeni bu sınıflandırmadır.
 
 ## F1 — Veri modeli, çekirdek & yetki
 | Kod | Görev | Kural |
@@ -115,7 +119,7 @@ Faz M kapandı: `/phase-close M` round 3 → GO (2026-10-06, main @ dffa61f, `do
 | Kod | Görev | Kural |
 |---|---|---|
 | F7-01 | Müşteri geçmişi (toplantı + audit, filtreli, sayfalı) | ● |
-| F7-02 | Haftalık müşteri raporu: snapshot (`reports.ts`), `isCustomerVisible`, düzenlenebilir alanlar, gönderildi + arşiv | ● |
+| F7-02 | Haftalık müşteri raporu: snapshot (`reports.ts`), `isCustomerVisible`, düzenlenebilir alanlar, gönderildi + arşiv. **Hafta tanımı: ADR-0005 K21** (takvim haftası Pzt–Paz, Europe/Istanbul; mockup `addBusinessDays` farkı) | ● |
 | F7-03 | İç yönetim raporu | |
 | F7-04 | PDF + Excel (exceljs) + arşiv | |
 

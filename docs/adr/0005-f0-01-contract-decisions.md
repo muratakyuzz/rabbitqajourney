@@ -1,4 +1,4 @@
-# ADR-0005: F0-01 gate sonrası Murat kararları (K8–K20)
+# ADR-0005: F0-01 gate sonrası Murat kararları (K8–K21)
 
 **Durum:** Kabul edildi
 **Tarih:** 2026-10-06
@@ -14,6 +14,8 @@ Numaralama: K8–K11 Murat'ın verdiği numaralardır. "K3 türevleri" bu ADR'de
 **Round 2 eki (2026-10-06):** Gate round 2 (@ 1d8f4d2) REV-F017 ile, sözleşmede "Murat onayı" dayanağı olmadan kapatılmış S10, S13, S15, S17 ve S18'i işaretledi. Murat bunları **K14–K18** olarak karara bağladı (aşağıda). Numaralar Murat'ındır.
 
 **Round 3 eki (2026-10-07):** Gate round 3 (@ 4563ca2, MERGE'E HAZIR) iki denetçinin bağımsız bulduğu tek Medium bulguyu (REV-F023 = RR-F027) Murat kararına bıraktı. Murat seçenek (a)'yı seçti: **K19** (aşağıda). Aynı turun denetim oturumu işleri (REV-F026, REV-F027 / RR-F031) de bu ADR'de ve PRODUCT_SPEC'te kapatıldı. F0-02 planında (2026-10-07) Murat round 3 Low'u RR-F032'yi hedef davranış olarak onayladı: **K20**.
+
+**F0-02 kapanış eki (2026-10-09):** `chore/f0-02-cleanup` gate round 2 (@ b936fb7) haftalık rapor penceresiyle ilgili bir Medium bulgu (RUL2-02) buldu. Bulgu branch öncesinden kalmadır ve hafta tanımı kararı gerektiriyordu. Murat takvim haftasını seçti: **K21** (aşağıda).
 
 ---
 
@@ -278,6 +280,33 @@ K1'in oluşturma istisnası geçerlidir: kayıt oluşturulurken girilen ilk değ
 - Uygulama F3-02 (akış motoru).
 
 **Etkilenen BACKLOG / bulgu:** RR-F032 (chore/f0-01-api-contract round 3), K19 "Sonuçlar" maddesindeki "(RR-F032, açık)".
+
+---
+
+## K21 — RUL2-02: Haftalık müşteri raporunun haftası
+
+**Bağlam:** Mockup haftalık raporun penceresini `weekEnd = addBusinessDays(weekStart, 4)` ile hesaplar (`reports.ts:28-29`; `weekStart` = haftanın Pazartesi'si, `alerts.ts` `weekStartOf`). Bunun iki sonucu var:
+- Cumartesi ve Pazar günü yapılan kayıtlar (adım/aksiyon tamamlama, karar tarihi) hiçbir rapora girmez.
+- Tam gün tatil içeren haftada `weekEnd` sonraki haftaya kayar. Örnek: 2026-10-26 haftasında (28 Ekim arife, 29 Ekim tatil) `weekEnd` 2026-11-02 Pazartesi olur. O Pazartesi'nin kaydı iki rapora birden girer.
+
+Snapshot dondurulduğu için (INV-27) hata kalıcıdır. Gate round 2 (RUL2-02, Medium) bu maddeyi F7-02 öncesine, hafta tanımı kararına bıraktı.
+
+**Karar (Murat, 2026-10-09):** Haftalık müşteri raporunun haftası **takvim haftasıdır**: Pazartesi 00:00 – Pazar 23:59, Europe/Istanbul.
+- Tatiller haftayı kaydırmaz. `weekEnd = weekStart + 6 takvim günü`.
+- Her kayıt tam olarak bir haftalık rapora girer. Kaydın haftası, zaman damgasının Europe/Istanbul'daki tarihine göre belirlenir.
+- İş günü hesabı (INV-13, `packages/shared/business-days`) rapor penceresinde kullanılmaz. Yalnızca termin ve SLA değerlerinde kullanılır; raporda bu, "Sizden beklenenler" bekleme süresi (`waitingDays`) ve aksiyon/adım terminleridir.
+
+**Sonuçlar:**
+- Olumlu: RUL2-02 kapanır. Hafta sonu kayıtları kaybolmaz, tatilli haftada çift sayım olmaz. Hafta tanımı tek ve tatil takvimine bağımsızdır.
+- Olumsuz / kabul edilen risk: **Mockup'tan bilinçli fark** (`reports.ts:28` `addBusinessDays(weekStart, 4)`). Yalnızca API'de uygulanır; mockup değişmez. Mockup'tan oluşturulmuş raporların `weekEnd`'i API raporlarıyla karşılaştırılmaz (mockup verisi taşınmaz).
+- Kapsam dışı: `report_not_sent` uyarısının tetik günleri (mockup: Cuma–Pazar, `alerts.ts:113-114`) bu kararla değişmez. Uyarı aynı takvim haftasının `weekStart`'ına bakar.
+
+**Takip:**
+- INV-27 (hafta tanımı + test sütunu) ve PRODUCT_SPEC "Raporlar" / B.4 bu kararla güncellendi (2026-10-09).
+- API_CONTRACT haftalık rapor ucu ve §4 (mockup farkı satırı): dayanak "ADR-0005 K21 (Murat, 2026-10-09)". Sonraki sözleşme turunda builder yazar.
+- F7-02 planı bu karara göre yazılır (plan henüz yok; PHASES F7-02 satırına not düşüldü). Doğrulama (BE): Cumartesi/Pazar kaydı o haftanın raporunda; Pazar 23:59 ve Pazartesi 00:00 Europe/Istanbul sınırı; 2026-10-26 haftasında `weekEnd` = 2026-11-01 ve 2026-11-02 kaydı yalnızca sonraki raporda.
+
+**Etkilenen BACKLOG / bulgu:** RUL2-02 (chore/f0-02-cleanup round 2).
 
 ---
 

@@ -217,7 +217,7 @@ Uyarılar yalnızca uygulama içinde gösterilir (e-posta/Slack yok). Uyarı ert
 
 Raporlar verilerden otomatik doldurulur; CSM göndermeden önce serbest metin alanlarını düzenleyebilir. Üretilen her rapor arşivlenir ve PDF olarak indirilebilir.
 
-**Müşteri haftalık durum raporu** (tek müşteri, son 7 gün):
+**Müşteri haftalık durum raporu** (tek müşteri, takvim haftası: Pazartesi 00:00 – Pazar 23:59, Europe/Istanbul). Tatiller haftayı kaydırmaz; her kayıt tam olarak bir haftanın raporuna girer. İş günü yalnızca terminlerde ve bekleme sürelerinde hesaplanır (ADR-0005 K21):
 - Proje sağlığı ve kısa özet
 - Aşama ilerlemesi, bu hafta tamamlananlar, plan ve gerçekleşen tarihler
 - Açık aksiyonlar (Virgosol tarafı ve müşteri tarafı), terminleri
@@ -344,6 +344,7 @@ Yok sayılan adres/domain'ler çıkarılır → kalan adresler proje kişilerini
 
 ## B.4 Raporlar ve kayıtlar
 - Haftalık müşteri raporu oluşturulduğu anda **snapshot** olarak dondurulur; CSM özet ve "gelecek hafta" alanlarını düzenler; "Gönderildi" işaretlenen rapor düzenlenemez ve arşivde kalır.
+- Rapor haftası takvim haftasıdır (Pazartesi–Pazar, Europe/Istanbul). Hafta sonu kayıtları o haftanın raporuna girer; tatilli haftada hafta uzamaz (ADR-0005 K21, 2026-10-09).
 - Müşteri raporuna yalnızca "müşteriye görünür" kayıtlar girer (varsayılan: aksiyon ve KPI görünür; toplantı ve risk/karar görünmez; aşama onayı aksiyonları görünmez).
 - Risk: etki, olasılık, azaltma planı. Karar: tarih, ilgili toplantı.
 - Destek kaydı: tür (teknik / kullanım / geliştirme talebi), çözüm (kapatırken zorunlu), geliştirme talebinde Product Kurulu sonucu ve müşteriye bildirim tarihi. **Destek kayıtları Faz 2'ye ertelendi** (M-09 ile sekme pasif).
