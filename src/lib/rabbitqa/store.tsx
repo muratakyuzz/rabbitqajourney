@@ -10,7 +10,7 @@ import { analyzeText, type IncomingMeta } from "./ai-mock";
 import { matchEmail } from "./email-match";
 import { isAutoStep, manualStatusError, settleAll, stepLockError } from "./completion";
 import type {
-  AiInsight, ChatChannel, InsightSource, IntegrationConfig, ProjectIntegrations, UnmatchedEmail,
+  AiInsight, ChatChannel, InsightProposedFields, InsightSource, IntegrationConfig, ProjectIntegrations, UnmatchedEmail,
   CustomerReport, User, Action, Adaptation, AdaptationItem, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RiskDecision, RqState, Step, SupportTicket,
 } from "./types";
 import { todayISO } from "./labels";
@@ -477,7 +477,6 @@ export function RqProvider({ children }: { children: ReactNode }) {
     addTicket: (t) => {
       if ((t.status === "resolved" || t.status === "closed") && !t.resolution.trim()) return "Çözüm metni zorunlu";
       add<SupportTicket>("tickets", { ...t, id: uid("tk"), openedAt: new Date().toISOString(), resolvedAt: null }, `Destek kaydı açıldı — ${t.title}`);
-      setState((s) => setStepByKey(s, t.projectId, "support_track", { status: "in_progress" }, mkAudit, "Otomatik kural: destek kaydı açıldı"));
       if (t.priority === "high") {
         setState((s) => ({
           ...s,
@@ -669,7 +668,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
     approveInsight: (id, edited, note) => {
       const ins = state.insights.find((i) => i.id === id);
       if (!ins || ins.status !== "pending") return "Öneri bulunamadı veya zaten incelendi";
-      const v = { ...ins.proposed, ...(edited ?? {}) } as Record<string, any>;
+      const v = { ...ins.proposed, ...(edited ?? {}) } as InsightProposedFields;
       const reason = `AI Insight onaylandı (${ins.source === "teams" ? "Teams" : "E-posta"}): ${ins.rationale}${note ? ` — Not: ${note}` : ""}`;
       let applied: string | null = ins.targetId;
       switch (ins.kind) {
@@ -683,7 +682,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
           }));
           break;
         }
-        case "action_update": if (ins.targetId) api.updateAction(ins.targetId, v, reason); break;
+        case "action_update": if (ins.targetId) api.updateAction(ins.targetId, v as Partial<Action>, reason); break;
         case "step_update": {
           if (!ins.targetId) break;
           const err = api.updateStep(ins.targetId, v as Partial<Step>, reason);

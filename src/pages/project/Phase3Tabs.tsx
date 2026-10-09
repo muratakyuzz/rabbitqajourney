@@ -542,7 +542,7 @@ export function GoLiveTab({ project }: { project: Project }) {
               if (!contactId) return toast.error("Onaylayan müşteri kişisini seçin");
               if (!reason.trim()) return toast.error("Onay notu zorunlu");
               const err = approveGoLive(project.id, contactId, approvedAt, reason.trim());
-              err ? toast.error(`Go-Live tamamlanamaz: ${err}`) : toast.success("Müşteri onayı kaydedildi");
+              if (err) toast.error(`Go-Live tamamlanamaz: ${err}`); else toast.success("Müşteri onayı kaydedildi");
             }}>Müşteri onayını kaydet</Button>
           </CardContent>
         </Card>

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -27,11 +27,19 @@ function renderProject(initialPath: string) {
   );
 }
 
+// Seed'in referans tarihi (pazartesi). Uyarılar (ör. cuma günü açılan report_not_sent) ve terminler
+// "bugün"e göre hesaplandığı için saat sabitlenir; yalnızca Date sahte, waitFor/findBy gerçek timer'la çalışır.
+const NOW = new Date("2026-10-05T09:00:00");
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
   localStorage.clear();
   vi.clearAllMocks();
   setUser({ id: "u_manager", role: "manager", name: "Örnek Manager", email: "manager@virgosol.com" });
 });
+
+afterEach(() => { vi.useRealTimers(); });
 
 describe("AC12 — Sekme düzeni", () => {
   it("manager (canSeeCredentials değil) için 12 sekme, Erişim bilgileri yok", async () => {

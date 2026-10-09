@@ -1,24 +1,28 @@
-# RabbitQAJourney
+# RabbitQA Onboarding Tracker
 
-https://github.com/muratakyuzz/partnerflow-elevate.git linkinde bir projem var bunu nasıl lovable'a import ederim?
+Virgosol iç ekibinin RabbitQA müşteri onboarding sürecini uçtan uca takip ettiği web uygulaması. Şu an dondurulmuş bir demo mockup'tır (`mockup-freeze`): backend yoktur, tüm veri tarayıcıda (localStorage) tutulur. Backend, dondurulmuş mockup'ın sözleşmesine (`docs/API_CONTRACT.md`) göre fazlar halinde yazılır.
 
-This project was built with [Lovable](https://lovable.dev).
+## Gereksinimler
+- Node 24
+- npm (tek kilit dosyası `package-lock.json`)
 
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/0e585865-becb-4d92-9d6b-1e3657945f79).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
+## Çalıştırma
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+npm ci
 npm run dev
 ```
+Uygulama http://localhost:8080 adresinde açılır. Demo giriş: store'daki kullanıcılardan birinin e-postası (`src/lib/auth-api.ts`); şifre kontrol edilmez, pasif kullanıcı giremez.
+
+## Kontroller
+```sh
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+## Belgeler
+- `AGENTS.md`: ajan ve geliştirme kuralları
+- `docs/PRODUCT_SPEC.md`: ürün gereksinimleri
+- `docs/PHASES.md`: faz ve görev planı
+- `docs/WORKFLOW.md`: geliştirme akışı

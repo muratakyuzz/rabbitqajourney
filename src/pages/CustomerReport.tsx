@@ -73,8 +73,8 @@ export default function CustomerReport() {
 
       {current ? (
         <ReportView key={current.id} rep={current} canEdit={canEdit && current.status === "draft"} canSend={canMarkReportSent(user, project) && current.status === "draft"}
-          onSave={(p) => { const e = updateCustomerReport(current.id, p); e ? toast.error(e) : toast.success("Rapor kaydedildi"); }}
-          onSend={() => { const e = markReportSent(current.id); e ? toast.error(e) : toast.success("Rapor gönderildi olarak işaretlendi"); }} />
+          onSave={(p) => { const e = updateCustomerReport(current.id, p); if (e) toast.error(e); else toast.success("Rapor kaydedildi"); }}
+          onSend={() => { const e = markReportSent(current.id); if (e) toast.error(e); else toast.success("Rapor gönderildi olarak işaretlendi"); }} />
       ) : (
         <Card><EmptyState title="Bu haftanın raporu oluşturulmadı" description={canEdit ? "Hafta seçip \"Rapor oluştur\" ile taslak hazırlayın." : "Arşivden bir rapor açın."} /></Card>
       )}

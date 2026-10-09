@@ -18,7 +18,7 @@ import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
 import {
   ACTION_STATUS_LABEL, BALL_LABEL, HEALTH_LABEL, INSIGHT_KIND_LABEL, INSIGHT_SOURCE_LABEL, INSIGHT_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, fmtDate, fmtDateTime,
 } from "@/lib/rabbitqa/labels";
-import type { AiInsight, InsightKind, RqState } from "@/lib/rabbitqa/types";
+import type { AiInsight, InsightKind, InsightProposedFields, RqState } from "@/lib/rabbitqa/types";
 
 const FIELD_LABEL: Record<string, string> = { status: "Durum", due: "Termin", health: "Sağlık", goLiveDate: "Go-Live", planEnd: "Plan bitiş", ownerId: "Sahip", priority: "Öncelik" };
 
@@ -39,7 +39,7 @@ export function targetLabel(state: RqState, i: AiInsight) {
 }
 
 export function insightSummary(state: RqState, i: AiInsight) {
-  const p = i.proposed as Record<string, any>;
+  const p = i.proposed as InsightProposedFields;
   switch (i.kind) {
     case "action_create": return `Yeni aksiyon: ${p.title}${p.ownerId ? ` — Sahip: ${personName(state, p.ownerId)}` : ""}${p.due ? ` — Termin ${fmtDate(p.due)}` : ""}`;
     case "action_update": return `Aksiyon güncelleme: ${targetLabel(state, i) || "—"}`;
@@ -55,8 +55,10 @@ export function insightSummary(state: RqState, i: AiInsight) {
 export function targetChanged(state: RqState, i: AiInsight) {
   if (!i.current || !i.targetId) return false;
   const t: Record<string, unknown> | undefined =
-    (state.actions.find((a) => a.id === i.targetId) as any) ?? (state.steps.find((s) => s.id === i.targetId) as any) ??
-    (state.phases.find((p) => p.id === i.targetId) as any) ?? (state.projects.find((p) => p.id === i.targetId) as any);
+    (state.actions.find((a) => a.id === i.targetId) as unknown as Record<string, unknown> | undefined) ??
+    (state.steps.find((s) => s.id === i.targetId) as unknown as Record<string, unknown> | undefined) ??
+    (state.phases.find((p) => p.id === i.targetId) as unknown as Record<string, unknown> | undefined) ??
+    (state.projects.find((p) => p.id === i.targetId) as unknown as Record<string, unknown> | undefined);
   if (!t) return true;
   return Object.entries(i.current).some(([k, v]) => String(t[k] ?? "") !== String(v ?? ""));
 }
@@ -149,7 +151,7 @@ export function InsightCard({ insight: i, showProject = true, onDone }: { insigh
 
 function ApproveDialog({ insight: i, edit, changed, onClose, onDone }: { insight: AiInsight; edit: boolean; changed: boolean; onClose: () => void; onDone?: () => void }) {
   const { state, approveInsight } = useRq();
-  const [v, setV] = useState<Record<string, any>>({ ...i.proposed });
+  const [v, setV] = useState<InsightProposedFields>({ ...i.proposed });
   const needsReason = i.kind === "health_change" || i.kind === "date_change";
   const [note, setNote] = useState(needsReason ? i.rationale : "");
   const set = (k: string, val: unknown) => setV((x) => ({ ...x, [k]: val }));

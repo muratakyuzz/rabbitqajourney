@@ -389,6 +389,12 @@ export interface AiInsight {
   appliedEntityId: string | null;
 }
 
+/** Mockup; F0-04'te packages/shared InsightProposal şemasıyla değişir. */
+export type InsightProposedFields = {
+  title?: string; description?: string; ownerId?: string | null; ball?: Ball; priority?: Priority; impact?: Priority; due?: string | null;
+  status?: StepStatus | ActionStatus; health?: Health; healthReason?: string; phaseId?: string; planEnd?: string; goLiveDate?: string;
+} & Record<string, unknown>;
+
 export interface UnmatchedEmail {
   id: string; from: string; to: string[]; cc: string[]; subject: string; at: string; excerpt: string;
   direction: "in" | "out"; status: "open" | "assigned" | "ignored"; assignedProjectId: string | null;

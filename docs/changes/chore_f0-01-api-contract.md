@@ -31,7 +31,7 @@ Doküman görevi; otomatik test yok — her AC için doğrulama yöntemi:
 | AC2 | ✅ | belge kontrolü | AUDIT §2 rotaları (/login, /forgot-password, /reset-password, overview, insights, projects, projects/:id + 13 sekme, report, my-work, reports, admin + 8 sekme) §3'te en az bir GET satırına bağlı |
 | AC3 | ✅ | belge kontrolü | §2–§3'te kullanılan her `authorize` aksiyonu §1.1 kataloğunda ve RBAC.md satırına eşli; satırı olmayanlar (`alert:create`, `adaptation:update`, `session:public`, Go-Live onayı, keşif/takım) §5'te (S5, S6, S7, S16) |
 | AC4 | ✅ (reviewer örneklemle doğrular) | rules-reviewer | Audit / gerekçe / kural kolonları store.tsx ve rules/flow/completion kodundan satır satır çıkarıldı; UI-only gerekçeler ayrıca işaretlendi |
-| AC5 | ✅ | `git diff --stat main` | Yalnızca `docs/`; uygulama rolünün commit'leri yalnızca `docs/API_CONTRACT.md` ve bu not. Sözleşme dışı doküman değişiklikleri (RBAC.md, INVARIANTS.md, PRODUCT_SPEC.md, ADR-0004/0005, reviews) denetim commit'leri 4ee47d4 ve f5a29a6 |
+| AC5 | ✅ | `git diff --stat main` | Yalnızca `docs/`; uygulama rolünün commit'leri yalnızca `docs/API_CONTRACT.md` ve bu not. Sözleşme dışı doküman değişiklikleri (RBAC.md, INVARIANTS.md, PRODUCT_SPEC.md, ADR-0004/0005, reviews) denetim commit'leri 4ee47d4, f5a29a6 ve 4563ca2 |
 
 AC1/AC3 kontrol komutu (özet): `sed -n '/^interface Ctx {/,/^}/p' src/lib/rabbitqa/store.tsx` → 51 ad; her biri `docs/API_CONTRACT.md` §2'de `| <no> | \`<ad>\`` satırında bulundu. §2–§3'teki `` `x:y` `` aksiyonlarının §1.1'de olmayanı: yalnızca `` `adapt:general` `` (adım anahtarı, yanlış pozitif).
 
@@ -122,7 +122,7 @@ Doküman görevi: "test" yerine ilgili satırlara BE için **Doğrulama** notu y
 | REV-F014 | Düzeltildi — §3, §4 | bdaf926 |
 | REV-F016 | Düzeltildi — S21 listesi + genel soru; #41/#43/#45/#46/#48 gerekçe sütunu | 1af4327 |
 | REV-F017 | Düzeltildi — denetim notuna göre (direktif madde 8 geçersiz): S10/S13/S18 dayanağı K14/K15/K18; S15 (K16) #14 ve S17 (K17) #2c'de hedef davranış, §4 satırları; #16 ve §4'teki "`rule_review` üreten tek kural" ifadeleri kaldırıldı | 06b5c43 |
-| REV-F019 | (b) Düzeltildi — `adaptation:read` (Low). (a) Düzeltilmedi — RBAC.md satırı denetim oturumunun işi (uygulama rolü RBAC.md'ye yazmaz) | 880dda4 |
+| REV-F019 | (b) Düzeltildi — `adaptation:read` (Low). (a) Denetim oturumunda yapıldı (4563ca2) | 880dda4 |
 | REV-F020 | Düzeltildi (Low) — #2c doğrulaması, §4 | 8de2024 |
 | REV-F021 | Düzeltildi (Low) | f7941f5 |
 | RR-F023 | Düzeltildi (Low) — #16, #5, §4; termin tabanı `max(startDate, bugün)`, `durationDays \|\| 1` | bd90f8c |

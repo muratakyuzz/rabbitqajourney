@@ -295,3 +295,42 @@ Round 2'deki 19 bulgunun hepsi kapandı (yukarıdaki round 2 tablosu tarihsel). 
 - Kapsam dışı aşamanın açık adımları iş sayılıyor (alerts.ts:50, 61) — INV-25 kapsamı, F6 öncesi.
 - Kapsama dönen 03 `locked` olunca 04 açık kalıyor — F3-02 planında bilinçli tercih olarak yazılmalı.
 - `customer_approval` "`out_of_scope` serbest" ↔ RR-F018 önceliği — F5-05 planı.
+
+## chore/f0-02-cleanup (@ 980e65c, 2026-10-07 — round 1)
+
+Gate kararı **MERGE'E HAZIR** (koşullu: CI GitHub'da kontrol edilmeli, `gh` yok). Bu branch F0-01 round 3 takip maddelerini (K19 sözleşme metni + REV-F028b, RR-F032/K20, RR-F029, RR-F030, RR-F028, REV-F025, REV-F024, REV-F028a, QA3-F001) `docs/API_CONTRACT.md` ve F0-01 değişiklik notuna yazdı; reviewer AC20/AC21 ile, rules-reviewer K19↔INV-25 karar tablosuyla doğruladı. Yalnızca RR-F028'in INV tarafı açık (RUL-02).
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| REV-01 | Low | `tailwindcss-animate` → `devDependencies` plan dışı (84eeac9); `--omit=dev --audit-level=high` yeşilinin bir nedeni bu sınıflandırma. Builder işi yok | package.json:82 | Murat — M7 (PHASES/AUDIT F0-02 kaydı) |
+| REV-02 | Low | Değişiklik notunda şablonun "Mockup ↔ API" ve "Ekran görüntüleri" başlıkları yok | docs/changes/chore_f0-02-cleanup.md:266-289 | F0-02 fix (ops.) |
+| REV-03 | Low | API_CONTRACT v1.3 geçmiş satırı C2 maddelerini C1 commit'inde önceden listeliyor; tek C2 revert'ünde tarihçe tutarsız kalır | docs/API_CONTRACT.md:315 | F0-02 fix (ops.) |
+| RUL-01 | Low | Sözleşme #29 ve §2.2 hâlâ kaldırılmış `support_track` kuralını anıyor | docs/API_CONTRACT.md:100, :138 | F0-02 fix (ops.) / sonraki sözleşme turu |
+| RUL-02 | Low | INV-28 (c) "05 `out_of_scope` + 07 `done`" için sözleşmeyle (D8 = (a), `409`) farklı okunuyor; M8 yapılmadı | docs/INVARIANTS.md:36 | Denetim / Murat (M8), F4-03 öncesi |
+| QA-01 | Low | AC14 mutasyon kanıtı gate'te yeniden üretilemedi: guard.mjs auditor rolünde geçici yazmayı (scratchpad kopya dahil) engelliyor | .claude/hooks/guard.mjs | Kit (Murat kararı) |
+| QA-03 | Info | Go-Live "Müşteri onayı kaydedildi" başarı dalı toast'ı ekranda doğrulanmadı (hata dalı doğrulandı) | src/pages/project/Phase3Tabs.tsx:545 | F0-04 L5b turu |
+
+### Açık sorular (round 1)
+- RR-F029: `goLiveApproval` varken `customer_approval` `done → out_of_scope` serbest mi `409` mu (güvenli varsayım `409`) — F5-05 planı.
+- K19: yeniden kilitlenen aşamanın `activatedAt`'i korunur mu (güvenli varsayım: korunur) — F3-02 planı.
+- `addTicket` `priority: "high"` yolu (otomatik uyarı + audit) için koruma testi yok — Faz 2 öncesi.
+- `InsightProposedFields` şemaya kopyalanmamalı; F0-04 `InsightProposal` #44 tür başına alan listesini zorlamalı (INV-19).
+- Sözleşme/plandaki `store.tsx` satır başvuruları 1 satır kaydı (main @ 7ba26ef'e sabitli) — sonraki sözleşme turu.
+- guard.mjs reviewer'ın `tsc -p tsconfig.app.json` komutunu da engelliyor — kit değişikliği gerekirse Murat.
+
+## chore/f0-02-cleanup (@ b936fb7, 2026-10-09 — round 2)
+
+Gate kararı **MERGE'E HAZIR** (CI run #57 yeşil, Murat doğruladı). Round 1'den RUL-01, REV-02, REV-03 düzeltildi ve doğrulandı (d419000, 5b85e7a, aee62be); yukarıdaki round 1 tablosu tarihsel. Round 1'den açık kalanlar: REV-01, RUL-02, QA-01, QA-03.
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| RUL2-02 | Medium | Haftalık rapor `weekEnd = addBusinessDays(weekStart, 4)`: cumartesi/pazar kayıtları hiçbir rapora girmiyor; tam gün tatilli haftada `weekEnd` sonraki pazartesiye kayıyor (2026-10-26 → 11-02), o günün kaydı iki raporda. Snapshot dondurulduğu için (INV-27) kalıcı. Branch öncesinden kalma; pazartesi Date sabitlemesi artık gizliyor | src/lib/rabbitqa/reports.ts:28-29 | F7-02 öncesi (hafta tanımı kararı: Murat/planner) |
+| RUL2-01 | Low | `report_not_sent` uyarısının (cuma/hafta sonu, `sent` rapor, 07 `done`, seed snooze anahtarı) hiç testi yok; açık `today` ile tarih matrisi testi gerekli | src/lib/rabbitqa/alerts.ts:148-155 | F0-04 / F6-03 |
+| RUL2-03 | Low | TEST_STRATEGY §3 tek sabit saat (`2026-09-01T09:00:00+03:00`) yazıyor; mockup testleri `2026-10-05T09:00:00` yerel kullanıyor ve sabit iki dosyada ayrı tanımlı. §3'e mockup/API ayrımı + "haftanın gününe bağlı kurallar açık `today` ile test edilir" eklenmeli; ortak `MOCKUP_NOW` | docs/TEST_STRATEGY.md:49 | Denetim (Murat onayıyla) / test altyapısı işi |
+| REV2-02 | Low | (RUL2-03 ile aynı konu, reviewer bakışı) "Gerçek saate bağlı test yok" ilkesi fb253e1'e kadar ihlal ediliyordu | docs/TEST_STRATEGY.md:49 | RUL2-03 ile birlikte |
+| REV2-01 | Low | API_CONTRACT v1.3 geçmiş satırı `support_track` kuralının kaldırılmasını (RUL-01, d419000) anmıyor | docs/API_CONTRACT.md:315 | Sonraki sözleşme turu (ops.) |
+
+### Öneriler (round 2)
+- §2.2 tablosundaki üstü çizili `support_track` satırı tablodan çıkarılıp altına not olarak yazılabilir (tablo başı cümlesiyle çelişmesin) — sonraki sözleşme turu.
+- "seed produces reqdoc_not_shared only for p_lojistik" testine `computeAlerts(s, "2026-10-05")` assert'i eklensin (iddiayı seed anında sınasın).
+- Dondurulmuş sahte Date: `ProjectDetail.tabs.test.tsx`'e ileride zaman damgası sıralaması assert'i eklenirse `shouldAdvanceTime` gerekir.

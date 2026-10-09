@@ -7,15 +7,19 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Tek kilit dosyası: package-lock.json (npm)
+bun.lock
+bun.lockb
+yarn.lock
+pnpm-lock.yaml
+
 node_modules
-dist
 dist-ssr
 *.local
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea
 .DS_Store
 *.suo
 *.ntvs*

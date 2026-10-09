@@ -428,6 +428,10 @@ describe("AI / alerts interplay", () => {
 });
 
 describe("reqdoc_not_shared — reads step status, not a project field (AC7, M-09b)", () => {
+  // createSeed() tarihleri "bugün"e göre kurar; seed'in referans tarihine sabitlenir.
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW); });
+  afterEach(() => { vi.useRealTimers(); });
+
   function fixtureWithOpenReqdoc(pid: string) {
     const s = createSeed();
     const reqdoc = s.steps.find((x) => x.projectId === pid && x.key === "reqdoc")!;
@@ -957,7 +961,7 @@ describe("RUL-05 Seçenek A — ensureReviewAction / cancelReviewAction (AC19)",
   it("REV-03/RUL-03 (i): a done phase keeps every ONPREM_KEYS step out_of_scope on On-prem->SaaS and opens a review action for each", () => {
     const s = createSeed();
     const pid = "p_isyatirim"; // 01 and 03 are done; force the ONPREM_KEYS steps out_of_scope first (AC19 fixture, same shape as fixtureWithOutOfScopeReqdoc)
-    const onpremKeys = ["reqdoc", "vpn_req", "vpn_info", "servers", "devops_handover"];
+    const onpremKeys: (string | undefined)[] = ["reqdoc", "vpn_req", "vpn_info", "servers", "devops_handover"];
     const scoped: RqState = {
       ...s,
       steps: s.steps.map((x) => (x.projectId === pid && onpremKeys.includes(x.key) ? { ...x, status: "out_of_scope" as const } : x)),
@@ -975,6 +979,10 @@ describe("RUL-05 Seçenek A — ensureReviewAction / cancelReviewAction (AC19)",
 });
 
 describe("buildReportSnapshot — p_perakende Uyarlama: Mobil (AC18)", () => {
+  // createSeed() tarihleri "bugün"e göre kurar; seed'in referans tarihine sabitlenir.
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW); });
+  afterEach(() => { vi.useRealTimers(); });
+
   it("a step completed this week via an 'adapt:<team>' audit appears in the completed list; phases 04/05 are present with the right status", async () => {
     const { buildReportSnapshot } = await import("./reports");
     const { weekStartOf } = await import("./alerts");

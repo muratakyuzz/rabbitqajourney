@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { RqProvider, useRq } from "./store";
 import { manualStatusError } from "./completion";
 import { createSeed, STATE_KEY } from "./seed";
+import type { StepCompletion, StepStatus } from "./types";
 import { loginApi } from "@/lib/auth-api";
 
 vi.mock("@/lib/auth-context", () => ({
@@ -14,6 +15,29 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 function setup() {
   return renderHook(() => useRq(), { wrapper: RqProvider });
+}
+
+/** Seeds a pending step_update insight on p_ornek. Without targetId it targets the first not-done step with the given completion and sets its status. */
+function seedStepUpdateInsight({ completion = "manual", status = "pending", proposed, targetId }: {
+  completion?: StepCompletion; status?: StepStatus; proposed: Record<string, unknown>; targetId?: string;
+}) {
+  const seeded = createSeed();
+  const pid = "p_ornek";
+  const step = seeded.steps.find((s) => s.projectId === pid && s.completion === completion && s.status !== "done")!;
+  const stepId = targetId ?? step.id;
+  const insight = {
+    id: "ai_test_step_update", projectId: pid, source: "teams" as const, kind: "step_update" as const, status: "pending" as const,
+    createdAt: new Date().toISOString(), targetId: stepId, current: { status: step.status },
+    sourceRef: { title: "t", from: "f", at: new Date().toISOString(), excerpt: "x", link: "#" },
+    proposed, rationale: "test", confidence: 90,
+    reviewedBy: null, reviewedAt: null, reviewNote: "", appliedEntityId: null,
+  };
+  localStorage.setItem(STATE_KEY, JSON.stringify({
+    ...seeded,
+    steps: targetId ? seeded.steps : seeded.steps.map((s) => (s.id === step.id ? { ...s, status } : s)),
+    insights: [...seeded.insights, insight],
+  }));
+  return { pid, stepId, insightId: insight.id };
 }
 
 beforeEach(() => {
@@ -452,44 +476,30 @@ describe("setInstallChoice — SaaS step is manual (REV-01)", () => {
 });
 
 describe("approveInsight — step_update guard (AC17)", () => {
-  it("rejects applying a step_update insight targeting a non-manual step", () => {
+  it("rejects applying a step_update insight targeting a pending data step — step, insight and audit stay unchanged", () => {
+    // ai-mock only proposes step_update for open manual steps, so the insight is seeded directly.
+    const { stepId, insightId } = seedStepUpdateInsight({ completion: "data", status: "pending", proposed: { status: "done" } });
     const { result } = setup();
-    const pid = "p_ornek";
-    const dataStep = result.current.state.steps.find((s) => s.projectId === pid && s.completion === "data")!;
-    act(() => {
-      result.current.simulateIncoming(pid, "teams", `${dataStep.title} tamamlandı.`, { title: "t", from: "f" });
-    });
-    const insight = result.current.state.insights.find((i) => i.projectId === pid && i.kind === "step_update" && i.targetId === dataStep.id);
-    // ai-mock filters out non-manual steps entirely — no such insight should exist, so this path is defensive.
-    if (!insight) return;
+    const step = result.current.state.steps.find((s) => s.id === stepId);
+    expect(step).toBeDefined();
+    expect(step!.completion).toBe("data");
+    expect(step!.status).toBe("pending");
+    const insight = result.current.state.insights.find((i) => i.id === insightId);
+    expect(insight).toBeDefined();
+    if (!insight) throw new Error("seed");
+    const auditCountBefore = result.current.state.audit.length;
     let err: string | null = null;
     act(() => { err = result.current.approveInsight(insight.id); });
     expect(err).toBe("Bu adım veriyle tamamlanır");
+    expect(result.current.state.steps.find((s) => s.id === stepId)!.status).toBe("pending");
+    expect(result.current.state.insights.find((i) => i.id === insightId)!.status).toBe("pending");
+    expect(result.current.state.audit.length).toBe(auditCountBefore);
   });
 });
 
 describe("approveInsight — step_update goes through updateStep's lock rules (REV-13)", () => {
-  function seedWithStepUpdateInsight(targetStatus: "pending" | "in_progress" | "locked", proposed: Record<string, unknown>) {
-    const seeded = createSeed();
-    const pid = "p_ornek";
-    const manualStep = seeded.steps.find((s) => s.projectId === pid && s.completion === "manual" && s.status !== "done")!;
-    const insight = {
-      id: "ai_test_step_update", projectId: pid, source: "teams" as const, kind: "step_update" as const, status: "pending" as const,
-      createdAt: new Date().toISOString(), targetId: manualStep.id, current: { status: manualStep.status },
-      sourceRef: { title: "t", from: "f", at: new Date().toISOString(), excerpt: "x", link: "#" },
-      proposed, rationale: "test", confidence: 90,
-      reviewedBy: null, reviewedAt: null, reviewNote: "", appliedEntityId: null,
-    };
-    localStorage.setItem(STATE_KEY, JSON.stringify({
-      ...seeded,
-      steps: seeded.steps.map((s) => (s.id === manualStep.id ? { ...s, status: targetStatus } : s)),
-      insights: [...seeded.insights, insight],
-    }));
-    return { pid, stepId: manualStep.id, insightId: insight.id };
-  }
-
   it("AC1: rejects an edited step_update proposing 'locked' on an open manual step — step and insight stay unchanged", () => {
-    const { stepId, insightId } = seedWithStepUpdateInsight("pending", { status: "pending" });
+    const { stepId, insightId } = seedStepUpdateInsight({ status: "pending", proposed: { status: "pending" } });
     const { result } = setup();
     const auditCountBefore = result.current.state.audit.length;
     let err: string | null = null;
@@ -501,7 +511,7 @@ describe("approveInsight — step_update goes through updateStep's lock rules (R
   });
 
   it("AC2: rejects approving (no edit) a step_update whose target step is now locked — step and insight stay unchanged", () => {
-    const { stepId, insightId } = seedWithStepUpdateInsight("locked", { status: "done" });
+    const { stepId, insightId } = seedStepUpdateInsight({ status: "locked", proposed: { status: "done" } });
     const { result } = setup();
     const auditCountBefore = result.current.state.audit.length;
     let err: string | null = null;
@@ -513,7 +523,7 @@ describe("approveInsight — step_update goes through updateStep's lock rules (R
   });
 
   it("AC3 (regression): approves a step_update to 'done' on an open manual step", () => {
-    const { stepId, insightId } = seedWithStepUpdateInsight("pending", { status: "done" });
+    const { stepId, insightId } = seedStepUpdateInsight({ status: "pending", proposed: { status: "done" } });
     const { result } = setup();
     let err: string | null = null;
     act(() => { err = result.current.approveInsight(insightId); });
@@ -527,18 +537,67 @@ describe("approveInsight — step_update goes through updateStep's lock rules (R
     expect(stepAudit?.reason).toMatch(/^AI Insight onaylandı/);
   });
 
-  it("AC5 (regression): still rejects a step_update insight targeting an auto-completed (data) step", () => {
+  it("AC5 (regression): still rejects a step_update insight targeting an auto-completed (meeting) step", () => {
+    const { stepId, insightId } = seedStepUpdateInsight({ completion: "meeting", status: "pending", proposed: { status: "done" } });
     const { result } = setup();
-    const pid = "p_ornek";
-    const dataStep = result.current.state.steps.find((s) => s.projectId === pid && s.completion === "data")!;
-    act(() => {
-      result.current.simulateIncoming(pid, "teams", `${dataStep.title} tamamlandı.`, { title: "t", from: "f" });
-    });
-    const insight = result.current.state.insights.find((i) => i.projectId === pid && i.kind === "step_update" && i.targetId === dataStep.id);
-    if (!insight) return;
+    const step = result.current.state.steps.find((s) => s.id === stepId);
+    expect(step).toBeDefined();
+    expect(step!.completion).toBe("meeting");
+    expect(step!.status).toBe("pending");
+    const insight = result.current.state.insights.find((i) => i.id === insightId);
+    expect(insight).toBeDefined();
+    if (!insight) throw new Error("seed");
+    const auditCountBefore = result.current.state.audit.length;
     let err: string | null = null;
     act(() => { err = result.current.approveInsight(insight.id); });
     expect(err).toBe("Bu adım veriyle tamamlanır");
+    expect(result.current.state.steps.find((s) => s.id === stepId)!.status).toBe("pending");
+    expect(result.current.state.insights.find((i) => i.id === insightId)!.status).toBe("pending");
+    expect(result.current.state.audit.length).toBe(auditCountBefore);
+  });
+});
+
+describe("not found (RUL-03)", () => {
+  it("updateStep with an unknown id returns 'Adım bulunamadı' — steps and audit stay unchanged", () => {
+    const { result } = setup();
+    const stepsBefore = result.current.state.steps;
+    const auditCountBefore = result.current.state.audit.length;
+    let err: string | null = null;
+    act(() => { err = result.current.updateStep("st_missing", { status: "done" }, "x"); });
+    expect(err).toBe("Adım bulunamadı");
+    expect(result.current.state.steps).toEqual(stepsBefore);
+    expect(result.current.state.audit.length).toBe(auditCountBefore);
+  });
+
+  it("approving a step_update whose target step does not exist returns 'Adım bulunamadı' — insight stays pending, audit unchanged", () => {
+    const { insightId } = seedStepUpdateInsight({ targetId: "st_missing", proposed: { status: "done" } });
+    const { result } = setup();
+    expect(result.current.state.steps.some((s) => s.id === "st_missing")).toBe(false);
+    const auditCountBefore = result.current.state.audit.length;
+    let err: string | null = null;
+    act(() => { err = result.current.approveInsight(insightId); });
+    expect(err).toBe("Adım bulunamadı");
+    expect(result.current.state.insights.find((i) => i.id === insightId)!.status).toBe("pending");
+    expect(result.current.state.audit.length).toBe(auditCountBefore);
+  });
+});
+
+describe("addTicket — support_track no-op (REV-07)", () => {
+  it("opening a ticket leaves steps unchanged and writes no 'destek kaydı açıldı' rule audit", () => {
+    const { result } = setup();
+    const pid = "p_ornek";
+    const stepsBefore = result.current.state.steps;
+    let err: string | null = null;
+    act(() => {
+      err = result.current.addTicket({
+        projectId: pid, title: "Test kaydı", description: "", module: "", priority: "medium", status: "open", ownerId: null,
+        type: "technical", resolution: "", boardDecision: null, customerNotifiedAt: null,
+      });
+    });
+    expect(err).toBeNull();
+    expect(result.current.state.tickets.some((t) => t.projectId === pid && t.title === "Test kaydı")).toBe(true);
+    expect(result.current.state.steps).toEqual(stepsBefore);
+    expect(result.current.state.audit.some((a) => a.reason === "Otomatik kural: destek kaydı açıldı")).toBe(false);
   });
 });
 
