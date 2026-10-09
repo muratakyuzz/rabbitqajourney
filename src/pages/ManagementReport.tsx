@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router";
 import { Printer } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -112,26 +112,26 @@ export default function ManagementReport() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <ChartCard title="Sağlık dağılımı">
-          <PieChart>
+          <PieChart accessibilityLayer={false}>
             <Pie data={healthData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
               {healthData.map((d) => <Cell key={d.name} fill={d.color} />)}
             </Pie>
-            <Tooltip contentStyle={tip} /><Legend wrapperStyle={{ fontSize: 12 }} />
+            <Tooltip contentStyle={tip} itemSorter={() => 0} /><Legend wrapperStyle={{ fontSize: 12 }} itemSorter={null} />
           </PieChart>
         </ChartCard>
         <ChartCard title="Gecikenler — sahibe göre" empty={!lateByOwner.length && "Geciken adım veya aksiyon yok."}>
-          <BarChart data={lateByOwner} layout="vertical" margin={{ left: 24 }}>
+          <BarChart data={lateByOwner} accessibilityLayer={false} layout="vertical" margin={{ left: 24 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis type="number" allowDecimals={false} tick={axis} /><YAxis type="category" dataKey="name" width={110} tick={axis} />
-            <Tooltip contentStyle={tip} /><Legend wrapperStyle={{ fontSize: 12 }} />
+            <Tooltip contentStyle={tip} itemSorter={() => 0} /><Legend wrapperStyle={{ fontSize: 12 }} itemSorter={null} />
             <Bar dataKey="Adım" stackId="a" fill="hsl(var(--primary))" /><Bar dataKey="Aksiyon" stackId="a" fill="hsl(var(--warning))" />
           </BarChart>
         </ChartCard>
         <ChartCard title="CSM başına müşteri ve açık iş" empty={!csmLoad.length && "Aktif CSM yok."}>
-          <BarChart data={csmLoad}>
+          <BarChart data={csmLoad} accessibilityLayer={false}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="name" tick={axis} /><YAxis allowDecimals={false} tick={axis} />
-            <Tooltip contentStyle={tip} /><Legend wrapperStyle={{ fontSize: 12 }} />
+            <Tooltip contentStyle={tip} itemSorter={() => 0} /><Legend wrapperStyle={{ fontSize: 12 }} itemSorter={null} />
             <Bar dataKey="Müşteri" fill="hsl(var(--primary))" /><Bar dataKey="Açık iş" fill="hsl(var(--muted-foreground))" />
           </BarChart>
         </ChartCard>

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within, fireEvent } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { RqProvider } from "@/lib/rabbitqa/store";
 import { createSeed, STATE_KEY } from "@/lib/rabbitqa/seed";
 import { InsightCard } from "@/components/rq/InsightCard";

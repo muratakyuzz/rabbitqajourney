@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router";
 import { AlertTriangle, ArrowDown, ArrowUp, Info, Plus, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { projectPlan } from "@/lib/rabbitqa/flow";

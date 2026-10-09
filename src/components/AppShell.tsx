@@ -1,4 +1,4 @@
-import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router";
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -172,7 +172,7 @@ function Topbar() {
   const navigate = useNavigate();
 
   return (
-    <header className="print:hidden h-14 border-b bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/75 flex items-center justify-between px-4 shrink-0">
+    <header className="print:hidden h-14 border-b bg-background/85 backdrop-blur-sm supports-backdrop-filter:bg-background/75 flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-2">
         <SidebarTrigger className="text-muted-foreground" />
       </div>

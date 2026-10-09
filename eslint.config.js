@@ -24,8 +24,11 @@ export default tseslint.config(
     },
   },
   {
-    // shadcn bileşenleri elle değiştirilmez (AGENTS.md §3); F0-02 D4
+    // shadcn bileşenleri elle değiştirilmez (AGENTS.md §3); F0-02 D4, §14 (a)
     files: ["src/components/ui/**/*.{ts,tsx}"],
-    rules: { "@typescript-eslint/no-empty-object-type": "off" },
+    rules: {
+      "@typescript-eslint/no-empty-object-type": "off",
+      "react-refresh/only-export-components": "off",
+    },
   },
 );

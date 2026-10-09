@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { AlertTriangle, BarChart3, Building2, CalendarDays, LifeBuoy, ListChecks, Rocket, Activity } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useState } from "react";

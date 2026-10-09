@@ -25,7 +25,11 @@ Bu işi sınırlayan kısıtlar:
   - `:root`/`.dark` HSL bileşen değişkenleri biçim olarak korunur; satır içi `hsl(var(--x))` kullanımları bunlara bağlı.
   - Kaynak taraması `src/**/*.{ts,tsx}` ile sınırlanır (v3 `content` eşdeğeri, cwd'den bağımsız).
   - `tailwindcss-animate` `@plugin` ile kalır.
-  - v3 görünümünü koruyan uyumluluk kuralları eklenir: varsayılan kenarlık, placeholder rengi, buton imleci.
+  - v3 görünümünü koruyan uyumluluk kuralları eklenir:
+    - (a) varsayılan kenarlık rengi;
+    - (b) placeholder rengi;
+    - (c) buton imleci;
+    - (d) `space-x-*` / `space-y-*` v3 seçicisi (`> :not([hidden]) ~ :not([hidden])`, ilk çocuk hariç kenar boşluğu). v4'ün `:not(:last-child)` davranışı `mb-*`/`mt-*` taşıyan çocuklarda ve satır yüksekliğinde fark üretir; `gap`'e geçiş satır kutusunu değiştirdiği için seçilmedi. Kural yalnızca sayısal değerleri kapsar (`--value(number)`); `space-*-px` ve `space-*-[..]` v4 davranışını alır, kullanılmamalıdır (Murat, 2026-10-09; F0-03a gate REV-06).
   - Entegrasyon `@tailwindcss/vite`; peer uyumsuzluğunda `@tailwindcss/postcss`.
 - **K3 — `components/ui` istisnası:** Yalnızca iki tür değişiklik yapılabilir:
   - (a) `@tailwindcss/upgrade` codemod'unun mekanik çıktısı;

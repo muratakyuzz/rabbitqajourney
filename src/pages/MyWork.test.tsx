@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { RqProvider, useRq } from "@/lib/rabbitqa/store";
 import MyWork from "@/pages/MyWork";

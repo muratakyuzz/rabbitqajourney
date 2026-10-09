@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { RqProvider } from "@/lib/rabbitqa/store";
 import ProjectDetail from "@/pages/ProjectDetail";

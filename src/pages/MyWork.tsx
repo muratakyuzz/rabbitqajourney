@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { previousStep } from "@/lib/rabbitqa/flow";
 import { businessDaysBetween } from "@/lib/rabbitqa/business-days";

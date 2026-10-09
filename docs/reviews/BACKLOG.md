@@ -343,3 +343,46 @@ Merge sonrası denetim oturumu (Murat talimatı):
 - **Yeniden hedeflendi:** RUL2-01 `report_not_sent` testi → F4-01; HandoverWorkspace AC1 / toast-router QA-02 flaky adayı → F4-01; REV2-01 → F0-03.
 - **Açık kalan (round 1):** QA-01 (guard.mjs, kit — Murat kararı), QA-03 (F0-04 L5b).
 - CI: `ci.yml` job seviyesindeki `hashFiles()` hatası Murat tarafından düzeltildi (5c41bd2); önceki 55 koşu geçersiz, ilk yeşil run #57.
+
+## chore/f0-03a-upgrades (@ 0ccd22c, 2026-10-09 — round 1)
+
+Gate kararı **DÜZELTME GEREKLİ** (High: REV-01 = QA-01, Sonner toast stili Tailwind 4 `@layer` × katmansız Sonner CSS). Medium maddeler düzeltme direktifinde; burada iz için.
+
+**Round 2 (@ 9ace149) durumu:** REV-01/QA-01, REV-02, REV-03/QA-03, QA-02/REV-04, REV-06, QA-05, QA-06 düzeltildi ve doğrulandı. REV-05/QA-04 açık; dönem değişimi sonrası legend sırası F0-06'da ölçülecek.
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| REV-02 | Medium | Değişiklik notu L5b-A "38/38 0 px" ve "değişiklik yok" diyor; eşik 0'da toast çiftleri 19.451 / 8.665 px, diğer >0 çiftler açıklanmamış | docs/changes/chore_f0-03a-upgrades.md:27,290,297 | F0-03a fix |
+| REV-03 / QA-03 (tooltip) | Medium | recharts 3 Tooltip varsayılan `itemSorter: 'name'`: "CSM başına müşteri ve açık iş" tooltip sırası ters ("Açık iş, Müşteri") | src/pages/ManagementReport.tsx:134 (+119, 126) | F0-03a fix |
+| QA-02 / REV-04 | Medium (QA) / Low (REV) | recharts 3 `accessibilityLayer` varsayılan `true`: 4 grafik Tab ile odaklanıyor, tıklamada odak çerçevesi + tooltip | src/components/rq/KpiChart.tsx:11, src/pages/ManagementReport.tsx:115,123,131 | F0-03a fix — **Karar verildi (Murat, 2026-10-09): (a) `accessibilityLayer={false}`**, main davranışı. Gerekçe: uygulama fare ile kullanım esaslı, a11y öncelik değil → PHASES F9-04'e not (kapsam daraltılabilir) |
+| REV-05 / QA-04 | Low | `Legend itemSorter={null}` sırası render'lar arasında değişebilir (recharts belgesi). qa-verifier "Bu ay → Bu hafta" sonrası tekrarlamadı; diğer dönemler denenmedi | src/pages/ManagementReport.tsx:119,126,134 | F0-06 (görsel regresyon setine dönem değişimi) |
+| REV-06 | Low | `space-x/y` uyumluluk kuralı ADR-0006 K2'nin 3 kuralı dışında; `--value(number)` yalnızca çıplak sayıları kapsıyor (`space-y-px` / `space-y-[..]` sessizce v4 davranışı) | src/index.css:139-166 | F0-03a fix (yorum) — **Karar verildi (Murat, 2026-10-09): kural kabul → ADR-0006 K2 (d)** |
+| QA-05 | Low | Eşik 0'da kalan farklar: `csm-insights-step-update-edit-dialog-status-open` en büyük kanal farkı 35, `manager-new-project-dialog` 10; neden kesinleşmedi (diyalog animasyon karesi / odak halkası?) | — | F0-03a fix (notta açıklama, REV-02 ile) |
+| QA-06 | Low | Go-Live onayı iki toast'u üst üste bindiriyor ("Müşteri onayı kaydedildi" arkada kalıyor); ekran kanıtı yarım. main'de de var | Go-Live onay akışı (`p_isyatirim`) | F0-06 (kalıcı L3/L6 testi, round 1 QA-03 ile birlikte) |
+
+### Öneriler / notlar (round 1)
+- F0-03b: lock `--prefer-dedupe` ile üretilmiş; bayraksız yeniden kurulum Radix'i yeniden bölebilir → kurulum talimatına yazılsın (AC2 `.npmrc`'yi yasaklıyor).
+- F0-06: kalıcı görsel betik eşik 0 + bbox raporu içersin; katmansız 3. taraf CSS (Sonner/Radix) Tailwind 4 utility'lerini ezer → toast ekranları regresyon setine. ADR-0006 K5 / plan §8.1'e tam-eşik geçişi (M2).
+- QA-07 (Info): Playwright MCP'de `animate-fade-in` ekran karelerine bağlı ilerliyor; viewport "ısıtma" sonrası `fullPage` çekim gerekiyor. §8.1 yöntemine eklenmeli.
+- QA-08 (Info): baseline yöntem farkları (`csm-tab-access-credentials` panel, `csm-phase00-handover-workspace` 2277 vs 1284 px, `manager-reports` animasyon ortası) — M-06 baseline yenilenirken düzeltilsin.
+- QA-09 (Info): CSS bundle 68,25 → 86,12 kB (+%26).
+- Bulgu değil: `ui/toast.tsx:70` Radix toast `focus:ring-2` rengi v4'te currentColor; Radix `toast()` çağrılmıyor, ulaşılamaz.
+
+## chore/f0-03a-upgrades (@ 9ace149, 2026-10-09 — round 2)
+
+Gate kararı **MERGE'E HAZIR**. Koşul: Murat QA2-04 yöntem sapmasını kabul etmeli. Engelleyici bulgu yok.
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| REV2-01 | Low | Not "description/action/cancel kullanılmıyor" diyor, ama `description` HandoverWorkspace toast'ında kullanılıyor (görsel olarak main ile aynı, qa-verifier r2). "betik L5b-A bölümünde" ifadesi karşılıksız | docs/changes/chore_f0-03a-upgrades.md:465 | F0-03a (merge öncesi, isteğe bağlı) / F0-03b |
+| REV2-02 | Low | `index.css` yorumundaki "sonner `<style>` bu dosyadan sonra eklenir" ifadesi yalnızca production için doğru, dev'de sıra ters. Sonuç v3 ile aynı | src/index.css:288-289 | F0-03a (isteğe bağlı) / F0-03b |
+| REV2-03 | Low | Notta KPI hover tooltip satırı builder ölçümüyle desteklenmiyor (`kpiTooltipOnHover: null`). qa-verifier r2 ölçümü: iki tarafta `25.09.2026 / Değer : 40 %` | docs/changes/chore_f0-03a-upgrades.md:356,371 | F0-03a (isteğe bağlı) / F0-03b |
+| REV2-04 | Low | `[class*="recharts-zIndex-layer_"]:focus` kuralı recharts'ın iç sınıf adına dayanıyor; sürüm değişince sessizce etkisiz kalabilir. ADR-0006 K2'de katmansız Sonner kuralları ve bu kural kayıtlı değil | src/index.css:312-318 | Denetim (M2): ADR-0006 K2 (e) + F0-06 regresyon adımı |
+| REV2-05 | Low | Direktif 1–3'ün not güncellemeleri db255a0'da `[REV-02]` etiketiyle toplanmış; izlenebilirlik zayıf | docs/changes/chore_f0-03a-upgrades.md | Süreç notu (sonraki turlar) |
+
+### Öneriler / notlar (round 2)
+- QA2-04 (Info): A seti, computed stil ve odak ölçümleri MCP yerine qa-verifier'ın kendi `playwright-core` betikleriyle yapıldı. Neden: ajan araç listesinde `browser_evaluate` yok. Kit önerisi: `.claude/agents/qa-verifier.md` araç listesine `mcp__playwright__browser_evaluate` eklensin (Murat kararı).
+- QA2-01 (Info): ham r2 PNG/diff seti `.verify/screens/f0-03a-gate-r2/` altında, commit edilmedi.
+- QA2-02 (Info): toast `box-shadow` serileştirmesinde v3'ün iki şeffaf ring katmanı yok; görsel etkisi yok.
+- QA2-03 (Info): Tailwind 4 `outline-hidden` yalnızca `forced-colors` modunda `2px solid transparent` veriyor; yüksek kontrast modunda v3'ten ayrışabilir (F9-04 kapsamı).
+- F0-06: description'lı handover toast'ı ve grafik tıklaması (çerçeve yok) regresyon setine eklensin.

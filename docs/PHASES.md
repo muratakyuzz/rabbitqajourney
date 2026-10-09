@@ -144,6 +144,6 @@ Faz M kapandı: `/phase-close M` round 3 → GO (2026-10-06, main @ dffa61f, `do
 | F9-01 | Mock adaptörlerin ve demo girişin üretim build'inden çıkarılması (yalnızca test/dev'de kalır) | |
 | F9-02 | Tam güvenlik denetimi (reviewer tam tarama) | ● |
 | F9-03 | Performans (parity EXPLAIN raporları, code-split — mevcut bundle 668 KB) | |
-| F9-04 | Erişilebilirlik + Türkçe metin taraması | |
+| F9-04 | Erişilebilirlik + Türkçe metin taraması. *Not (Murat, 2026-10-09): uygulama fare ile kullanım esaslıdır, erişilebilirlik öncelik değil; kapsam buna göre daraltılabilir. F0-03a'da recharts 3'ün klavye katmanı bilinçli olarak kapatıldı (`accessibilityLayer={false}`, gate QA-02/REV-04).* | |
 | F9-05 | Tam E2E regresyon + UAT | |
 | F9-06 | Docker imajları (web, api, worker), test ortamına çıkış runbook'u, yedekleme, izleme | |

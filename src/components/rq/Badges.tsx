@@ -5,7 +5,7 @@ import { ACTION_STATUS_LABEL, HEALTH_LABEL, PHASE_STATUS_LABEL, PRIORITY_LABEL, 
 
 type Tone = "success" | "warning" | "danger" | "info" | "muted";
 const TONE: Record<Tone, string> = {
-  success: "bg-success/12 text-success border-success/25",
+  success: "text-success border-success/25",
   warning: "bg-warning/15 text-warning-foreground border-warning/40",
   danger: "bg-destructive/10 text-destructive border-destructive/25",
   info: "bg-info/10 text-info border-info/25",

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router";
 import { ArrowLeft, Check, CheckCircle2, FileText, PanelRight, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
