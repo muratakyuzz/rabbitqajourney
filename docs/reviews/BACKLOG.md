@@ -374,15 +374,26 @@ Gate kararı **MERGE'E HAZIR**. Koşul: Murat QA2-04 yöntem sapmasını kabul e
 
 | ID | Severity | Özet | Dosya | Hedef faz |
 |---|---|---|---|---|
-| REV2-01 | Low | Not "description/action/cancel kullanılmıyor" diyor, ama `description` HandoverWorkspace toast'ında kullanılıyor (görsel olarak main ile aynı, qa-verifier r2). "betik L5b-A bölümünde" ifadesi karşılıksız | docs/changes/chore_f0-03a-upgrades.md:465 | F0-03a (merge öncesi, isteğe bağlı) / F0-03b |
-| REV2-02 | Low | `index.css` yorumundaki "sonner `<style>` bu dosyadan sonra eklenir" ifadesi yalnızca production için doğru, dev'de sıra ters. Sonuç v3 ile aynı | src/index.css:288-289 | F0-03a (isteğe bağlı) / F0-03b |
-| REV2-03 | Low | Notta KPI hover tooltip satırı builder ölçümüyle desteklenmiyor (`kpiTooltipOnHover: null`). qa-verifier r2 ölçümü: iki tarafta `25.09.2026 / Değer : 40 %` | docs/changes/chore_f0-03a-upgrades.md:356,371 | F0-03a (isteğe bağlı) / F0-03b |
-| REV2-04 | Low | `[class*="recharts-zIndex-layer_"]:focus` kuralı recharts'ın iç sınıf adına dayanıyor; sürüm değişince sessizce etkisiz kalabilir. ADR-0006 K2'de katmansız Sonner kuralları ve bu kural kayıtlı değil | src/index.css:312-318 | Denetim (M2): ADR-0006 K2 (e) + F0-06 regresyon adımı |
+| REV2-01 | Low | Not "description/action/cancel kullanılmıyor" diyor, ama `description` HandoverWorkspace toast'ında kullanılıyor (görsel olarak main ile aynı, qa-verifier r2). "betik L5b-A bölümünde" ifadesi karşılıksız | docs/changes/chore_f0-03a-upgrades.md:465 | → F0-03b (kapanış satırı, aşağıda) |
+| REV2-02 | Low | `index.css` yorumundaki "sonner `<style>` bu dosyadan sonra eklenir" ifadesi yalnızca production için doğru, dev'de sıra ters. Sonuç v3 ile aynı | src/index.css:288-289 | → F0-03b (kapanış satırı, aşağıda) |
+| REV2-03 | Low | Notta KPI hover tooltip satırı builder ölçümüyle desteklenmiyor (`kpiTooltipOnHover: null`). qa-verifier r2 ölçümü: iki tarafta `25.09.2026 / Değer : 40 %` | docs/changes/chore_f0-03a-upgrades.md:356,371 | → F0-03b (kapanış satırı, aşağıda) |
+| REV2-04 | Low | `[class*="recharts-zIndex-layer_"]:focus` kuralı recharts'ın iç sınıf adına dayanıyor; sürüm değişince sessizce etkisiz kalabilir. ADR-0006 K2'de katmansız Sonner kuralları ve bu kural kayıtlı değil | src/index.css:312-318 | **Karar verildi → ADR-0006 K2 (e)** (Murat, 2026-10-09). Test adımı → F0-06 (kapanış satırı, aşağıda) |
 | REV2-05 | Low | Direktif 1–3'ün not güncellemeleri db255a0'da `[REV-02]` etiketiyle toplanmış; izlenebilirlik zayıf | docs/changes/chore_f0-03a-upgrades.md | Süreç notu (sonraki turlar) |
 
 ### Öneriler / notlar (round 2)
-- QA2-04 (Info): A seti, computed stil ve odak ölçümleri MCP yerine qa-verifier'ın kendi `playwright-core` betikleriyle yapıldı. Neden: ajan araç listesinde `browser_evaluate` yok. Kit önerisi: `.claude/agents/qa-verifier.md` araç listesine `mcp__playwright__browser_evaluate` eklensin (Murat kararı).
+- QA2-04 (Info): A seti, computed stil ve odak ölçümleri MCP yerine qa-verifier'ın kendi `playwright-core` betikleriyle yapıldı. Neden: ajan araç listesinde `browser_evaluate` yok. **Kapandı (Murat, 2026-10-09): sapma kabul**; kit önerisi uygulandı (aşağıda).
 - QA2-01 (Info): ham r2 PNG/diff seti `.verify/screens/f0-03a-gate-r2/` altında, commit edilmedi.
 - QA2-02 (Info): toast `box-shadow` serileştirmesinde v3'ün iki şeffaf ring katmanı yok; görsel etkisi yok.
 - QA2-03 (Info): Tailwind 4 `outline-hidden` yalnızca `forced-colors` modunda `2px solid transparent` veriyor; yüksek kontrast modunda v3'ten ayrışabilir (F9-04 kapsamı).
 - F0-06: description'lı handover toast'ı ve grafik tıklaması (çerçeve yok) regresyon setine eklensin.
+
+## F0-03a kapanış (main @ de4d6a5, 2026-10-09)
+
+Merge sonrası denetim oturumu (Murat talimatı). CI run #65 yeşil; `npm audit` (tam) 0; L5b 38/38 eşik 0,1 altında, toast'lar eşik 0'da 0 px.
+- **Kapandı / karar verildi:** QA2-04 (yöntem sapması kabul: qa-verifier'ın kendi `playwright-core` betiği builder'dan bağımsız; kit: `.claude/agents/qa-verifier.md`'ye `mcp__playwright__browser_evaluate` eklendi), REV2-04 (→ ADR-0006 K2 (e) recharts odak kuralı, K2 (f) katmansız Sonner kuralları).
+- **Açık kalan:** REV-05/QA-04 (F0-06, round 1 tablosunda), REV2-05 (süreç notu).
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| REV2-01, REV2-02, REV2-03 | Low | F0-03a değişiklik notu ve `index.css` yorumu düzeltmeleri, merge öncesinde yapılmadı. REV2-01: not :465 "description/action/cancel kullanılmıyor" yerine "description `HandoverWorkspace.tsx:72`'de kullanılıyor; action/cancel kullanılmıyor"; "betik L5b-A bölümünde" yerine katman kontrolünün tarifi (build CSS'inde seçicilerin `@layer` derinliği 0). REV2-02: `index.css:288-289` yorumu "sonner `<style>` production'da bu dosyadan sonra, dev'de önce eklenir; sıra v3 ile aynı". REV2-03: not :356,371 KPI hover satırı qa-verifier r2 ölçümüyle (`25.09.2026 / Değer : 40 %`, iki tarafta aynı) ya da "betik yakalayamadı" | docs/changes/chore_f0-03a-upgrades.md:356,371,465; src/index.css:288-289 (F0-03b sonrası `apps/web/src/index.css`) | F0-03b. Taşıma commit'inden ayrı bir commit'te yapılır (R100 bozulmasın); commit mesajı üç ID'yi taşır. Yorum değişikliği build CSS'ine girmemeli, CSS hash eşitliğini gate doğrular |
+| REV2-04 (test) | Low | ADR-0006 K2 (e) kuralı recharts iç sınıf adına (`recharts-zIndex-layer_`) bağlı; recharts yükseltmesinde sessizce etkisiz kalabilir. Regresyon adımı: KpiChart ve rapor grafiklerine tıklama → odak çerçevesi yok (main/baseline ile eşik 0 karşılaştırma ya da hedef `g` öğesinde computed `outline-style: none`) | src/index.css:312-318 | F0-06 (görsel regresyon seti). Aynı turda ADR-0006 K2 (f) takibi: toast ekranları eşik 0 (description'lı handover toast'ı dahil) + build CSS'inde 4 Sonner seçicisinin `@layer` derinliği 0 kontrolü |

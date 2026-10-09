@@ -48,10 +48,16 @@ Engelleyici bulgu yok. Aşağıdakiler isteğe bağlı Low düzeltmelerdir; merg
 Her düzeltmeyi ayrı commit'te, mesajında bulgu ID'si ile yap. Bitince lint/typecheck/test/build çalıştır, değişiklik notundaki 'Review düzeltmeleri' tablosunu güncelle ve push et.
 
 ## Murat / denetim işleri (round 2)
-- **QA2-04:** Yöntem sapmasını kabul et ya da A setinin MCP ile yeniden koşulmasını iste. Kit için önerilen değişiklik: qa-verifier araç listesine `browser_evaluate`.
-- **REV2-04 (M2):** ADR-0006 K2 (e) kaydını aç. İçeriği: katmansız 3. taraf CSS × Tailwind 4 `@layer` (Sonner) ve recharts 3 zIndex odak kuralı. F0-06 regresyon setine şunlar eklensin: grafik tıklaması → çerçeve yok; toast ekranları (description'lı handover toast'ı dahil); build CSS'inde Sonner seçicilerinin `@layer` dışında kaldığını sınayan kontrol.
+- ~~**QA2-04:** Yöntem sapmasını kabul et ya da A setinin MCP ile yeniden koşulmasını iste.~~ → **kabul** (aşağıda). Kit: qa-verifier araç listesine `browser_evaluate` eklendi.
+- ~~**REV2-04 (M2):** ADR-0006 K2 (e) kaydını aç.~~ → eklendi (aşağıda). İçeriği: katmansız 3. taraf CSS × Tailwind 4 `@layer` (Sonner) ve recharts 3 zIndex odak kuralı. F0-06 regresyon setine şunlar eklensin: grafik tıklaması → çerçeve yok; toast ekranları (description'lı handover toast'ı dahil); build CSS'inde Sonner seçicilerinin `@layer` dışında kaldığını sınayan kontrol.
 - **REV2-05:** Bundan sonra not güncellemeleri ilgili düzeltme commit'ine girsin ya da toplu commit tüm ID'leri taşısın.
 - QA2-01 … QA2-03 Info: işlem gerekmez (ayrıntı `qa-verifier-r2.md`'de).
+
+## Merge ve kapanış (2026-10-09, main @ de4d6a5, squash)
+- **CI:** run #65 yeşil. **Audit:** `npm audit` (tam) 0. **L5b:** 38/38 ekran çifti eşik 0,1 altında; toast çiftleri eşik 0'da 0 px.
+- **QA2-04 → Murat kararı: kabul.** qa-verifier A setini kendi `playwright-core` betiğiyle koştu, çünkü MCP'de `browser_evaluate` yoktu. Betikler builder'ınkinden bağımsız olduğu için yazan ≠ doğrulayan ayrımı korundu. Bu nedenle karar koşulsuz MERGE'E HAZIR. Kit: `.claude/agents/qa-verifier.md` araç listesine `mcp__playwright__browser_evaluate` eklendi; bundan sonra ölçümler MCP ile yapılabilir.
+- **REV2-04 → ADR-0006 K2 (e).** recharts iç katmanlarına `outline: none` kuralı (a6f46d8) Murat'ın "fare esaslı kullanım" kararına dayanıyor. Risk: kural recharts'ın iç sınıf adına bağlı, yükseltmede sessizce bozulabilir. F0-06 test adımı BACKLOG'da. Katmansız Sonner kuralları (79531b6) da K2 (f) olarak kaydedildi.
+- **REV2-01..03:** merge öncesinde düzeltilmedi → F0-03b (BACKLOG).
 
 ---
 

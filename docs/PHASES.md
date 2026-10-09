@@ -49,7 +49,7 @@ Faz M kapandı: `/phase-close M` round 3 → GO (2026-10-06, main @ dffa61f, `do
 |---|---|---|---|
 | F0-01 | **API sözleşmesi çıkarımı:** dondurulmuş mockup'ın store `Ctx` işlemleri (M-09 sonrası) + `types.ts` + saf iş mantığı dosyaları (`flow.ts`, `completion.ts`, `rules.ts`, `alerts.ts`, `reports.ts`) + ekranlar → `docs/API_CONTRACT.md` (endpoint, girdi/çıktı şeması, rol, audit/gerekçe, tetiklenen kurallar). Kod değişmez | ● | ✅ |
 | F0-02 | **Temizlik:** tek kilit dosyası (npm; bun dosyaları silinir, `npm ci` çalışır), kullanılmayan paketler (`xlsx`, `@supabase/supabase-js` + `src/integrations/supabase` + `supabase/`, `canvas-confetti`, `@lovable.dev/mcp-js`, `lovable-tagger`), `.lovable/` klasörü, README'deki Lovable metni, `.env` repodan çıkar + `.env.example`, `.gitignore`, TS `strict: true`, lint hataları (16), code-split (bundle 1,16 MB). **package-lock senkronu M-09b'de yapıldı (QA-01, main @ aee9657); kalan F0-02 işleri:** `bun.lockb` silinir, lint, `npm audit`, kullanılmayan paketler (xlsx vb.) | | ✅ |
-| F0-03a | **Yükseltme (tek paket yapısında):** React 19, Vite 8 + plugin-react v6, Vitest 5 (+ `@vitest/*`), Tailwind 4, react-router 7, recharts 3, date-fns 4 + @date-fns/tz; `npm audit` (tam) 0. Plan: `docs/plans/F0-03a-stack-upgrades.md`, ADR-0006. **Kabul:** M-06 görsel referansına göre fark yok (L5b, ADR-0006 K5) | | |
+| F0-03a | **Yükseltme (tek paket yapısında):** React 19, Vite 8 + plugin-react v6, Vitest 5 (+ `@vitest/*`), Tailwind 4, react-router 7, recharts 3, date-fns 4 + @date-fns/tz; `npm audit` (tam) 0. Plan: `docs/plans/F0-03a-stack-upgrades.md`, ADR-0006. **Kabul:** M-06 görsel referansına göre fark yok (L5b, ADR-0006 K5) | | ✅ |
 | F0-03b | **Monorepo taşıma:** `apps/web` (mevcut kod), `apps/api` (boş), `packages/shared`; npm workspaces. F0-03a merge'ünden sonra. Plan: `docs/plans/F0-03b-monorepo.md`. **Kabul:** saf taşıma (R100), CSS hash aynı, M-06 görsel referansına göre fark yok | | |
 | F0-04 | **FE veri erişim katmanı:** `packages/shared` zod şemaları (types.ts'ten), modül bazlı TanStack Query hook'ları, `DataSource` arayüzü; mevcut store → `mock` adaptörü; modül başına `VITE_DATA_<MODÜL>=mock|http` anahtarı; ekranlar `useRq()` yerine hook'ları kullanır. **Kabul:** görsel referansa göre fark yok, tüm akışlar aynı | ● | |
 | F0-05 | **API + işçi iskeleti:** `apps/api` ve boş `apps/worker` (ADR-0003), Express 5, katmanlar, hata/validasyon middleware'i, helmet/cors/rate-limit, `db/` (pgmem\|pg), migration runner (`schema_migrations` + checksum, `--pg-only`), seed (mock seed ile aynı veri), dev snapshot | ● | |
@@ -60,6 +60,12 @@ Faz M kapandı: `/phase-close M` round 3 → GO (2026-10-06, main @ dffa61f, `do
 **F0-02 kapanışı (2026-10-09, main @ 3e08fe1):** `/gate` round 2 (@ b936fb7) → MERGE'E HAZIR (`docs/reviews/chore_f0-02-cleanup/SUMMARY.md`).
 - **CI:** `ci.yml`'deki job seviyesindeki `if: hashFiles(...)` ifadesi workflow'u geçersiz kılıyordu; önceki 55 koşu geçersizdi. Murat kontrolü step seviyesine taşıyarak düzeltti (5c41bd2). İlk yeşil CI: run #57.
 - **`tailwindcss-animate` → `devDependencies` (3e08fe1 (squash; branch commit 84eeac9), Murat kararı; REV-01 / M7):** paket yalnızca build-time kullanılır (Tailwind eklentisi, çıktı CSS'e derlenir). Sürüm ve üretilen CSS değişmedi. `npm audit --omit=dev` sonucunun 0 olmasının bir nedeni bu sınıflandırmadır.
+
+**F0-03a kapanışı (2026-10-09, main @ de4d6a5, squash):** `/gate` round 2 (@ 9ace149) → MERGE'E HAZIR (`docs/reviews/chore_f0-03a-upgrades/SUMMARY.md`).
+- **CI:** run #65 yeşil (app ✔, check-migrations ✔, secrets ✔; parity atlandı, `migrations/` yok).
+- **Audit:** `npm audit` (tam) 0 açık (ADR-0006 K7).
+- **L5b (ADR-0006 K5):** 38/38 ekran çifti eşik 0,1'de kabul sınırının altında (en kötü `manager-reports` 272 px, %0,01). Toast çiftleri eşik 0'da 0 px.
+- **Kararlar:** QA2-04 yöntem sapması kabul (Murat); recharts odak kuralı ADR-0006 K2 (e) olarak kaydedildi (REV2-04). REV2-01..03 → F0-03b (`docs/reviews/BACKLOG.md`).
 
 ## F1 — Veri modeli, çekirdek & yetki
 | Kod | Görev | Kural |
