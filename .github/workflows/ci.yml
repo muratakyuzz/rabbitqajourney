@@ -30,10 +30,22 @@ jobs:
         run: |
           if npm ls xlsx --all >/dev/null 2>&1; then echo "::error::xlsx (SheetJS npm) yasaklı — ADR-0001"; exit 1; fi
 
+  # hashFiles() job seviyesindeki `if` içinde kullanılamaz; kontrol burada
+  # step seviyesinde yapılır ve sonucu parity job'una output olarak aktarılır.
+  check-migrations:
+    runs-on: ubuntu-latest
+    outputs:
+      has_migrations: ${{ steps.check.outputs.found }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: echo "found=${{ hashFiles('migrations/*.sql') != '' }}" >> "$GITHUB_OUTPUT"
+
   # L5: aynı entegrasyon testleri gerçek PostgreSQL'de (ADR-0002)
   parity:
+    needs: check-migrations
+    if: needs.check-migrations.outputs.has_migrations == 'true'
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('migrations/*.sql') != '' }}
     services:
       postgres:
         image: postgres:17-alpine
