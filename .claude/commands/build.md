@@ -27,7 +27,7 @@ Plandaki branch adını kullan. Branch uzakta varsa `git fetch && git checkout <
 - Yeni paket gerekiyorsa önce kullanıcıya sor.
 
 ### 4. Doğrula
-Plandaki komutları çalıştır (yoksa: `npm run lint && npx tsc --noEmit && npm test && npm run build`; UI/akış değiştiyse varsa `npm run e2e`). Kırmızıysa düzelt. Lint hata sayısı main'deki sayıdan artmamalı (main'deki sayı: plan veya `docs/AUDIT.md`).
+Plandaki komutları çalıştır (yoksa, kökten: `npm run lint && npm run typecheck && npm test && npm run build`; UI/akış değiştiyse varsa `npm run e2e`). Kırmızıysa düzelt. Lint hata sayısı main'deki sayıdan artmamalı (main'deki sayı: plan veya `docs/AUDIT.md`).
 Test çıktılarını (test-results/, playwright-report/, coverage/) commit etme.
 
 ### 5. Değişiklik notu ve push (PR açılmaz)

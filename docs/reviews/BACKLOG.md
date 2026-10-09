@@ -409,7 +409,7 @@ Gate kararı **MERGE'E HAZIR**. CI #70 yeşil (Murat bildirimi, `gh` yok). Engel
 | REV-03 | Low | README, iş günü hesabının F0-04'te shared'a geleceğini ima ediyor. Plan §9'a göre F6-01'de | README.md:13 | F0-03b (isteğe bağlı `/fix`) ya da F0-04 |
 | REV-04 | Low | shared `tsconfig.json`'da `lib` ve `types` yok. DOM ve hoist edilen bütün `@types` görünür; shared'da `window` ya da `process` kullanımı typecheck'ten geçer | packages/shared/tsconfig.json:2-10 | F0-04 (`lib: ["ES2022"]`, `types: []` + `window` negatif kontrolü) |
 | REV-05 | Low | ESLint `**/*.{ts,tsx}` → `globals.browser` ve react kuralları shared, api ve worker'a da uygulanıyor | eslint.config.js:11-22 | F0-05 (workspace bazında ESLint) |
-| REV-06 | Low | Kitteki yedek komutlar monorepo sonrası yanlış: kökte `npx tsc --noEmit` 0 dosya kontrol ediyor (yanlış yeşil), kökte `npx vite` `index.html` bulamıyor | .claude/commands/build.md:30; docs/agents/qa-verifier.md:63 | Kit §13 (denetim, Murat onayıyla): `npm run typecheck`, `npm ci`, `npm run dev`/`preview` |
+| REV-06 | Low | Kitteki yedek komutlar monorepo sonrası yanlış: kökte `npx tsc --noEmit` 0 dosya kontrol ediyor (yanlış yeşil), kökte `npx vite` `index.html` bulamıyor | .claude/commands/build.md:30; docs/agents/qa-verifier.md:63 | **Kapandı (Murat onayı, 2026-10-09, F0-03b kapanış):** `npm run typecheck`, `npm ci`, `npm run dev -- …` / `npm run preview -- …` |
 | QA-01 | Low (bilgi) | M-06 baseline'da 37 PNG var; plan "D12 kabul edildiyse 38" diyor | docs/reviews/M-06/baseline | F0-06 (baseline yenilenirken) |
 | QA-02 | Low (süreç) | Denetim rolünde guard, worktree'de `node_modules` silme komutunu engelliyor. Temiz kurulum yalnızca `npm ci` ile sağlandı | .claude/hooks/guard.mjs | Süreç notu |
 
@@ -418,3 +418,9 @@ Gate kararı **MERGE'E HAZIR**. CI #70 yeşil (Murat bildirimi, `gh` yok). Engel
 - Kökten `npm test -- <bayrak>` vitest'e ulaşmıyor (workspace'e devir). F0-06'da Vitest `projects` kurulurken bakılmalı.
 - L5b-A metin rasterleştirme belirsizliği (5 ekran, ≤ %0,07, yeniden çekimde 0): F0-06 betiğine otomatik yeniden çekim ya da font ısıtma eklenmeli (QA-07 ailesi).
 - `guard.mjs:33` içindeki `^src/`, `^public/` ve `^index\.html$` desenleri boşta kaldı, zararsız (kit §13 temizliği).
+
+## F0-03b kapanış (main @ af702c1, 2026-10-09)
+
+Merge sonrası denetim oturumu (Murat talimatı). Branch CI #70 ve main CI #72 yeşil (Murat bildirimi).
+- **Kapandı:** REV-06 (Murat onayı). `.claude/commands/build.md` §4 yedek komutu: `npm run typecheck`. `docs/agents/qa-verifier.md` demo modu: `npm ci`, `npm run typecheck`, `npm run dev -- --host 127.0.0.1 --port 8090` (build çıktısı için `npm run preview -- …`).
+- **Açık kalan:** REV-01, REV-02, REV-03 (belge düzeltmeleri; merge öncesinde `/fix` yapılmadı), REV-04 (F0-04), REV-05 (F0-05), QA-01 (F0-06), QA-02 (süreç notu), `guard.mjs:33` boşta kalan desenler (kit temizliği).

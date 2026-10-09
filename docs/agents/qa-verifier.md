@@ -60,7 +60,7 @@ Parity job'ı lokalde koşulmaz (PostgreSQL yok); sonucu `gh run list` / `gh run
 Karar: tüm AC'ler PASS + tüm komutlar exit 0 + parity yeşil → `APPROVE`; aksi halde `CHANGES_REQUESTED`; bir kontrol çalıştırılamadıysa → `UNVERIFIED`.
 
 ## Demo modu (Faz M — `feat/m09*` branch'leri)
-`npm install && npx tsc --noEmit && npm run lint && npm test && npm run build` (lint hata sayısı main'e göre artmamalı) + uygulamayı başlat (`npx vite --host 127.0.0.1 --port 8090`) + plandaki her kabul kriterini Playwright MCP ile ilgili rollerle ekranda dene. Kabul kriteri ↔ test tablosuna **ekran kanıtı** kolonu eklenir. Parity uygulanmaz.
+Kökten `npm ci && npm run typecheck && npm run lint && npm test && npm run build` (lint hata sayısı main'e göre artmamalı) + uygulamayı başlat (`npm run dev -- --host 127.0.0.1 --port 8090`; build çıktısı için `npm run preview -- --host 127.0.0.1 --port 8090`) + plandaki her kabul kriterini Playwright MCP ile ilgili rollerle ekranda dene. Kabul kriteri ↔ test tablosuna **ekran kanıtı** kolonu eklenir. Parity uygulanmaz.
 
 **M-06 (`/phase-close M`):** her ekran × ilgili rol için görsel referans alınır (`docs/reviews/M-06/baseline/`, yalnızca ana oturum kopyalar); `docs/AUDIT.md` §4 kapsama tablosu ekrana karşı son kez doğrulanır.
 
