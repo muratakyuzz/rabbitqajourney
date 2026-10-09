@@ -15,14 +15,14 @@ Roller: `csm`, `devops`, `care`, `manager`, `admin` (enum değerleri mockup'taki
 
 **Yaklaşım:** FE mock veriyle tam mockup olarak tamamlandı (Lovable, bitti) ve M-09 + M-06 ile dondurulur. BE dondurulmuş mockup'ın sözleşmesine (`docs/API_CONTRACT.md`) göre yazılır; ekranlar modül modül `mock` → `http` adaptörüne geçirilir. Mevcut durum: `docs/AUDIT.md`.
 
-### Demo kuralları (Faz M — M-09 ve mockup koduna dokunan her iş, F0-04'e kadar)
+### Demo kuralları (Faz M — M-09 ve mockup koduna dokunan her iş, F0-04 sonuna kadar)
 - Backend, veritabanı, Supabase yok. Tüm veri `src/lib/rabbitqa/` store'unda (`RqProvider`/`useRq`) ve seed'de.
 - Her veri değişikliği store fonksiyonundan geçer ve audit yazar; bileşende state doğrudan değişmez.
 - Gerekçe zorunlu: kurulum tipi/LLM değişikliği, tarih ve durum değişikliği, uyarı kapatma/erteleme.
 - Enum değerleri değiştirilmez/yeniden adlandırılmaz; yalnızca yeni değer eklenir. Model değişirse state sürümü +1 ve store KEY aynı sürüme.
 - Akış yalnızca `flow.ts` (`advanceFlow`, `isOpenStep`); adım tamamlama yalnızca `completion.ts` (M-09a); uyarılar yalnızca `alerts.ts`; iş günü yalnızca `business-days.ts`; rapor snapshot'ı yalnızca `reports.ts`.
 - Yetki yalnızca `perm.ts`; bileşende rol karşılaştırması yok (Overview'daki role göre içerik hariç).
-- Yeni npm paketi yok (F0-03 hariç: yalnızca ADR-0006 K4 izin listesi). Arayüz Türkçe, tarih `gg.aa.yyyy`, mevcut AppShell/tema/shadcn.
+- Yeni npm paketi yok (F0-03 hariç: yalnızca ADR-0006 K4 izin listesi; F0-04: yalnızca ADR-0007 K2 izin listesi). Arayüz Türkçe, tarih `gg.aa.yyyy`, mevcut AppShell/tema/shadcn.
 - Kilitli ("Sırası gelmedi") adım iş sayılmaz.
 
 ### Mockup yapısı (main @ 4bfa4cb)
