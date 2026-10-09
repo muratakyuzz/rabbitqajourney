@@ -285,8 +285,9 @@
   Tailwind 4 utilities live in @layer; sonner injects its CSS unlayered at
   runtime, so it overrides the ui/sonner.tsx classNames. These unlayered
   rules restore the v3 values with the same (0,3,0) specificity the v3
-  group-[.toaster] / group-[.toast] utilities had; sonner's <style> is
-  appended after this file, so ties resolve as in v3.
+  group-[.toaster] / group-[.toast] utilities had. In production sonner's
+  <style> is appended after this file, in dev before it; the order is the
+  same as in v3, so ties resolve as in v3.
 */
 [data-sonner-toaster] [data-sonner-toast].toast {
   background-color: hsl(var(--background));

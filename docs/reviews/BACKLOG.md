@@ -397,3 +397,24 @@ Merge sonrası denetim oturumu (Murat talimatı). CI run #65 yeşil; `npm audit`
 |---|---|---|---|---|
 | REV2-01, REV2-02, REV2-03 | Low | F0-03a değişiklik notu ve `index.css` yorumu düzeltmeleri, merge öncesinde yapılmadı. REV2-01: not :465 "description/action/cancel kullanılmıyor" yerine "description `HandoverWorkspace.tsx:72`'de kullanılıyor; action/cancel kullanılmıyor"; "betik L5b-A bölümünde" yerine katman kontrolünün tarifi (build CSS'inde seçicilerin `@layer` derinliği 0). REV2-02: `index.css:288-289` yorumu "sonner `<style>` production'da bu dosyadan sonra, dev'de önce eklenir; sıra v3 ile aynı". REV2-03: not :356,371 KPI hover satırı qa-verifier r2 ölçümüyle (`25.09.2026 / Değer : 40 %`, iki tarafta aynı) ya da "betik yakalayamadı" | docs/changes/chore_f0-03a-upgrades.md:356,371,465; src/index.css:288-289 (F0-03b sonrası `apps/web/src/index.css`) | F0-03b. Taşıma commit'inden ayrı bir commit'te yapılır (R100 bozulmasın); commit mesajı üç ID'yi taşır. Yorum değişikliği build CSS'ine girmemeli, CSS hash eşitliğini gate doğrular |
 | REV2-04 (test) | Low | ADR-0006 K2 (e) kuralı recharts iç sınıf adına (`recharts-zIndex-layer_`) bağlı; recharts yükseltmesinde sessizce etkisiz kalabilir. Regresyon adımı: KpiChart ve rapor grafiklerine tıklama → odak çerçevesi yok (main/baseline ile eşik 0 karşılaştırma ya da hedef `g` öğesinde computed `outline-style: none`) | src/index.css:312-318 | F0-06 (görsel regresyon seti). Aynı turda ADR-0006 K2 (f) takibi: toast ekranları eşik 0 (description'lı handover toast'ı dahil) + build CSS'inde 4 Sonner seçicisinin `@layer` derinliği 0 kontrolü |
+
+## chore/f0-03b-monorepo (@ 590529b, 2026-10-09 — round 1)
+
+Gate kararı **MERGE'E HAZIR**. CI #70 yeşil (Murat bildirimi, `gh` yok). Engelleyici bulgu yok. REV2-01..03 bu branch'te `42696b9` ile kapandı. CSS hash'inin aynı kaldığını qa-verifier doğruladı.
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| REV-01 | Low | Not "52 çalışma zamanı bağımlılığı" diyor. Gerçekte main'de 50 var, `@rabbitqa/shared` ile 51 | docs/changes/chore_f0-03b-monorepo.md:28 | F0-03b (isteğe bağlı `/fix`) ya da F0-03b kapanış |
+| REV-02 | Low | F0-03a notunda `@layer` derinliği cümlesi tekrarlanıyor. "Sonner `head` sonuna ekler" ifadesi REV2-02 ile düzeltilen `index.css` yorumuyla çelişiyor (prod: sonra, dev: önce) | docs/changes/chore_f0-03a-upgrades.md:465 | F0-03b (isteğe bağlı `/fix`) ya da F0-03b kapanış |
+| REV-03 | Low | README, iş günü hesabının F0-04'te shared'a geleceğini ima ediyor. Plan §9'a göre F6-01'de | README.md:13 | F0-03b (isteğe bağlı `/fix`) ya da F0-04 |
+| REV-04 | Low | shared `tsconfig.json`'da `lib` ve `types` yok. DOM ve hoist edilen bütün `@types` görünür; shared'da `window` ya da `process` kullanımı typecheck'ten geçer | packages/shared/tsconfig.json:2-10 | F0-04 (`lib: ["ES2022"]`, `types: []` + `window` negatif kontrolü) |
+| REV-05 | Low | ESLint `**/*.{ts,tsx}` → `globals.browser` ve react kuralları shared, api ve worker'a da uygulanıyor | eslint.config.js:11-22 | F0-05 (workspace bazında ESLint) |
+| REV-06 | Low | Kitteki yedek komutlar monorepo sonrası yanlış: kökte `npx tsc --noEmit` 0 dosya kontrol ediyor (yanlış yeşil), kökte `npx vite` `index.html` bulamıyor | .claude/commands/build.md:30; docs/agents/qa-verifier.md:63 | Kit §13 (denetim, Murat onayıyla): `npm run typecheck`, `npm ci`, `npm run dev`/`preview` |
+| QA-01 | Low (bilgi) | M-06 baseline'da 37 PNG var; plan "D12 kabul edildiyse 38" diyor | docs/reviews/M-06/baseline | F0-06 (baseline yenilenirken) |
+| QA-02 | Low (süreç) | Denetim rolünde guard, worktree'de `node_modules` silme komutunu engelliyor. Temiz kurulum yalnızca `npm ci` ile sağlandı | .claude/hooks/guard.mjs | Süreç notu |
+
+### Öneriler / notlar
+- `envDir` artık `apps/web`. F0-04'te kök `.env`'deki `VITE_DATA_<MODÜL>` web'e ulaşmaz; değişiklik notundaki "envDir → F0-08" önerisi F0-04'e çekilmeli.
+- Kökten `npm test -- <bayrak>` vitest'e ulaşmıyor (workspace'e devir). F0-06'da Vitest `projects` kurulurken bakılmalı.
+- L5b-A metin rasterleştirme belirsizliği (5 ekran, ≤ %0,07, yeniden çekimde 0): F0-06 betiğine otomatik yeniden çekim ya da font ısıtma eklenmeli (QA-07 ailesi).
+- `guard.mjs:33` içindeki `^src/`, `^public/` ve `^index\.html$` desenleri boşta kaldı, zararsız (kit §13 temizliği).

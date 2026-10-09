@@ -4,6 +4,7 @@
 > Kaynaklar: `src/lib/rabbitqa/store.tsx` (`Ctx`), `types.ts`, `perm.ts`, `flow.ts`, `completion.ts`, `rules.ts`, `alerts.ts`, `reports.ts`, `email-match.ts`, `ai-mock.ts`, `src/lib/auth-api.ts`, `src/pages/**` · `docs/PRODUCT_SPEC.md` (Ek A, Ek B dahil) · `docs/RBAC.md` · `docs/INVARIANTS.md` · `docs/adr/0004-f0-pre-decisions.md` (K1–K7) · `docs/adr/0005-f0-01-contract-decisions.md` (K8–K20).
 > Şemaların tek kaynağı `packages/shared/src/schemas/` (INV-19). Bu doküman şemaları tekrar yazmaz; şema adına referans verir (§6). Şemaların kendisi F0-04'te yazılır.
 > Hedef davranış: ADR-0004 ve ADR-0005 kararları, `docs/RBAC.md` ve `docs/INVARIANTS.md` sözleşmeye **hedef** olarak yazılmıştır. Mockup'tan farklı olan her nokta §4'te, RBAC/spec ile çelişen veya karşılığı olmayan her nokta §5'tedir.
+> F0-03b'den itibaren mockup kodu `apps/web/src/` altındadır; bu belgedeki `src/…` başvuruları `apps/web/src/…` olarak okunur.
 
 ## 1. Genel kurallar
 - Taban yol: `/api/v1`. JSON. Tarih: `YYYY-MM-DD`, zaman damgası: ISO 8601 (UTC). "Bugün" ve iş günü hesabı Europe/Istanbul'a göre, yalnızca `packages/shared/business-days` ile (INV-13).
