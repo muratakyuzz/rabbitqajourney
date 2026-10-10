@@ -16,7 +16,7 @@
     "preview": "npm run preview -w @rabbitqa/web --",
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && node --test .claude/hooks/guard.test.mjs",
     "test:watch": "npm run test:watch -w @rabbitqa/web --",
     "check": "npm run lint && npm run typecheck && npm test"
   },
