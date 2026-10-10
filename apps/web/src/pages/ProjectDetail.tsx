@@ -485,13 +485,13 @@ export function StepDialog({ step, project, onClose }: { step: Step; project: Pr
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2"><Label>Top kimde</Label><EnumSelect value={ball} onChange={setBall} labels={BALL_LABEL} /></div>
             <div className="grid gap-2">
-              <Label>Durum</Label>
+              <Label htmlFor="step-status">Durum</Label>
               {locked ? (
                 <>
                   <Input value="Sırası gelmedi" disabled />
                   <p className="text-xs text-muted-foreground">Sırası gelince otomatik açılır; durumu elle değiştirilemez.</p>
                 </>
-              ) : <EnumSelect value={status} onChange={setStatus} labels={statusLabels as Record<StepStatus, string>} />}
+              ) : <EnumSelect id="step-status" value={status} onChange={setStatus} labels={statusLabels as Record<StepStatus, string>} />}
               {dataOrMeeting && !locked && (
                 <p className="text-xs text-muted-foreground">Bu adım {step.completion === "data" ? "veriyle" : "toplantıyla"} tamamlanır; elle yalnızca Kapsam dışı yapılabilir.</p>
               )}

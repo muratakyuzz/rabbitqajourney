@@ -102,9 +102,9 @@ export function HandoverWorkspace({ project, phase, readOnly, csmEditable }: Wor
             </Select>
           </div>
           <div data-field="salespersonId" className="grid gap-2">
-            <div className="flex items-center"><Label>Devir alınan satışçı</Label><StepMini phase={phase} stepKey="sales_license" /></div>
+            <div className="flex items-center"><Label htmlFor="hw-salesperson">Devir alınan satışçı</Label><StepMini phase={phase} stepKey="sales_license" /></div>
             <Select value={project.salespersonId ?? NONE} disabled={readOnly} onValueChange={(v) => updateProject(project.id, { salespersonId: v === NONE ? null : v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger id="hw-salesperson"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>Seçilmedi</SelectItem>
                 {state.salespeople.filter((s) => s.active !== false || s.id === project.salespersonId).map((s) => <SelectItem key={s.id} value={s.id} disabled={s.active === false}>{s.name}{s.active === false ? " (pasif)" : ""}</SelectItem>)}

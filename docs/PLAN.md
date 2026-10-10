@@ -199,11 +199,13 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
   - `npm run check` yeşil: lint 0 hata / 27 uyarı; test sayıları api 110, web 259, shared 284, guard 3. API testleri `TZ=UTC` ve `TZ=Europe/Istanbul` ile de geçiyor.
 
 ## M5 — Kapanış
-- [ ] Playwright: tek ana akış e2e (yeni proje → adım tamamla → toplantı kaydet + aksiyon → aksiyonu tamamla → aşamayı onayla)
+- [x] Playwright: tek ana akış e2e (yeni proje → 00 veri adımları Satış Devri formundan → satış devri toplantısı + aksiyon → aksiyonu tamamla → 00'ı onayla, yenile → 01'de elle adım StepDialog'dan, yenile)
 - [ ] Tek inceleme turu (M0–M4 aralığı) ve görsel kontrol (bu dört ekran)
 - [ ] `git tag faz1`
 - **Notlar:**
-  - e2e (`2d39cee`): `npm run e2e` gerçek API (`127.0.0.1:3001`) + Vite (`localhost:8080`) ile Chromium'da koşar; `npm run check`'e dahil değil. Şimdilik yalnız 1. adım (giriş → yeni proje → proje detayı) var. 2. adım bekliyor: 00 Satış Devri'nde elle tamamlanan adım yok (hepsi veri ya da toplantıyla tamamlanıyor); akışın hangi adımı "Tamamlandı" yapacağı Murat'ın kararı.
+  - e2e: `npm run e2e` gerçek API (`127.0.0.1:3001`) + Vite (`localhost:8080`) ile Chromium'da koşar; `npm run check`'e dahil değil. Tek test, altı adım, hepsi arayüzden (API'ye doğrudan istek yok): (1) giriş → yeni proje; (2) Satış Devri formundan satışçı + lisans modeli, modül, "Taahhüt yok", kurulum tipi + LLM, teklif ve sözleşme dokümanı (dosya Playwright `setInputFiles` ile seçilir), her biri için adım "Tamamlandı"; (3) "Satış devri toplantısı" adımından toplantı (Yapıldı, CSM iç katılımcı, bir aksiyon) → adım tamamlandı; (4) Aksiyonlar sekmesinde satırdaki kutuyla tamamla; (5) "Aşamayı tamamla" → 00 tamamlandı, yenileyince 00, aksiyon ve toplantı API'den geliyor; (6) 01'de "Onboarding sunumunun paylaşılması" StepDialog'dan "Tamamlandı", yenileyince kalıyor.
+  - e2e'nin bulabilmesi için birkaç etikete kontrol bağı eklendi (`htmlFor`/`id`): yeni proje diyaloğu, Satış Devri'nde satışçı, toplantı diyaloğunda Durum, aksiyon alanlarında Başlık, StepDialog'da Durum. Davranış değişmedi.
+  - Onaylayan e2e'de "Örnek Administrator": Faz 1'de API'nin geçerli kullanıcısı seed admin (Yetki satırı); test bunu bilerek doğruluyor.
   - İnceleme turu yapıldı (`docs/reviews/faz1-review.md`), bulgular düzeltildi (aynı dosyada "Düzeltmeler"). Görsel kontrol Murat'ta; kutu o zaman işaretlenir.
 
 ---
@@ -295,3 +297,4 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 - 2026-10-11 (inceleme D6): Oturum ortasında API restart'ı (dev'de `tsx watch` her API dosyası kaydında) istemcide fark edilmiyor; `bootId` yalnız açılışta kontrol edilir. Sayfa yenilenince store seed'e döner ve tutarlılık geri gelir. Düzeltilmedi: yalnız geliştirmede görülür, Faz 2'de kalıcı PostgreSQL ile restart veri sıfırlamaz.
 - 2026-10-11 (inceleme D8): `.github/workflows/ci.yml:34`'teki "parity job'una output olarak aktarılır" yorumu parity job'u kalktığı için eskidi; değişiklik Murat'a önerildi (workflow'lara elle dokunulur).
 - 2026-10-11 (inceleme Y2): API varsayılan olarak yalnız `127.0.0.1`'i dinler (`API_HOST`), Vite dev/preview `localhost`. Faz 1'de kimlik doğrulama olmadığından yerel ağa açmak bilinçli bir karar olmalı (`API_HOST=0.0.0.0`).
+- 2026-10-11 (M5): 00 Satış Devri'nde elle tamamlanan adım yok (hepsi veri ya da toplantıyla tamamlanıyor). e2e 00'da veri ve toplantı yolunu, elle tamamlama yolunu 01'deki "Onboarding sunumunun paylaşılması" adımıyla (StepDialog → `PATCH /api/steps/:id`) test eder.

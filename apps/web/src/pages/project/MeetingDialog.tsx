@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Link } from "react-router";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,10 +38,10 @@ export function PersonSelect({ value, onChange, projectId, includeContacts = tru
   );
 }
 
-export function EnumSelect<T extends string>({ value, onChange, labels, disabled }: { value: T; onChange: (v: T) => void; labels: Record<T, string>; disabled?: boolean }) {
+export function EnumSelect<T extends string>({ id, value, onChange, labels, disabled }: { id?: string; value: T; onChange: (v: T) => void; labels: Record<T, string>; disabled?: boolean }) {
   return (
     <Select value={value} onValueChange={(v) => onChange(v as T)} disabled={disabled}>
-      <SelectTrigger><SelectValue /></SelectTrigger>
+      <SelectTrigger id={id}><SelectValue /></SelectTrigger>
       <SelectContent>
         {(Object.keys(labels) as T[]).map((k) => <SelectItem key={k} value={k}>{labels[k]}</SelectItem>)}
       </SelectContent>
@@ -55,10 +55,11 @@ export type ActionDraft = { title: string; ownerId: string | null; ball: Ball; d
 /** `creating`: a new action cannot start as cancelled (cancelling needs a reason, API #6/#7). */
 export function ActionFields({ d, setD, projectId, showStatus, creating }: { d: ActionDraft; setD: (d: ActionDraft) => void; projectId: string; showStatus?: boolean; creating?: boolean }) {
   const { state } = useRq();
+  const titleId = useId();
   const statusLabels = creating ? (({ cancelled: _c, ...rest }) => rest)(ACTION_STATUS_LABEL) as Record<ActionStatus, string> : ACTION_STATUS_LABEL;
   return (
     <div className="grid gap-3">
-      <div className="grid gap-2"><Label>Başlık</Label><Input value={d.title} onChange={(e) => setD({ ...d, title: e.target.value })} /></div>
+      <div className="grid gap-2"><Label htmlFor={titleId}>Başlık</Label><Input id={titleId} value={d.title} onChange={(e) => setD({ ...d, title: e.target.value })} /></div>
       <div className="grid grid-cols-2 gap-3">
         <div className="grid gap-2"><Label>Sahip</Label><PersonSelect value={d.ownerId} onChange={(v) => setD({ ...d, ownerId: v, ball: ballForOwner(v, state.users, d.ball) })} projectId={projectId} /></div>
         <div className="grid gap-2">
@@ -140,8 +141,8 @@ export function MeetingDialog({ project, onClose, defaultType = "checkin", defau
             <div className="grid gap-2"><Label>Tür</Label><EnumSelect value={type} onChange={setType} labels={MEETING_TYPE_LABEL} /></div>
             <div className="grid gap-2"><Label>Tarih</Label><Input type="date" value={date} onChange={(e) => onDateChange(e.target.value)} /></div>
             <div className="grid gap-2">
-              <Label>Durum</Label>
-              <EnumSelect value={status} onChange={(v) => { setStatus(v); setStatusTouched(true); }} labels={MEETING_STATUS_LABEL} />
+              <Label htmlFor="meeting-status">Durum</Label>
+              <EnumSelect id="meeting-status" value={status} onChange={(v) => { setStatus(v); setStatusTouched(true); }} labels={MEETING_STATUS_LABEL} />
             </div>
           </div>
           {type === "adaptation" && (
