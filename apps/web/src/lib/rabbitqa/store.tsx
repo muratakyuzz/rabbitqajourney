@@ -10,7 +10,7 @@ import { analyzeText, type IncomingMeta } from "./ai-mock";
 import { matchEmail } from "./email-match";
 import { isAutoStep, manualStatusError, settleAll, stepLockError } from "./completion";
 import type {
-  AiInsight, ChatChannel, InsightProposedFields, InsightSource, IntegrationConfig, ProjectIntegrations, UnmatchedEmail,
+  AiInsight, ChatChannel, InsightProposedAny, InsightSource, IntegrationConfig, ProjectIntegrations, UnmatchedEmail,
   CustomerReport, User, Action, Adaptation, AdaptationItem, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RiskDecision, RqState, Step, SupportTicket,
 } from "./types";
 import { todayISO } from "./labels";
@@ -668,7 +668,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
     approveInsight: (id, edited, note) => {
       const ins = state.insights.find((i) => i.id === id);
       if (!ins || ins.status !== "pending") return "Öneri bulunamadı veya zaten incelendi";
-      const v = { ...ins.proposed, ...(edited ?? {}) } as InsightProposedFields;
+      const v = { ...ins.proposed, ...(edited ?? {}) } as InsightProposedAny;
       const reason = `AI Insight onaylandı (${ins.source === "teams" ? "Teams" : "E-posta"}): ${ins.rationale}${note ? ` — Not: ${note}` : ""}`;
       let applied: string | null = ins.targetId;
       switch (ins.kind) {

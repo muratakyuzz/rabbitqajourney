@@ -297,6 +297,8 @@ Murat kararı bekleyen noktalar. Sözleşme her birinde **güvenli varsayımı**
 S10, S13, S15, S17 ve S18 gate round 2'de (REV-F017) Murat onayıyla ADR-0005 K14–K18 olarak karara bağlandı; S15 ve S17 mockup'tan farklı hedef davranıştır (§4).
 
 ## 6. Şema adları (`packages/shared/src/schemas/` — F0-04)
+F0-04a: enum'lar, `ActionCreate`, `RiskDecisionCreate` ve `InsightProposal` (tür başına alan şemaları, #44) yazıldı; varlıklar F0-04b.
+
 Varlık şemaları `types.ts`'teki tip adlarını korur; istek şemaları `<Varlık>Create` / `<Varlık>Patch`. Enum'lar `packages/shared/src/enums/` (değerler mockup ile birebir).
 
 **Enum'lar:** `Role`, `Ball`, `StepStatus`, `Dependency`, `PhaseStatus`, `Health`, `ActionStatus`, `Priority`, `ActionSource`, `ContactRole`, `CommitmentStatus`, `MeetingType`, `InstallType`, `LlmChoice`, `DocType`, `StepCompletion`, `MeetingStatus`, `AdaptationItem`, `AlertSeverity`, `AlertStatus`, `TicketStatus`, `TicketType`, `BoardDecision`, `RiskKind`, `RiskStatus`, `AlertType`, `AlertLevel`, `AlertStateStatus`, `ChatProvider`, `ConnStatus`, `InsightKind`, `InsightStatus`, `InsightSource`.

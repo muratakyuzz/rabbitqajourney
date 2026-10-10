@@ -10,7 +10,7 @@ Virgosol iç ekibinin RabbitQA müşteri onboarding sürecini uçtan uca takip e
 npm workspaces monorepo'su; komutlar kökten çalışır ve workspace'lere devredilir.
 - `apps/web`: web uygulaması (`@rabbitqa/web`; React, Vite). Mockup kodu `apps/web/src/` altındadır.
 - `apps/api`: API (`@rabbitqa/api`); şimdilik boş iskelet, F0-05'te yazılır.
-- `packages/shared`: ortak şemalar, enum'lar ve iş günü hesabı (`@rabbitqa/shared`); şimdilik boş, F0-04'te dolar.
+- `packages/shared`: ortak şemalar ve enum'lar (`@rabbitqa/shared`; enum'lar ve AI öneri şemaları F0-04a, varlık şemaları F0-04b), iş günü hesabı (F6-01).
 
 ## Çalıştırma
 ```sh

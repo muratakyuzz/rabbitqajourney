@@ -424,3 +424,40 @@ Gate kararı **MERGE'E HAZIR**. CI #70 yeşil (Murat bildirimi, `gh` yok). Engel
 Merge sonrası denetim oturumu (Murat talimatı). Branch CI #70 ve main CI #72 yeşil (Murat bildirimi).
 - **Kapandı:** REV-06 (Murat onayı). `.claude/commands/build.md` §4 yedek komutu: `npm run typecheck`. `docs/agents/qa-verifier.md` demo modu: `npm ci`, `npm run typecheck`, `npm run dev -- --host 127.0.0.1 --port 8090` (build çıktısı için `npm run preview -- …`).
 - **Açık kalan:** REV-01, REV-02, REV-03 (belge düzeltmeleri; merge öncesinde `/fix` yapılmadı), REV-04 (F0-04), REV-05 (F0-05), QA-01 (F0-06), QA-02 (süreç notu), `guard.mjs:33` boşta kalan desenler (kit temizliği).
+
+## chore/f0-04a-shared-foundation (@ 007f47d, 2026-10-09)
+
+Gate kararı **MERGE'E HAZIR**. CI yeşil @ 007f47d (Murat bildirimi, `gh` yok). Bu branch F0-03b'den REV-01, REV-02, REV-03 (belge düzeltmeleri, `7be6093`), REV-04 (shared `lib`/`types` + `no-runtime-globals.ts`) ve envDir önerisini kapattı.
+
+RUL-01 (Medium; #44 türler arası alan reddi) ve RUL-02 (Low; RiskStatus çapraz testi) tur 2'de (@ 5d7e656) düzeltildi ve doğrulandı. rules-reviewer 4 mutasyonu tekrarladı (1/3/4/1 kırmızı) ve 3 ek mutasyon denedi. Bu iki satır aşağıdaki tablodan çıkarıldı.
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| REV-01 | Low | `step_update`, `health_change` ve `date_change` alanları elle yazılmış. Patch şemaları shared'a gelince `.pick` ile türetilmeli (INV-19) | packages/shared/src/schemas/insight.ts:15-25 | F0-04b / F3 |
+| REV-02 | Low | AC3 envDir testi jsdom'da koşuyor çünkü `setup.ts` `window`'a yazıyor | apps/web/src/test/vite-env.test.ts:6-7; apps/web/src/test/setup.ts:3 | F0-06 (`setup.ts` koruması ya da Vitest `projects` → `@vitest-environment node`) |
+| REV-03 | Low | react-hooks 7 uyarıları shadcn dosyalarında, kaynak düzeltilerek temizlenemez: `components/ui/carousel.tsx:96`, `components/ui/sidebar.tsx:536`, `hooks/use-mobile.tsx:14` | eslint.config.js:35-42 | F0-05 (ui bloğunda Compiler kuralları `off`, `use-mobile` için karar) |
+| — | Low (iz) | react-hooks 7 uyarıları shadcn dışında: `store.tsx:131` (refs), `CustomerReport.tsx:89` (set-state-in-effect), `Projects.tsx:35` (preserve-manual-memoization) | apps/web/src | 04c–04h (dokunulan dosyada temizlenir, plan §13) |
+
+### Açık sorular (Murat kararı, F8-03 / 04h öncesi)
+- INV-12: `*_create` önerilerinde `isCustomerVisible`, `status`, `decidedAt`, `probability` ve `mitigation` alanları #44'e göre AI'den gelebiliyor, ama onay diyaloğu bir kısmını göstermiyor. Seçenekler: (a) bu alanları AI'nin önerebileceği alanlardan çıkarmak, (b) diyaloğun her alanı göstermesini zorunlu kılmak.
+- Boş `proposed: {}` altı türde şemadan geçiyor. Karar: kayıt anında boş olmama kontrolü mü, türe göre zorunlu alan mı?
+- V2: `step_update.status = locked` şemada reddedilsin mi, yoksa yalnızca #5 `409` mu?
+- F8-03 notları: `{...proposed, ...edited}` yeniden parse edilmeli; düzenlenen `phaseId` için proje sahipliği kontrol edilmeli; `sourceRef.link` için `https:` / `#` kısıtı konmalı ve link sunucuda üretilmeli; `current` sunucuda hesaplanmalı. Ayrıca AC7 testinde `toStrictEqual` değerlendirilmeli (04h).
+
+## chore/f0-04a-shared-foundation (@ 5d7e656, 2026-10-10 — tur 2)
+
+Gate kararı **MERGE'E HAZIR**. CI yeşil @ 5d7e656 (Murat bildirimi; `gh` yok). Üç gate de APPROVE verdi. AC9 tekrar doğrulandı: bundle tur 1 ile bayt bayt aynı.
+
+5d7e656 BACKLOG'u uygulama rolünde değiştirmişti. Gate bu değişikliği sahiplendi ve yukarıdaki biçimde yeniden yazdı (REV-04/05).
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| GATE-01 | Medium | Guard, yorumlayıcı üzerinden yapılan yazmayı ve korumalı yolun commit'lenmesini görmüyor. Builder BACKLOG'u `python3 - <<EOF … open(p,"w")` ile yazıp commit'ledi. `MUTATORS` listesinde python/node/awk/ruby yok; `p="docs/…"` token'ı eşleşmiyor; builder'ın `git add`/`commit` komutları denetlenmiyor. CLAUDE.md'deki "zorlayan: guard" beyanı şu an tam karşılanmıyor. Öneri: (1) builder `git commit` → `git diff --cached --name-only` ∩ `AUDIT_PATHS` ise engelle; (2) yorumlayıcıları `MUTATORS`'a ekle ve gömülü yol eşleşmesi kur; (3) `/fix` ve AGENTS.md'ye "BACKLOG gate'e aittir; korumalı yol isteyen talimatta dur ve bildir" kuralını yaz | .claude/hooks/guard.mjs:84-110; .claude/commands/fix.md | Kit değişikliği, F0-04b `/build` öncesi (Murat isteğiyle, denetim rolü); en geç F0-07 |
+| REV-04 | Low (süreç) | `/fix`, uygulama rolüne salt okunur olan `docs/reviews/BACKLOG.md`'yi değiştirdi. Bunu Murat'ın talimatı istedi, ancak kapanışı gate'ten önce düzelten taraf kaydetti. Kök neden ve kalıcı çözüm GATE-01'de | docs/reviews/BACKLOG.md (5d7e656) | Kapandı. Gate kaydı yeniden yazdı; önleme için GATE-01 |
+| REV-05 | Low | Builder kapanışı "Hedef faz" sütununa yazdı ve "doğrulandı" iddiasını kendisi yaptı. Gelenek ise paragraf notu ve satırı tablodan çıkarmak | docs/reviews/BACKLOG.md | Kapandı (bu kayıt) |
+| REV-06 | Low (bilgi) | RUL-01 ve RUL-02 tek commit'te (WORKFLOW.md:147). Aynı dosyada ortak tablolar kullanıldığı için kabul edildi | 5d7e656 | Eylem yok |
+| REV-07 | Low | `date_change` için tek alanlı yabancı alan assertion'ı boşa çalışıyor (tür kısmi değil). Test gücünü :104 taşıyor | packages/shared/src/schemas/insight.test.ts:105 | F0-04b (isteğe bağlı) |
+| REV-08 | Low | `STATUS_BY_KIND`, `ALLOWED`'a bağlı değil. `status` alanı olan yeni bir tür eklenirse matris o türü sessizce atlar | packages/shared/src/schemas/insight.test.ts:54-63 | F0-04b (eşitlik testi) |
+| RR-Ö4 | Low | Sunucunun atadığı alanlar (`source`, `ruleKey`, `insightId`, `meetingId`, `kind`) yalnızca create türlerinde açıkça reddediliyor. Update türlerinde bunları yalnızca `.strict()` koruyor | packages/shared/src/schemas/insight.test.ts:128-139 | F8-03 öncesi |
+| QA-01 | Low | Flaky: soğuk worktree'de `npm ci` sonrası ilk koşuda `HandoverWorkspace.test.tsx` (AC1) ve `HandoverWorkspace.toast-router.test.tsx` (QA-02) 5000 ms'de zaman aşımına uğradı. Sonraki 3 koşu temiz | apps/web/src/pages/project/workspaces/HandoverWorkspace{,.toast-router}.test.tsx | F0-06 (açık timeout ya da yavaşlık incelemesi) |
+| — | Low (iz) | Değişiklik notundaki RUL-01 mutasyon satırında M3'ün tipi yazılmamış. "→ 4" sayısı `z.string()` ile çıkıyor, `StepStatusSchema` ile 2 | docs/changes/chore_f0-04a-shared-foundation.md:166 | F0-04b değişiklik notu |

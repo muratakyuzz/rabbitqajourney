@@ -1,30 +1,75 @@
-export type Role = "csm" | "devops" | "care" | "manager" | "admin";
-export type Ball = "customer" | "csm" | "devops" | "care";
-export type StepStatus = "pending" | "in_progress" | "done" | "out_of_scope" | "locked";
-export type Dependency = "previous" | "independent";
-export type PhaseStatus = "not_started" | "in_progress" | "at_risk" | "late" | "done" | "out_of_scope" | "locked";
-export type Health = "green" | "yellow" | "red";
-export type ActionStatus = "open" | "in_progress" | "done" | "cancelled";
-export type Priority = "low" | "medium" | "high";
-export type ActionSource = "meeting" | "rule" | "manual" | "teams" | "email";
-export type ContactRole = "sponsor" | "pm" | "tech";
-export type CommitmentStatus = "open" | "met" | "unmet";
-export type MeetingType =
-  | "brief"
-  | "kickoff"
-  | "discovery"
-  | "devops_handover"
-  | "training"
-  | "adaptation"
-  | "checkin"
-  | "go_no_go"
-  | "other";
-
-export type InstallType = "saas" | "onprem";
-export type LlmChoice = "rabbitqa" | "own" | "gpu";
-export type DocType = "offer" | "contract" | "req_doc" | "presentation" | "other";
-export type StepCompletion = "manual" | "data" | "meeting";
-export type MeetingStatus = "planned" | "held" | "cancelled";
+// Enums come from @rabbitqa/shared (F0-04a, INV-19); entities move there in F0-04b.
+export type {
+  Role,
+  Ball,
+  StepStatus,
+  Dependency,
+  PhaseStatus,
+  Health,
+  ActionStatus,
+  Priority,
+  ActionSource,
+  ContactRole,
+  CommitmentStatus,
+  MeetingType,
+  InstallType,
+  LlmChoice,
+  DocType,
+  StepCompletion,
+  MeetingStatus,
+  AdaptationItem,
+  AlertSeverity,
+  AlertStatus,
+  TicketStatus,
+  TicketType,
+  BoardDecision,
+  RiskKind,
+  RiskStatus,
+  AlertType,
+  AlertLevel,
+  AlertStateStatus,
+  ChatProvider,
+  ConnStatus,
+  InsightKind,
+  InsightStatus,
+  InsightSource,
+  InsightProposedAny,
+} from "@rabbitqa/shared";
+import type {
+  Role,
+  Ball,
+  StepStatus,
+  Dependency,
+  PhaseStatus,
+  Health,
+  ActionStatus,
+  Priority,
+  ActionSource,
+  ContactRole,
+  CommitmentStatus,
+  MeetingType,
+  InstallType,
+  LlmChoice,
+  DocType,
+  StepCompletion,
+  MeetingStatus,
+  AdaptationItem,
+  AlertSeverity,
+  AlertStatus,
+  TicketStatus,
+  TicketType,
+  BoardDecision,
+  RiskKind,
+  RiskStatus,
+  AlertType,
+  AlertLevel,
+  AlertStateStatus,
+  ChatProvider,
+  ConnStatus,
+  InsightKind,
+  InsightStatus,
+  InsightSource,
+} from "@rabbitqa/shared";
 
 export interface User {
   id: string;
@@ -191,8 +236,6 @@ export interface Kpi {
   isCustomerVisible: boolean;
 }
 
-export type AdaptationItem = "projectCreated" | "docsIdentified" | "docsUploaded" | "aiTrained" | "firstSamples";
-
 export interface Adaptation {
   id: string;
   projectId: string;
@@ -221,9 +264,6 @@ export interface DocumentRec {
   addedAt: string;
 }
 
-export type AlertSeverity = "info" | "warning" | "critical";
-export type AlertStatus = "open" | "resolved";
-
 export interface Alert {
   id: string;
   projectId: string;
@@ -236,8 +276,6 @@ export interface Alert {
   resolvedAt: string | null;
   resolvedBy: string | null;
 }
-
-export type TicketStatus = "open" | "in_progress" | "waiting_customer" | "resolved" | "closed";
 
 export interface SupportTicket {
   id: string;
@@ -255,11 +293,6 @@ export interface SupportTicket {
   boardDecision: BoardDecision | null;
   customerNotifiedAt: string | null;
 }
-export type TicketType = "technical" | "usage" | "feature_request";
-export type BoardDecision = "pending" | "accepted" | "rejected" | "planned";
-
-export type RiskKind = "risk" | "decision";
-export type RiskStatus = "open" | "mitigated" | "accepted" | "realized";
 
 export interface RiskDecision {
   id: string;
@@ -327,24 +360,12 @@ export interface AlertThresholds {
   phaseRiskDays: number; dueSoonDays: number; customerWaitDays: number; customerWaitRedDays: number;
   reqDocDays: number; goLiveCommitDays: number; credentialDays: number; silentDays: number;
 }
-export type AlertType =
-  | "phase_late" | "phase_at_risk" | "item_late" | "action_due_soon" | "waiting_customer" | "reqdoc_not_shared" | "handover_missing"
-  | "open_commitment" | "discovery_missing" | "kpi_unmeasurable" | "license_mismatch" | "credential_expiring" | "report_not_sent" | "silent_project"
-  | "manual";
-export type AlertLevel = "yellow" | "red";
-export type AlertStateStatus = "open" | "snoozed" | "closed";
 export interface AlertState { key: string; status: AlertStateStatus; snoozedUntil: string | null; reason: string; by: string; at: string }
 export interface ComputedAlert {
   key: string; type: AlertType; level: AlertLevel; projectId: string;
   entity: "phase" | "step" | "action" | "project" | "commitment" | "kpi" | "credential";
   entityId: string; ownerId: string | null; title: string; detail: string;
 }
-
-export type ChatProvider = "teams" | "slack";
-export type ConnStatus = "disconnected" | "connected" | "error";
-export type InsightKind = "action_create" | "action_update" | "step_update" | "risk_create" | "decision_create" | "health_change" | "date_change";
-export type InsightStatus = "pending" | "approved" | "rejected" | "expired";
-export type InsightSource = "teams" | "email";
 
 export interface ProjectIntegrations {
   chat: { provider: ChatProvider; channelId: string | null; active: boolean; since: string | null };
@@ -388,12 +409,6 @@ export interface AiInsight {
   reviewNote: string;
   appliedEntityId: string | null;
 }
-
-/** Mockup; F0-04'te packages/shared InsightProposal şemasıyla değişir. */
-export type InsightProposedFields = {
-  title?: string; description?: string; ownerId?: string | null; ball?: Ball; priority?: Priority; impact?: Priority; due?: string | null;
-  status?: StepStatus | ActionStatus; health?: Health; healthReason?: string; phaseId?: string; planEnd?: string; goLiveDate?: string;
-} & Record<string, unknown>;
 
 export interface UnmatchedEmail {
   id: string; from: string; to: string[]; cc: string[]; subject: string; at: string; excerpt: string;

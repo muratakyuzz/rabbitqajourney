@@ -25,7 +25,7 @@
 - **`tsconfig.app.json` `lib` ES2020 → ES2022 (`d95469e`):** D4'ün yan etkisi; ayrı commit (Açık sorular 2).
 - **Workspace kurulumu (`65a140a`):**
   - Kök `package.json`: `rabbitqa`, private, `type: module`, `workspaces: ["apps/*", "packages/*"]`, `engines.node >=24`. Script'ler plan §2'deki gibi workspace'lere devreder. Ortak araçlar (`typescript`, `eslint`, `@eslint/js`, `typescript-eslint`, `globals`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `@types/node`) kökte, aynı aralıklarla. `@types/node` `^22.16.5` → `^24.19.2` (D4).
-  - `apps/web/package.json` (`@rabbitqa/web`): main'deki 7 script (`dev`, `build`, `build:dev`, `preview`, `test`, `test:watch`, `typecheck`) aynen. 52 çalışma zamanı bağımlılığı ve 11 web dev bağımlılığı aynı aralıklarla. Ek olarak `"@rabbitqa/shared": "*"` (import edilmiyor).
+  - `apps/web/package.json` (`@rabbitqa/web`): main'deki 7 script (`dev`, `build`, `build:dev`, `preview`, `test`, `test:watch`, `typecheck`) aynen. 50 çalışma zamanı bağımlılığı (+ `@rabbitqa/shared` = 51) ve 11 web dev bağımlılığı aynı aralıklarla. Ek olarak `"@rabbitqa/shared": "*"` (import edilmiyor).
   - `apps/api/`: yalnızca `package.json` (`@rabbitqa/api`, script/bağımlılık yok) ve `README.md`.
   - `packages/shared/`: `package.json` (`exports: { ".": "./src/index.ts" }`, `typecheck` script'i), `tsconfig.json`, `src/index.ts` (yalnızca `export {};` + yorum).
   - Kök `tsconfig.json` (yeni içerik): `files: []` + `references` (`./apps/web`, `./packages/shared`) (D5).
