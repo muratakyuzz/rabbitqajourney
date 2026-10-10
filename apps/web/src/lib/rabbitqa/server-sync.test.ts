@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ProjectCore } from "@rabbitqa/shared";
 import { createSeed } from "@rabbitqa/shared/domain/seed";
 import type { Action } from "@rabbitqa/shared/domain/types";
-import { canon, diffProject, emptyView, mergeEffects, recordRuleActions, recordSteps } from "./server-sync";
+import { canon, diffProject, emptyView, mergeEffects, recordActions, recordSteps, replaceProjectData } from "./server-sync";
 
 const rule = (over: Partial<Action>): Action => ({
   id: "a_x", projectId: "p_garanti", title: "Kural", ownerId: null, ball: "csm", due: null, priority: "medium",
@@ -59,7 +59,7 @@ describe("diffProject", () => {
     const s = { ...createSeed(), actions: [rule({ ruleKey: "rk" })] };
     const view = emptyView();
     recordSteps(view, s.steps.filter((x) => x.projectId === "p_garanti"));
-    recordRuleActions(view, s.actions);
+    recordActions(view, s.actions);
     expect(diffProject(s, "p_garanti", view)).toEqual({ steps: [], actions: [] });
 
     const step = s.steps.find((x) => x.projectId === "p_garanti")!;
@@ -73,10 +73,34 @@ describe("diffProject", () => {
     expect(d.actions.map((a) => a.status)).toEqual(["cancelled"]);
   });
 
+  it("other actions (meeting, AI, manual) are compared as a whole, by id; a new one shows up", () => {
+    const meeting = rule({ id: "a_m", source: "meeting", ruleKey: undefined, meetingId: "m_local", title: "Toplantıdan" });
+    const s = { ...createSeed(), actions: [meeting] };
+    const view = emptyView();
+    recordActions(view, s.actions);
+    expect(diffProject(s, "p_garanti", view).actions).toEqual([]);
+
+    const fresh = rule({ id: "a_ai", source: "teams", ruleKey: undefined, insightId: "ai_1" });
+    const next = { ...s, actions: [{ ...meeting, priority: "high" as const }, fresh] };
+    expect(diffProject(next, "p_garanti", view).actions.map((a) => a.id)).toEqual(["a_m", "a_ai"]);
+    expect(diffProject(next, "p_akbank", view).actions).toEqual([]);
+  });
+
   it("priority of a rule action is not compared (the server does not take it over)", () => {
     const s = { ...createSeed(), actions: [rule({})] };
     const view = emptyView();
-    recordRuleActions(view, s.actions);
+    recordActions(view, s.actions);
     expect(diffProject({ ...s, actions: [rule({ priority: "high" })] }, "p_garanti", view).actions).toEqual([]);
+  });
+});
+
+describe("replaceProjectData", () => {
+  it("the project's phases, steps and actions become the server's; other projects stay", () => {
+    const s = createSeed();
+    const server = rule({ id: "a_server", source: "manual", ruleKey: undefined });
+    const out = replaceProjectData(s, "p_garanti", { phases: [], steps: [], actions: [server] });
+    expect(out.actions.filter((a) => a.projectId === "p_garanti")).toEqual([server]);
+    expect(out.actions.filter((a) => a.projectId !== "p_garanti")).toEqual(s.actions.filter((a) => a.projectId !== "p_garanti"));
+    expect(out.steps.some((x) => x.projectId === "p_garanti")).toBe(false);
   });
 });

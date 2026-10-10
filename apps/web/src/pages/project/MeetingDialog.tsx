@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Pill } from "@/components/rq/Badges";
 import { personName, useRq } from "@/lib/rabbitqa/store";
 import { selectableUsers } from "@/lib/rabbitqa/perm";
+import { ballForOwner } from "@rabbitqa/shared/domain/ball";
 import { ACTION_STATUS_LABEL, BALL_LABEL, MEETING_STATUS_LABEL, MEETING_TYPE_LABEL, PRIORITY_LABEL, fmtDate, todayISO } from "@rabbitqa/shared/domain/labels";
 import type { ActionStatus, Ball, MeetingStatus, MeetingType, Priority, Project } from "@rabbitqa/shared/domain/types";
 
@@ -34,9 +35,9 @@ export function PersonSelect({ value, onChange, projectId, includeContacts = tru
   );
 }
 
-export function EnumSelect<T extends string>({ value, onChange, labels }: { value: T; onChange: (v: T) => void; labels: Record<T, string> }) {
+export function EnumSelect<T extends string>({ value, onChange, labels, disabled }: { value: T; onChange: (v: T) => void; labels: Record<T, string>; disabled?: boolean }) {
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as T)}>
+    <Select value={value} onValueChange={(v) => onChange(v as T)} disabled={disabled}>
       <SelectTrigger><SelectValue /></SelectTrigger>
       <SelectContent>
         {(Object.keys(labels) as T[]).map((k) => <SelectItem key={k} value={k}>{labels[k]}</SelectItem>)}
@@ -47,13 +48,19 @@ export function EnumSelect<T extends string>({ value, onChange, labels }: { valu
 
 export type ActionDraft = { title: string; ownerId: string | null; ball: Ball; due: string | null; priority: Priority; status: ActionStatus; isCustomerVisible: boolean };
 
+/** The ball follows the owner (shared ballForOwner, same as the API); it is chosen by hand only without an owner. */
 export function ActionFields({ d, setD, projectId, showStatus }: { d: ActionDraft; setD: (d: ActionDraft) => void; projectId: string; showStatus?: boolean }) {
+  const { state } = useRq();
   return (
     <div className="grid gap-3">
       <div className="grid gap-2"><Label>Başlık</Label><Input value={d.title} onChange={(e) => setD({ ...d, title: e.target.value })} /></div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="grid gap-2"><Label>Sahip</Label><PersonSelect value={d.ownerId} onChange={(v) => setD({ ...d, ownerId: v })} projectId={projectId} /></div>
-        <div className="grid gap-2"><Label>Top kimde</Label><EnumSelect value={d.ball} onChange={(v) => setD({ ...d, ball: v })} labels={BALL_LABEL} /></div>
+        <div className="grid gap-2"><Label>Sahip</Label><PersonSelect value={d.ownerId} onChange={(v) => setD({ ...d, ownerId: v, ball: ballForOwner(v, state.users, d.ball) })} projectId={projectId} /></div>
+        <div className="grid gap-2">
+          <Label>Top kimde</Label>
+          <EnumSelect value={d.ball} onChange={(v) => setD({ ...d, ball: v })} labels={BALL_LABEL} disabled={!!d.ownerId} />
+          {d.ownerId && <p className="text-xs text-muted-foreground">Sahipten belirlenir.</p>}
+        </div>
         <div className="grid gap-2"><Label>Termin</Label><Input type="date" value={d.due ?? ""} onChange={(e) => setD({ ...d, due: e.target.value || null })} /></div>
         <div className="grid gap-2"><Label>Öncelik</Label><EnumSelect value={d.priority} onChange={(v) => setD({ ...d, priority: v })} labels={PRIORITY_LABEL} /></div>
         {showStatus && <div className="grid gap-2"><Label>Durum</Label><EnumSelect value={d.status} onChange={(v) => setD({ ...d, status: v })} labels={ACTION_STATUS_LABEL} /></div>}
@@ -165,7 +172,7 @@ export function MeetingDialog({ project, onClose, defaultType = "checkin", defau
           <div className="grid gap-2">
             <div className="flex items-center justify-between">
               <Label>Toplantıdan doğan aksiyonlar</Label>
-              <Button size="sm" variant="outline" onClick={() => setActions([...actions, { title: "", ownerId: project.csmId, ball: "csm", due: null, priority: "medium", status: "open", isCustomerVisible: true }])}><Plus className="h-3.5 w-3.5 mr-1" />Aksiyon</Button>
+              <Button size="sm" variant="outline" onClick={() => setActions([...actions, { title: "", ownerId: project.csmId, ball: ballForOwner(project.csmId, state.users, "csm"), due: null, priority: "medium", status: "open", isCustomerVisible: true }])}><Plus className="h-3.5 w-3.5 mr-1" />Aksiyon</Button>
             </div>
             {actions.map((a, i) => (
               <div key={i} className="rounded-lg border p-3 relative">

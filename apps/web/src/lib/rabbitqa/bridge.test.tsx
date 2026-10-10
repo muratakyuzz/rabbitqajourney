@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
 import { apiError, fakeApi, json } from "@/test/fake-api";
+import { STATE_KEY, createSeed } from "@rabbitqa/shared/domain/seed";
 import { BRIDGE_DEBOUNCE_MS, RqProvider, useRq } from "./store";
 
 vi.mock("@/lib/auth-context", () => ({
@@ -16,6 +17,7 @@ async function setup(api: ReturnType<typeof fakeApi>) {
   const hook = renderHook(() => useRq(), { wrapper: RqProvider });
   const projects = hook.result.current.state.projects.length;
   await waitFor(() => expect(api.callsTo("GET", /^\/projects\/[^/]+\/phases$/)).toHaveLength(projects));
+  await waitFor(() => expect(api.callsTo("GET", /^\/projects\/[^/]+\/actions$/)).toHaveLength(projects));
   await pause(BRIDGE_DEBOUNCE_MS + 100); // anything hydration itself might cause has settled
   return hook;
 }
@@ -90,7 +92,42 @@ describe("API bridge", () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Değişiklik sunucuya yazılamadı: Çakışma"));
     await waitFor(() => expect(api.callsTo("GET", /^\/projects\/p_garanti\/phases$/)).toHaveLength(2));
+    await waitFor(() => expect(api.callsTo("GET", /^\/projects\/p_garanti\/actions$/)).toHaveLength(2)); // the reload covers actions
     await waitFor(() => expect(result.current.state.steps.find((s) => s.id === STEP)?.ball).toBe(serverBall));
+    await pause(BRIDGE_DEBOUNCE_MS + 100);
+    expect(api.callsTo("POST", /steps\/sync$/)).toHaveLength(1);
+  });
+
+  it("hydration: the project's actions become the server's (server wins)", async () => {
+    // the store has a local-only action and an old title; the server has neither
+    const seed = createSeed();
+    const local = { ...seed.actions.find((a) => a.id === "a_2")!, id: "a_local_only", title: "Yalnız yerelde" };
+    localStorage.setItem(STATE_KEY, JSON.stringify({ ...seed, actions: [...seed.actions, local] }));
+    const api = fakeApi({
+      "GET /projects/p_isyatirim/actions": () => json(200, {
+        items: api.server.actions.filter((a) => a.projectId === "p_isyatirim").map((a) => (a.id === "a_2" ? { ...a, title: "Sunucudaki başlık" } : a)),
+      }),
+    });
+    const { result } = await setup(api);
+    const mine = result.current.state.actions.filter((a) => a.projectId === "p_isyatirim");
+    expect(mine.map((a) => a.id).sort()).toEqual(seed.actions.filter((a) => a.projectId === "p_isyatirim").map((a) => a.id).sort());
+    expect(mine.find((a) => a.id === "a_2")?.title).toBe("Sunucudaki başlık");
+    // what came from the server is the server view: nothing to send back
+    expect(api.callsTo("POST", /p_isyatirim\/steps\/sync$/)).toEqual([]);
+  });
+
+  it("an action from the meeting dialog (store addMeeting) goes to the server through sync, once", async () => {
+    const api = fakeApi();
+    const { result } = await setup(api);
+    act(() => {
+      result.current.addMeeting(
+        { projectId: "p_garanti", type: "checkin", date: "2026-10-12", internalIds: ["u_deniz"], contactIds: [], notes: "", decisions: "", status: "held" },
+        [{ title: "Toplantıdan doğan aksiyon", ownerId: "u_deniz", ball: "csm", due: "2026-10-20", priority: "high", status: "open" }],
+      );
+    });
+    await waitFor(() => expect(api.callsTo("POST", /p_garanti\/steps\/sync$/)).toHaveLength(1));
+    const body = api.callsTo("POST", /p_garanti\/steps\/sync$/)[0].body as { actions: { title: string; source: string; meetingId: string | null }[] };
+    expect(body.actions).toEqual([expect.objectContaining({ title: "Toplantıdan doğan aksiyon", source: "meeting", meetingId: expect.any(String) })]);
     await pause(BRIDGE_DEBOUNCE_MS + 100);
     expect(api.callsTo("POST", /steps\/sync$/)).toHaveLength(1);
   });

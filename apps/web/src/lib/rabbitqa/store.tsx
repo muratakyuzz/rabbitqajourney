@@ -21,8 +21,8 @@ import type { RuleEffects, TemplateVersion } from "@rabbitqa/shared";
 import { fetchTemplate } from "@/lib/api/template";
 import { ApiError, apiErrorMessage } from "@/lib/api";
 import { getPhases, patchPhase, syncProject } from "@/lib/api/projects";
-import { currentRuleActions } from "@rabbitqa/shared/domain/rule-actions";
-import { diffProject, emptyView, mergeEffects, projectsIn, recordRuleActions, recordSteps, replaceProjectPlan, type ServerView, canon } from "./server-sync";
+import { getActions } from "@/lib/api/actions";
+import { diffProject, emptyView, mergeEffects, projectsIn, recordActions, recordSteps, replaceProjectData, type ServerView, canon } from "./server-sync";
 
 /** Debounce of the client-rule bridge (docs/PLAN.md M2b). */
 export const BRIDGE_DEBOUNCE_MS = 300;
@@ -55,7 +55,7 @@ interface Ctx {
   updateProject: (id: string, patch: Partial<Project>, reason?: string) => void;
   updatePhase: (id: string, patch: Partial<Phase>, reason?: string) => string | null;
   updateStep: (id: string, patch: Partial<Step>, reason?: string) => string | null;
-  addAction: (a: Omit<Action, "id" | "createdAt" | "isCustomerVisible"> & { isCustomerVisible?: boolean }) => void;
+  /** Mockup callers only (AI action_update approval); the Actions tab writes through the API (docs/PLAN.md M3). */
   updateAction: (id: string, patch: Partial<Action>, reason?: string) => void;
   addMeeting: (m: Omit<Meeting, "id" | "isCustomerVisible"> & { isCustomerVisible?: boolean }, actions: (Omit<Action, "id" | "createdAt" | "meetingId" | "projectId" | "source" | "isCustomerVisible"> & { isCustomerVisible?: boolean })[]) => string;
   addContact: (c: Omit<Contact, "id">) => void;
@@ -169,23 +169,22 @@ export function RqProvider({ children }: { children: ReactNode }) {
       const view = views.current.get(pid) ?? (e.project?.id === pid ? emptyView() : null);
       if (!view) continue;
       recordSteps(view, e.steps.filter((x) => x.projectId === pid));
-      recordRuleActions(view, e.actions.filter((x) => x.projectId === pid));
+      recordActions(view, e.actions.filter((x) => x.projectId === pid));
       views.current.set(pid, view);
     }
     setState((s) => mergeEffects(s, e));
   }, [setState]);
 
-  /** Loads a project's phases and steps from the API (server wins) and starts bridging it. */
+  /** Loads a project's phases, steps and actions from the API (server wins) and starts bridging it. */
   const hydrate = useCallback(async (pid: string): Promise<"ok" | "missing" | "offline"> => {
     try {
-      const data = await getPhases(pid);
+      const [plan, actions] = await Promise.all([getPhases(pid), getActions(pid)]);
       const view = emptyView();
-      recordSteps(view, data.steps);
-      // no actions endpoint yet (M3): the store's rule actions are taken as the server's
-      recordRuleActions(view, [...currentRuleActions(stateRef.current.actions, pid).values()]);
+      recordSteps(view, plan.steps);
+      recordActions(view, actions);
       views.current.set(pid, view);
       lastSent.current.delete(pid);
-      setState((s) => replaceProjectPlan(s, pid, data));
+      setState((s) => replaceProjectData(s, pid, { ...plan, actions }));
       return "ok";
     } catch (e) {
       views.current.delete(pid);
@@ -200,7 +199,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
 
   const hydrateAll = useCallback(async (ids: string[]) => {
     const results = await Promise.all(ids.map(hydrate));
-    if (results.includes("offline")) console.warn("API'ye ulaşılamadı; aşama/adım köprüsü kapalı, mockup verisiyle devam ediliyor.");
+    if (results.includes("offline")) console.warn("API'ye ulaşılamadı; aşama/adım/aksiyon köprüsü kapalı, mockup verisiyle devam ediliyor.");
   }, [hydrate]);
 
   useEffect(() => {
@@ -221,7 +220,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
       lastSent.current.set(pid, payload);
       // optimistic: what is in flight is not sent again while waiting
       recordSteps(view, diff.steps);
-      recordRuleActions(view, diff.actions);
+      recordActions(view, diff.actions);
       try {
         applyServerEffects(await syncProject(pid, diff));
       } catch (e) {
@@ -352,7 +351,6 @@ export function RqProvider({ children }: { children: ReactNode }) {
       patch<Step>("steps", id, changes, reason);
       return null;
     },
-    addAction: (a) => add<Action>("actions", { ...a, isCustomerVisible: a.isCustomerVisible ?? !(a.ruleKey ?? "").startsWith("phase_approval:"), id: uid("a"), createdAt: new Date().toISOString() }),
     updateAction: (id, p, reason) => patch<Action>("actions", id, p, reason),
     addMeeting: (m, actions) => {
       const meeting: Meeting = { ...m, isCustomerVisible: m.isCustomerVisible ?? false, id: uid("m") };

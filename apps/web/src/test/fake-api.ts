@@ -30,6 +30,12 @@ export function fakeApi(handlers: Record<string, Handler> = {}) {
       if (!server.projects.some((p) => p.id === pid)) return apiError(404, "NOT_FOUND", "Proje bulunamadı.");
       return json(200, { phases: server.phases.filter((p) => p.projectId === pid), steps: server.steps.filter((s) => s.projectId === pid) });
     }
+    m = key.match(/^GET \/projects\/([^/]+)\/actions$/);
+    if (m) {
+      const pid = m[1];
+      if (!server.projects.some((p) => p.id === pid)) return apiError(404, "NOT_FOUND", "Proje bulunamadı.");
+      return json(200, { items: server.actions.filter((a) => a.projectId === pid) });
+    }
     m = key.match(/^POST \/projects\/([^/]+)\/steps\/sync$/);
     if (m) {
       const b = call.body as { steps?: unknown[]; actions?: unknown[] };

@@ -37,6 +37,8 @@ import { useAuth } from "@/lib/auth-context";
 import { personName, projectProgress, useAlertViews, useComputedAlerts, useRq } from "@/lib/rabbitqa/store";
 import { useServerAction } from "@/lib/rabbitqa/use-server-action";
 import { completePhase as completePhaseApi, patchPhase, patchStep } from "@/lib/api/projects";
+import { createAction, patchAction } from "@/lib/api/actions";
+import { ballForOwner } from "@rabbitqa/shared/domain/ball";
 import type { PhasePatch, StepPatch } from "@rabbitqa/shared";
 import { derivePhaseStatus } from "@rabbitqa/shared/domain/alerts";
 import { canEditFlow, canEditItem, canManageProject, canSeeCredentials, selectableUsers } from "@/lib/rabbitqa/perm";
@@ -610,59 +612,107 @@ function PhaseDialog({ phase, onClose }: { phase: Phase; onClose: () => void }) 
 }
 
 /* ── Actions ────────────────────────────────────────────── */
+// Writes go to the API (docs/PLAN.md M3); filters read the store, which holds the server's copy.
+type ActionFilter = "open" | "late" | "customer" | "mine" | "done" | "all";
+const ACTION_FILTER_LABEL: Record<ActionFilter, string> = {
+  open: "Açık", late: "Geciken", customer: "Top müşteride", mine: "Bana atanan", done: "Tamamlanan", all: "Tümü",
+};
+const isOpenAction = (a: Action) => a.status === "open" || a.status === "in_progress";
+
 function ActionsTab({ project }: { project: Project }) {
-  const { state, addAction } = useRq();
+  const { state } = useRq();
   const { user } = useAuth();
+  const { busy, run } = useServerAction();
   const [edit, setEdit] = useState<Action | null>(null);
   const [creating, setCreating] = useState(false);
-  const actions = state.actions.filter((a) => a.projectId === project.id).sort((a, b) => (a.due ?? "9").localeCompare(b.due ?? "9"));
+  const [filter, setFilter] = useState<ActionFilter>("open");
+  const all = state.actions.filter((a) => a.projectId === project.id).sort((a, b) => (a.due ?? "9").localeCompare(b.due ?? "9"));
+  const matches: Record<ActionFilter, (a: Action) => boolean> = {
+    open: isOpenAction,
+    late: (a) => isOpenAction(a) && isOverdue(a.due, false),
+    customer: (a) => isOpenAction(a) && a.ball === "customer",
+    mine: (a) => isOpenAction(a) && !!user && a.ownerId === user.id,
+    done: (a) => a.status === "done",
+    all: () => true,
+  };
+  const actions = all.filter(matches[filter]);
+  const toggleDone = async (a: Action, done: boolean) => {
+    const err = await run(() => patchAction(a.id, { status: done ? "done" : "open" }));
+    if (err) toast.error(err);
+  };
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">Aksiyonlar</CardTitle>
         {canManageProject(user, project) && <Button size="sm" onClick={() => setCreating(true)}><Plus className="h-4 w-4 mr-1" />Aksiyon ekle</Button>}
       </CardHeader>
-      <CardContent>
-        {actions.length === 0 ? <EmptyState title="Aksiyon yok" description="Toplantılardan veya elle aksiyon ekleyebilirsiniz." /> : (
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Aksiyon filtresi">
+          {(Object.keys(ACTION_FILTER_LABEL) as ActionFilter[]).map((f) => (
+            <Button key={f} size="sm" variant={filter === f ? "default" : "outline"} aria-pressed={filter === f} onClick={() => setFilter(f)}>
+              {ACTION_FILTER_LABEL[f]} ({all.filter(matches[f]).length})
+            </Button>
+          ))}
+        </div>
+        {all.length === 0 ? <EmptyState title="Aksiyon yok" description="Toplantılardan veya elle aksiyon ekleyebilirsiniz." />
+          : actions.length === 0 ? <EmptyState title="Bu filtrede aksiyon yok" description="Başka bir filtre seçin." /> : (
           <Table>
             <TableHeader><TableRow>
+              <TableHead className="w-10"><span className="sr-only">Tamamlandı</span></TableHead>
               <TableHead>Başlık</TableHead><TableHead>Sahip</TableHead><TableHead>Top</TableHead><TableHead>Termin</TableHead>
               <TableHead>Öncelik</TableHead><TableHead>Durum</TableHead><TableHead>Kaynak</TableHead><TableHead className="w-10" />
             </TableRow></TableHeader>
             <TableBody>
-              {actions.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="font-medium">{a.title}<VisibleIcon visible={a.isCustomerVisible} /></TableCell>
-                  <TableCell>{personName(state, a.ownerId)}</TableCell>
-                  <TableCell>{BALL_LABEL[a.ball]}</TableCell>
-                  <TableCell className={isOverdue(a.due, a.status === "done" || a.status === "cancelled") ? "text-destructive font-medium" : ""}>{fmtDate(a.due)}</TableCell>
-                  <TableCell><PriorityBadge p={a.priority} /></TableCell>
-                  <TableCell><ActionStatusBadge status={a.status} /></TableCell>
-                  <TableCell><AiSourceBadge action={a} /></TableCell>
-                  <TableCell>{canEditItem(user, project, a.ownerId) && <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEdit(a)} aria-label="Aksiyonu düzenle"><Pencil className="h-3.5 w-3.5" /></Button>}</TableCell>
-                </TableRow>
-              ))}
+              {actions.map((a) => {
+                const canEdit = canEditItem(user, project, a.ownerId);
+                return (
+                  <TableRow key={a.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={a.status === "done"} disabled={!canEdit || busy || a.status === "cancelled"}
+                        onCheckedChange={(c) => void toggleDone(a, c === true)} aria-label={`Tamamlandı: ${a.title}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">{a.title}<VisibleIcon visible={a.isCustomerVisible} /></TableCell>
+                    <TableCell>{personName(state, a.ownerId)}</TableCell>
+                    <TableCell>{BALL_LABEL[a.ball]}</TableCell>
+                    <TableCell className={isOverdue(a.due, !isOpenAction(a)) ? "text-destructive font-medium" : ""}>{fmtDate(a.due)}</TableCell>
+                    <TableCell><PriorityBadge p={a.priority} /></TableCell>
+                    <TableCell><ActionStatusBadge status={a.status} /></TableCell>
+                    <TableCell><AiSourceBadge action={a} /></TableCell>
+                    <TableCell>{canEdit && <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEdit(a)} aria-label="Aksiyonu düzenle"><Pencil className="h-3.5 w-3.5" /></Button>}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
       </CardContent>
-      {(edit || creating) && (
-        <ActionDialog
-          project={project}
-          action={edit}
-          onClose={() => { setEdit(null); setCreating(false); }}
-          onCreate={(a) => addAction({ ...a, projectId: project.id, source: "manual", meetingId: null })}
-        />
-      )}
+      {(edit || creating) && <ActionDialog project={project} action={edit} onClose={() => { setEdit(null); setCreating(false); }} />}
     </Card>
   );
 }
 
-function ActionDialog({ project, action, onClose, onCreate }: { project: Project; action: Action | null; onClose: () => void; onCreate: (a: ActionDraft) => void }) {
-  const { updateAction, state } = useRq();
-  const [d, setD] = useState<ActionDraft>(action ? { title: action.title, ownerId: action.ownerId, ball: action.ball, due: action.due, priority: action.priority, status: action.status, isCustomerVisible: action.isCustomerVisible } : { title: "", ownerId: project.csmId, ball: "csm", due: null, priority: "medium", status: "open", isCustomerVisible: true });
+/** Action panel: create (POST) or edit (PATCH). A new due date and cancelling need a reason, like the API. */
+function ActionDialog({ project, action, onClose }: { project: Project; action: Action | null; onClose: () => void }) {
+  const { state } = useRq();
+  const { busy, run } = useServerAction();
+  const [d, setD] = useState<ActionDraft>(action
+    ? { title: action.title, ownerId: action.ownerId, ball: action.ball, due: action.due, priority: action.priority, status: action.status, isCustomerVisible: action.isCustomerVisible }
+    : { title: "", ownerId: project.csmId, ball: ballForOwner(project.csmId, state.users, "csm"), due: null, priority: "medium", status: "open", isCustomerVisible: true });
   const [reason, setReason] = useState("");
-  const needsReason = !!action && (d.due !== action.due || d.status !== action.status);
+  const [error, setError] = useState<string | null>(null);
+  const needsReason = !!action && (d.due !== action.due || (d.status === "cancelled" && action.status !== "cancelled"));
+  const save = async () => {
+    if (!d.title.trim()) return setError("Başlık zorunlu");
+    if (needsReason && !reason.trim()) return setError("Gerekçe zorunlu");
+    const err = await run(() => (action
+      ? patchAction(action.id, { ...d, title: d.title.trim(), ...(reason.trim() ? { reason: reason.trim() } : {}) })
+      : createAction(project.id, { ...d, title: d.title.trim() })));
+    if (err) return setError(err);
+    toast.success(action ? "Aksiyon güncellendi" : "Aksiyon eklendi");
+    onClose();
+  };
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
@@ -671,15 +721,11 @@ function ActionDialog({ project, action, onClose, onCreate }: { project: Project
           <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs"><Sparkles className="inline h-3 w-3 mr-1 text-primary" />Kaynak mesaj ({ins.source === "teams" ? "Teams" : "E-posta"} · {ins.sourceRef.from}): “{ins.sourceRef.excerpt}”</p>
         ) : null; })()}
         <ActionFields d={d} setD={setD} projectId={project.id} showStatus />
-        {needsReason && <div className="grid gap-2"><Label>Gerekçe (zorunlu)</Label><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></div>}
+        {needsReason && <div className="grid gap-2"><Label>Gerekçe (termin değişikliği ve iptalde zorunlu)</Label><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></div>}
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Vazgeç</Button>
-          <Button onClick={() => {
-            if (!d.title.trim()) return toast.error("Başlık zorunlu");
-            if (needsReason && !reason.trim()) return toast.error("Gerekçe zorunlu");
-            if (action) updateAction(action.id, d, reason.trim() || undefined); else onCreate(d);
-            onClose();
-          }}>Kaydet</Button>
+          <Button disabled={busy} onClick={() => void save()}>{busy ? "Kaydediliyor…" : "Kaydet"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

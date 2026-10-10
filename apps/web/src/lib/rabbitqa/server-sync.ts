@@ -3,7 +3,7 @@ import { currentRuleAction, currentRuleActions, isRuleAction } from "@rabbitqa/s
 import { DEFAULT_PROJECT_INTEGRATIONS } from "@rabbitqa/shared/domain/seed";
 import type { Action, Project, RqState, Step } from "@rabbitqa/shared/domain/types";
 
-// Store ↔ API bridge, pure part (docs/PLAN.md M2b). The API owns phases, steps and rule actions of a project;
+// Store ↔ API bridge, pure part (docs/PLAN.md M2b, M3). The API owns phases, steps and actions of a project;
 // the store keeps a copy. Per project we remember the last server picture ("view") and send whatever the
 // mockup screens changed since then (POST steps/sync). Everything the server returns is merged back here.
 
@@ -15,10 +15,13 @@ export function canon(v: unknown): string {
       : x);
 }
 
-/** Last server picture of one project: step id → canon(step), ruleKey → canon(fields the server takes over). */
-export interface ServerView { steps: Map<string, string>; rule: Map<string, string> }
+/**
+ * Last server picture of one project: step id → canon(step); rule actions by ruleKey → canon(fields the server
+ * takes over); every other action by id → canon(action).
+ */
+export interface ServerView { steps: Map<string, string>; rule: Map<string, string>; actions: Map<string, string> }
 
-export const emptyView = (): ServerView => ({ steps: new Map(), rule: new Map() });
+export const emptyView = (): ServerView => ({ steps: new Map(), rule: new Map(), actions: new Map() });
 
 /** The server matches rule actions by ruleKey and takes over only these fields. */
 const ruleFields = (a: Action) => canon({ status: a.status, title: a.title, due: a.due, ownerId: a.ownerId });
@@ -26,15 +29,19 @@ const ruleFields = (a: Action) => canon({ status: a.status, title: a.title, due:
 export function recordSteps(view: ServerView, steps: Step[]) {
   for (const s of steps) view.steps.set(s.id, canon(s));
 }
-export function recordRuleActions(view: ServerView, actions: Action[]) {
-  for (const a of actions) if (isRuleAction(a)) view.rule.set(a.ruleKey, ruleFields(a));
+export function recordActions(view: ServerView, actions: Action[]) {
+  for (const a of actions) {
+    if (isRuleAction(a)) view.rule.set(a.ruleKey, ruleFields(a));
+    else view.actions.set(a.id, canon(a));
+  }
 }
 
-/** What the store has and the server has not seen: changed/new steps and current rule actions. */
+/** What the store has and the server has not seen: changed/new steps, current rule actions and other actions. */
 export function diffProject(s: RqState, projectId: string, view: ServerView): { steps: Step[]; actions: Action[] } {
   const steps = s.steps.filter((x) => x.projectId === projectId && view.steps.get(x.id) !== canon(x));
-  const actions = [...currentRuleActions(s.actions, projectId).values()].filter((a) => view.rule.get(a.ruleKey!) !== ruleFields(a));
-  return { steps, actions };
+  const rule = [...currentRuleActions(s.actions, projectId).values()].filter((a) => view.rule.get(a.ruleKey!) !== ruleFields(a));
+  const other = s.actions.filter((a) => a.projectId === projectId && !isRuleAction(a) && view.actions.get(a.id) !== canon(a));
+  return { steps, actions: [...rule, ...other] };
 }
 
 /** Project ids touched by a server response. */
@@ -87,11 +94,12 @@ export function mergeEffects(s: RqState, e: RuleEffects): RqState {
   return { ...s, projects, phases: upsert(s.phases, e.phases), steps: upsert(s.steps, e.steps), actions };
 }
 
-/** Hydration / reload: the project's phases and steps become exactly the server's (server wins). */
-export function replaceProjectPlan(s: RqState, projectId: string, data: PhasesWithSteps): RqState {
+/** Hydration / reload: the project's phases, steps and actions become exactly the server's (server wins). */
+export function replaceProjectData(s: RqState, projectId: string, data: PhasesWithSteps & { actions: Action[] }): RqState {
   return {
     ...s,
     phases: [...s.phases.filter((p) => p.projectId !== projectId), ...data.phases],
     steps: [...s.steps.filter((x) => x.projectId !== projectId), ...data.steps],
+    actions: [...s.actions.filter((a) => a.projectId !== projectId), ...data.actions],
   };
 }
