@@ -1,8 +1,9 @@
-import type { PhasePatch, PhasesWithSteps, ProjectCore, ProjectCreate, RuleEffects, Step, StepPatch } from "@rabbitqa/shared";
+import type { Action, PhasePatch, PhasesWithSteps, ProjectCore, ProjectCreate, RuleEffects, Step, StepPatch, StepsSync } from "@rabbitqa/shared";
 import { manualStatusError, stepLockError } from "@rabbitqa/shared/domain/completion";
 import { advanceFlow, projectPlan } from "@rabbitqa/shared/domain/flow";
 import { todayISO } from "@rabbitqa/shared/domain/labels";
 import { cancelReviewAction, ensureReviewAction } from "@rabbitqa/shared/domain/rules";
+import { currentRuleAction, isRuleAction } from "@rabbitqa/shared/domain/rule-actions";
 import { buildFromTemplate, uid } from "@rabbitqa/shared/domain/seed";
 import type { Phase, RqState } from "@rabbitqa/shared/domain/types";
 import type { Db, Queryable } from "../../db";
@@ -171,10 +172,20 @@ const REOPEN = new Set(["locked", "pending", "in_progress"]);
  * Upserts step records computed by client-side rules. No lock checks (INV-25: rules may bypass the lock).
  * Steps not in the payload are untouched. In a `done` phase the status stays as it is (RUL-05 option A):
  * a step asked back into scope gets a review action instead, a step taken out of scope cancels it.
+ * Rule actions are matched by projectId + ruleKey (the server keeps its id) and only
+ * status/title/due/ownerId are taken over; an unknown ruleKey is inserted.
  */
-export async function syncSteps(db: Db, projectId: string, incoming: Step[]): Promise<Effects> {
+export async function syncSteps(db: Db, projectId: string, { steps: incoming, actions: incomingActions }: StepsSync): Promise<Effects> {
   return db.transaction(async (tx) => {
     if (!(await findProjectCore(tx, projectId))) throw notFound("Proje bulunamadı.");
+    /** ids already used by another record: such an incoming action gets a new id when inserted */
+    const takenIds = new Set<string>();
+    for (const [i, a] of incomingActions.entries()) {
+      if (!isRuleAction(a)) throw badRequest("Köprüden yalnızca kural aksiyonu (source \"rule\", ruleKey dolu) gönderilebilir.", `actions.${i}.ruleKey`);
+      if (a.projectId !== projectId) throw badRequest("Aksiyon bu projeye ait değil.", `actions.${i}.projectId`);
+      const row = (await tx.query<{ project_id: string; rule_key: string | null }>("SELECT project_id, rule_key FROM actions WHERE id = $1", [a.id])).rows[0];
+      if (row && (row.project_id !== projectId || row.rule_key !== a.ruleKey)) takenIds.add(a.id);
+    }
     const ids = new Set<string>();
     for (const [i, st] of incoming.entries()) {
       if (ids.has(st.id)) throw badRequest("Aynı adım iki kez gönderildi.", `steps.${i}.id`);
@@ -204,6 +215,15 @@ export async function syncSteps(db: Db, projectId: string, incoming: Step[]): Pr
           }
         }
         next = { ...next, steps: existing ? replace(next.steps, record) : [...next.steps, record] };
+      }
+      for (const a of incomingActions) {
+        const match = currentRuleAction(next.actions.filter((x) => x.projectId === projectId && x.ruleKey === a.ruleKey));
+        if (match) {
+          const merged: Action = { ...match, status: a.status, title: a.title, due: a.due, ownerId: a.ownerId };
+          next = { ...next, actions: replace(next.actions, merged) };
+        } else {
+          next = { ...next, actions: [...next.actions, { ...a, id: takenIds.has(a.id) ? uid("a") : a.id }] };
+        }
       }
       return next;
     });

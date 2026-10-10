@@ -11,7 +11,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Pill } from "@/components/rq/Badges";
 import { useRq } from "@/lib/rabbitqa/store";
 import { ApiError, apiErrorMessage } from "@/lib/api";
-import { fetchTemplate, saveTemplate } from "@/data/template";
+import { fetchTemplate, saveTemplate } from "@/lib/api/template";
 import { projectPlan } from "@rabbitqa/shared/domain/flow";
 import { conditionFor } from "@rabbitqa/shared/domain/completion";
 import { BALL_LABEL, COMPLETION_LABEL, MEETING_TYPE_LABEL, fmtDateTime } from "@rabbitqa/shared/domain/labels";

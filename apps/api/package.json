@@ -17,8 +17,8 @@
     "zod": "^4.6.5"
   },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "dev": "TZ=Europe/Istanbul tsx watch src/server.ts",
+    "start": "TZ=Europe/Istanbul tsx src/server.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   }

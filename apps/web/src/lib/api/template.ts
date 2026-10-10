@@ -1,5 +1,5 @@
 import { TemplateVersionSchema, type PhaseTpl, type TemplateVersion } from "@rabbitqa/shared";
-import { api } from "@/lib/api";
+import { api } from "./client";
 
 // Ayarlar → Aşama şablonu (docs/PLAN.md M1). The API owns the template; the store keeps a copy for new projects.
 

@@ -19,9 +19,12 @@ import { visibleProjects, canAssignCsm, canCreateProject, isCsmUser, selectableC
 import { Pill } from "@/components/rq/Badges";
 import { fmtDate, HEALTH_LABEL, todayISO } from "@rabbitqa/shared/domain/labels";
 import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api";
+import { createProject } from "@/lib/api/projects";
+import type { ProjectCreate } from "@rabbitqa/shared";
 
 export default function Projects() {
-  const { state, createProject } = useRq();
+  const { state, applyServerEffects } = useRq();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
@@ -132,10 +135,18 @@ export default function Projects() {
         onOpenChange={setOpen}
         defaultCsm={isCsmUser(user) && user ? user.id : null}
         canAssignCsm={canAssignCsm(user)}
-        onCreate={(input) => {
-          const id = createProject(input);
-          toast.success("Proje oluşturuldu, aşamalar şablondan kopyalandı");
-          navigate(`/app/projects/${id}`);
+        onCreate={async (input) => {
+          try {
+            const created = await createProject(input);
+            // the store then settles data steps (csm, sales_license, modules …) and the bridge sends them
+            applyServerEffects(created);
+            toast.success("Proje oluşturuldu, aşamalar şablondan kopyalandı");
+            navigate(`/app/projects/${created.project.id}`);
+            return true;
+          } catch (e) {
+            toast.error(apiErrorMessage(e));
+            return false;
+          }
         }}
       />
     </div>
@@ -149,7 +160,8 @@ function NewProjectDialog({
   onOpenChange: (v: boolean) => void;
   defaultCsm: string | null;
   canAssignCsm: boolean;
-  onCreate: (p: Parameters<ReturnType<typeof useRq>["createProject"]>[0]) => void;
+  /** Resolves true when the project was created (the dialog then closes). */
+  onCreate: (p: ProjectCreate) => Promise<boolean>;
 }) {
   const { state } = useRq();
   const [customerName, setCustomerName] = useState("");
@@ -161,12 +173,16 @@ function NewProjectDialog({
   const [startDate, setStartDate] = useState(todayISO());
   const [goLiveDate, setGoLiveDate] = useState("");
 
-  const submit = () => {
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
     if (!customerName.trim() || !goLiveDate) return toast.error("Müşteri adı ve Go-Live tarihi zorunlu");
-    onCreate({
+    setBusy(true);
+    const ok = await onCreate({
       customerName: customerName.trim(), name, csmId: csmId === "none" ? null : csmId, salespersonId: salespersonId === "none" ? null : salespersonId,
       licenseModel, purchasedModules: modules, startDate, goLiveDate,
     });
+    setBusy(false);
+    if (!ok) return;
     onOpenChange(false);
     setCustomerName("");
   };
@@ -219,7 +235,7 @@ function NewProjectDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Vazgeç</Button>
-          <Button onClick={submit}>Oluştur</Button>
+          <Button onClick={() => void submit()} disabled={busy}>{busy ? "Oluşturuluyor…" : "Oluştur"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

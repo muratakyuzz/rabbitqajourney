@@ -78,8 +78,8 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 - [x] `GET /api/projects/:projectId/phases` — M2a. Yanıt `{ phases, steps }`; türetilmiş durum ve `ConditionResult` istemcide kalır (Kararlar)
 - [x] `PATCH /api/phases/:id` (#3; plan bitişi gerekçeli), `POST /api/phases/:id/complete` (#4; aşama onayı, sonraki aşama açılır, onaylayan + tarih) — M2a
 - [x] `PATCH /api/steps/:id` (#5): durum (gerekçeli), termin (gerekçeli), sorumlu/top; kilitli adıma elle değişiklik `409`; köprü `POST /api/projects/:projectId/steps/sync` — M2a
-- [ ] Store köprüsü: phases/steps hidrasyonu, yeni proje diyaloğu → API, mockup kurallarının adım değişikliklerini API'ye yazması
-- [ ] Testler: kopyalama, sıralı açılış, kilit, aşama onayı, gerekçe zorunluluğu, iş günü (tatil dahil) — API tarafı M2a'da tamam; web köprüsü testleri M2b
+- [x] Store köprüsü: phases/steps hidrasyonu, yeni proje diyaloğu → API, mockup kurallarının adım değişikliklerini API'ye yazması — M2b
+- [x] Testler: kopyalama, sıralı açılış, kilit, aşama onayı, gerekçe zorunluluğu, iş günü (tatil dahil) — API M2a, web köprüsü M2b
 - **Kabul:** yeni proje → Aşamalar sekmesi API'den gelir; adım tamamla, termin değiştir, aşamayı onayla → sayfa yenilenince durur; uyarılar ve diğer sekmeler bozulmaz
 - **Notlar:**
   - **M2a (API, 2026-10-10):** web'e dokunulmadı.
@@ -88,6 +88,29 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
     - Şema: `projects`'e `salesperson_id`, `license_model`, `purchased_modules`; yeni `holidays` tablosu (seed: TR tatilleri); `steps.owner_id` FK'sı kaldırıldı (sahip kişi de olabilir).
     - Shared: `ProjectCore`, `ProjectCreate`, `Phase`/`Step`/`Action`, `PhasePatch`, `StepPatch`, `StepsSync`, `RuleEffects`, `PhasesWithSteps` şemaları. Domain'deki `Phase`/`Step`/`Action` tipleri bu şemalardan türetiliyor.
     - `npm run check` yeşil: lint 0 hata / 27 uyarı; test sayıları api 62, web 232, shared 276. API testleri `TZ=UTC` ile de geçiyor.
+  - **M2b (web + köprü, 2026-10-10, tag `m2`):**
+    - API: `steps/sync` body'sine opsiyonel `actions` (yalnız `source: "rule"` + `ruleKey`). Sunucu `projectId` + `ruleKey` ile eşleştirir; açık olanı, yoksa en yenisini seçer (`domain/rule-actions.ts`, web ile ortak). Sunucunun id'si korunur. `dev`/`start` `TZ=Europe/Istanbul`.
+    - Web API: `lib/api/` (`client`, `template`, `projects`: `createProject`, `getPhases`, `patchPhase`, `completePhase`, `patchStep`, `syncProject`).
+    - Store: `applyServerEffects` (saf kısmı `lib/rabbitqa/server-sync.ts` → `mergeEffects`). Proje başına "son sunucu görüntüsü" (`ServerView`: adım id → kanonik JSON, `ruleKey` → status/title/due/ownerId). Hidrasyon: açılışta her proje için paralel `GET phases`; 404 → yalnız yerel (`isLocalOnly`).
+    - Köprü: her store değişikliğinde görüntüsü olan projeler için fark hesaplanır. 300 ms sonra `POST steps/sync` gider; proje başına sıralı kuyruk var; gönderilen kayıt beklenirken görüntüye işlenir. Hata → toast + `GET phases` ile yeniden yükleme (sunucu kazanır). Aynı fark art arda ikinci kez oluşursa gönderilmez, konsola uyarı yazılır (döngü koruması).
+    - Ekranlar: Aşamalar sekmesindeki "Aşamayı tamamla", `StepDialog` (adım satırındaki düzenle; durum/termin/sorumlu/top/akış tek diyalogda), `PhaseDialog` ("Aşamayı düzenle": durum, plan tarihleri) ve yeni proje diyaloğu API'yi çağırıyor (`useServerAction`: busy + hata mesajı). `PhaseWorkspaceSheet` yalnız okur; çalışma alanlarındaki değişiklikler köprüden gider.
+    - Tarayıcıda denendi:
+      - Yeni proje → `POST /projects` + bir sync (`csm`, `sales_license`, `modules` done).
+      - Termin gerekçeyle değişti (`PATCH`, `reason`).
+      - Kurulum tipi, LLM, taahhüt yok, teklif, sözleşme ve brief → her biri tek sync. Brief sync'i istemcinin açtığı `phase_approval`'ı da taşıdı; sunucuda tek kayıt.
+      - "Aşamayı tamamla" → 00 done, 01 açıldı, onay aksiyonu done.
+      - Yenileme → durum kalıcı, sync gitmedi.
+      - On-prem → SaaS → tek sync: 5 adım `out_of_scope` + yeni `saas_env`, sunucuda da aynı.
+      - API restart → web ve sunucu seed'e döndü.
+      - Konsolda hata yok.
+    - `npm run check` yeşil: lint 0 hata / 27 uyarı; test sayıları api 65, web 247, shared 276.
+  - **Faz 2'ye kalan "Hedef" kuralları (API_CONTRACT #3, #5):**
+    - K10: tamamlanmış aşamayı yeniden açınca onaylayan, onay tarihi ve `actualEnd` temizlenir.
+    - Kapsam dışından dönen aşama/adım önce `locked` olur, akışla açılır.
+    - Tamamlanmış aşamadaki adıma elle durum değişikliği `409`.
+    - Aşama kapsam dışı yapılınca açık `phase_approval` iptal edilir.
+    - "Sahip ata" aksiyonu (rol bazlı sahip `ownerId: null`).
+    - Tatiller yalnız seed'den; Ayarlar → Tatiller sunucuya gitmez.
 
 ## M3 — Aksiyonlar
 - [ ] `GET /api/projects/:projectId/actions`, `POST /api/projects/:projectId/actions` (#6), `PATCH /api/actions/:id` (#7; termin ve iptalde gerekçe zorunlu)
@@ -145,3 +168,10 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
   - `csmId` olmayan bir kullanıcıysa `400`.
 - 2026-10-10 (M2a): Sync'te aşaması `done` olan adımın durumu değişmez (RUL-05 Seçenek A). Kapsam dışından geri istenen adım için `ensureReviewAction`, kapsam dışına alınan adım için `cancelReviewAction` çalışır. Tamamlanmış aşamaya `out_of_scope` gelen yeni adım (`saas_env`) eklenir ve inceleme aksiyonu açılır.
 - 2026-10-10 (M2a): Tatil takvimi sunucuda `holidays` tablosundan okunur (seed: TR tatilleri). Ayarlar → Tatiller hâlâ store'da; oradaki değişiklik sunucuya gitmez (ekran API'ye geçince kalkar).
+- 2026-10-10 (M2b): Kural aksiyonlarının kimliği `projectId` + `ruleKey` (id değil): web ve API aynı kuralları ayrı çalıştırıp kendi kopyalarını açar. Seçim `domain/rule-actions.ts` → `currentRuleAction` (açık olan, yoksa en yeni), iki tarafta ortak. Köprü bir kural aksiyonunun yalnız status/title/due/ownerId alanlarını taşır.
+- 2026-10-10 (M2b): Köprü yalnız adımları ve kural aksiyonlarını taşır; aşamalar taşınmaz. AI önerisi onayındaki aşama plan tarihi (`date_change` + `phaseId`) bu yüzden ayrıca `PATCH /phases/:id` ile yazılır (gerekçe = onay gerekçesi). AI `step_update` yerel `updateStep` + köprüden gider (kilit kuralları yerelde uygulanır).
+- 2026-10-10 (M2b): Store'da eski `createProject` ve `completePhase` kaldırıldı (çağıran yok). `updatePhase`/`updateStep` yalnız AI öneri onayı (`approveInsight`) ve store testleri için kaldı.
+- 2026-10-10 (M2b): `StepDialog` "Tamamlandı" için gerekçe istemiyor (API ile aynı, K1).
+- 2026-10-10 (M2b): API'nin döndürdüğü proje store'da var olan projeyle birleşirken `installType`, `llmChoice`, `teams` ezilmez (bu alanlar Faz 1'de store'da değişiyor, API'ye yazılmıyor).
+- 2026-10-10 (M2b): "Demo verisini sıfırla" artık store'u seed'e döndürüp projeleri API'den yeniden yükler (sunucu kazanır). Sıfırlama sunucuyu sıfırlamaz; bunun için API restart gerekir.
+- 2026-10-10 (M2b): Yalnız yerel projeler (API'de 404) ekranlarda API çağrısı yapınca hata toast'ı görür; yerel yedek yol yok.

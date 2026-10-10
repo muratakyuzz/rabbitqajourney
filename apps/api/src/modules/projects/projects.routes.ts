@@ -13,7 +13,7 @@ export function projectsRouter(db: Db) {
     res.json(await listPhases(db, req.params.projectId));
   });
   r.post("/projects/:projectId/steps/sync", async (req, res) => {
-    res.json(await syncSteps(db, req.params.projectId, StepsSyncSchema.parse(req.body).steps));
+    res.json(await syncSteps(db, req.params.projectId, StepsSyncSchema.parse(req.body)));
   });
   r.patch("/phases/:id", async (req, res) => {
     res.json(await updatePhase(db, req.params.id, PhasePatchSchema.parse(req.body)));

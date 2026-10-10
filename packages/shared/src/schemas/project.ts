@@ -124,10 +124,14 @@ export const StepPatchSchema = z.object({
 });
 export type StepPatch = z.infer<typeof StepPatchSchema>;
 
-/** POST /api/projects/:projectId/steps/sync — bridge for step changes computed by client-side rules (origin client-rule). */
+/**
+ * POST /api/projects/:projectId/steps/sync — bridge for changes computed by client-side rules (origin client-rule).
+ * `actions`: rule actions only (source "rule" + ruleKey); the server matches them by projectId + ruleKey.
+ */
 export const StepsSyncSchema = z.object({
-  steps: z.array(StepSchema).min(1),
-});
+  steps: z.array(StepSchema).default([]),
+  actions: z.array(ActionSchema).default([]),
+}).refine((b) => b.steps.length + b.actions.length > 0, { message: "Gönderilecek adım veya aksiyon yok.", path: ["steps"] });
 export type StepsSync = z.infer<typeof StepsSyncSchema>;
 
 /** Response of every phase/step write: only the records that changed (including rule/flow effects). */

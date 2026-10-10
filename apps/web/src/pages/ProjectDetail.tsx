@@ -35,6 +35,9 @@ import {
 } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { personName, projectProgress, useAlertViews, useComputedAlerts, useRq } from "@/lib/rabbitqa/store";
+import { useServerAction } from "@/lib/rabbitqa/use-server-action";
+import { completePhase as completePhaseApi, patchPhase, patchStep } from "@/lib/api/projects";
+import type { PhasePatch, StepPatch } from "@rabbitqa/shared";
 import { derivePhaseStatus } from "@rabbitqa/shared/domain/alerts";
 import { canEditFlow, canEditItem, canManageProject, canSeeCredentials, selectableUsers } from "@/lib/rabbitqa/perm";
 import { isActivePhase, isOpenStep, previousStep } from "@rabbitqa/shared/domain/flow";
@@ -259,7 +262,8 @@ function CompletionHint({ step }: { step: Step }) {
 }
 
 function PhasesTab({ project, initialWorkspace }: { project: Project; initialWorkspace?: string }) {
-  const { state, completePhase } = useRq();
+  const { state } = useRq();
+  const { busy, run } = useServerAction();
   const { user } = useAuth();
   const manage = canManageProject(user, project);
   const phases = state.phases.filter((p) => p.projectId === project.id).sort((a, b) => a.order - b.order);
@@ -339,10 +343,10 @@ function PhasesTab({ project, initialWorkspace }: { project: Project; initialWor
                     )}
                     {manage && <Button size="sm" variant="outline" onClick={() => setEditPhase(ph)}><Pencil className="h-3.5 w-3.5 mr-1" />Aşamayı düzenle</Button>}
                     {manage && ph.status !== "done" && !locked && (
-                      <Button size="sm" onClick={() => {
-                        const err = completePhase(ph.id);
+                      <Button size="sm" disabled={busy} onClick={async () => {
+                        const err = await run(() => completePhaseApi(ph.id));
                         if (err) toast.error(`Aşama tamamlanamaz: ${err}`);
-                      }}><CheckCircle2 className="h-3.5 w-3.5 mr-1" />Aşamayı tamamla</Button>
+                      }}><CheckCircle2 className="h-3.5 w-3.5 mr-1" />{busy ? "Kaydediliyor…" : "Aşamayı tamamla"}</Button>
                     )}
                   </div>
                 </div>
@@ -445,8 +449,9 @@ function PhasesTab({ project, initialWorkspace }: { project: Project; initialWor
   );
 }
 
-function StepDialog({ step, project, onClose }: { step: Step; project: Project; onClose: () => void }) {
-  const { state, updateStep } = useRq();
+export function StepDialog({ step, project, onClose }: { step: Step; project: Project; onClose: () => void }) {
+  const { state } = useRq();
+  const { busy, run } = useServerAction();
   const { user } = useAuth();
   const flow = canEditFlow(user, project);
   const locked = step.status === "locked";
@@ -458,7 +463,8 @@ function StepDialog({ step, project, onClose }: { step: Step; project: Project; 
   const [dependency, setDependency] = useState<Dependency>(step.dependency);
   const [durationDays, setDurationDays] = useState(step.durationDays);
   const [reason, setReason] = useState("");
-  const needsReason = (due || null) !== step.due || status !== step.status;
+  // marking done needs no reason (ADR-0004 K1); other status changes and due changes do — same as the API
+  const needsReason = (due || null) !== step.due || (status !== step.status && status !== "done");
   const statusLabels = { ...STEP_STATUS_LABEL } as Partial<Record<StepStatus, string>>;
   if (!locked) delete statusLabels.locked;
   if (dataOrMeeting) {
@@ -525,16 +531,17 @@ function StepDialog({ step, project, onClose }: { step: Step; project: Project; 
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Vazgeç</Button>
-          <Button onClick={() => {
+          <Button disabled={busy} onClick={async () => {
             if (needsReason && !reason.trim()) return toast.error("Gerekçe zorunlu");
-            const p: Partial<Step> = { ownerId, ball };
+            const p: StepPatch = { ownerId, ball };
             if (!locked) { p.due = due || null; p.status = status; }
             if (flow) { p.dependency = dependency; if (locked) p.durationDays = durationDays; }
-            const err = updateStep(step.id, p, reason.trim() || undefined);
+            if (reason.trim()) p.reason = reason.trim();
+            const err = await run(() => patchStep(step.id, p));
             if (err) return toast.error(err);
             toast.success("Adım güncellendi");
             onClose();
-          }}>Kaydet</Button>
+          }}>{busy ? "Kaydediliyor…" : "Kaydet"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -542,7 +549,7 @@ function StepDialog({ step, project, onClose }: { step: Step; project: Project; 
 }
 
 function PhaseDialog({ phase, onClose }: { phase: Phase; onClose: () => void }) {
-  const { updatePhase } = useRq();
+  const { busy, run } = useServerAction();
   const locked = phase.status === "locked";
   const initialStatus: PhaseStatus = phase.status === "late" || phase.status === "at_risk" ? "in_progress" : phase.status;
   const [status, setStatus] = useState<PhaseStatus>(initialStatus);
@@ -585,15 +592,17 @@ function PhaseDialog({ phase, onClose }: { phase: Phase; onClose: () => void }) 
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Vazgeç</Button>
-          <Button onClick={() => {
+          <Button disabled={busy} onClick={async () => {
             if (needsReason && !reason.trim()) return toast.error("Gerekçe zorunlu");
-            const err = updatePhase(phase.id, {
+            // baselineEnd is not sent: the API writes it once from planEnd (INV-07)
+            const patch: PhasePatch = {
               ...(status !== initialStatus ? { status } : {}), planStart: planStart || null, planEnd: planEnd || null, actualStart: actualStart || null,
-              baselineEnd: phase.baselineEnd ?? (planEnd || null),
-            }, reason.trim() || undefined);
+              ...(reason.trim() ? { reason: reason.trim() } : {}),
+            };
+            const err = await run(() => patchPhase(phase.id, patch));
             if (err) return toast.error(err);
             onClose();
-          }}>Kaydet</Button>
+          }}>{busy ? "Kaydediliyor…" : "Kaydet"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

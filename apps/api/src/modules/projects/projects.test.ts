@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import {
   ApiErrorBodySchema, PhasesWithStepsSchema, RuleEffectsSchema, TemplateVersionSchema,
-  type PhaseTpl, type ProjectCreate, type RuleEffects, type Step,
+  type Action, type PhaseTpl, type ProjectCreate, type RuleEffects, type Step,
 } from "@rabbitqa/shared";
 import { addBusinessDays } from "@rabbitqa/shared/domain/business-days";
 import { PHASE_TEMPLATE } from "@rabbitqa/shared/domain/seed";
@@ -243,6 +243,46 @@ describe("POST /api/projects/:projectId/steps/sync (client-rule bridge)", () => 
     expect(e.actions).toHaveLength(1);
     expect(e.actions[0]).toMatchObject({ ruleKey: "rule_review:st_perakende_16", status: "open", source: "rule" });
     expect((await stepOf("p_perakende", "st_perakende_16")).status).toBe("out_of_scope");
+  });
+
+  describe("rule actions", () => {
+    const ruleAction = (over: Partial<Action> = {}): Action => ({
+      id: "a_client_1", projectId: "p_garanti", title: "GPU gereksinimlerinin müşteriye iletilmesi", ownerId: "u_deniz", ball: "devops",
+      due: "2026-10-14", priority: "medium", status: "open", source: "rule", meetingId: null, createdAt: NOW.toISOString(),
+      ruleKey: "llm:gpu_req", isCustomerVisible: false, ...over,
+    });
+    const byRuleKey = async (ruleKey: string) =>
+      (await db.query<{ id: string; title: string; status: string }>("SELECT id, title, status FROM actions WHERE rule_key = $1", [ruleKey])).rows;
+
+    it("the same ruleKey twice → one record; the server id is kept, status/title/due/ownerId follow", async () => {
+      const first = await request(app).post("/api/projects/p_garanti/steps/sync").send({ actions: [ruleAction()] });
+      expect(first.status).toBe(200);
+      expect(effects(first).actions).toHaveLength(1);
+
+      const second = await request(app).post("/api/projects/p_garanti/steps/sync")
+        .send({ actions: [ruleAction({ id: "a_client_2", status: "cancelled", title: "GPU (iptal)", due: null })] });
+      expect(effects(second).actions[0]).toMatchObject({ id: "a_client_1", status: "cancelled", title: "GPU (iptal)", due: null });
+      expect(await byRuleKey("llm:gpu_req")).toEqual([{ id: "a_client_1", title: "GPU (iptal)", status: "cancelled" }]);
+    });
+
+    it("a client copy of the server's own review action → still one record", async () => {
+      const st = await stepOf("p_perakende", "st_perakende_16");
+      const own = await request(app).post("/api/projects/p_perakende/steps/sync").send({ steps: [{ ...st, status: "locked" }] });
+      const serverId = effects(own).actions[0].id;
+
+      const client = ruleAction({ id: "a_local_review", projectId: "p_perakende", ruleKey: "rule_review:st_perakende_16", title: "Gözden geçir (istemci)" });
+      const res = await request(app).post("/api/projects/p_perakende/steps/sync").send({ steps: [{ ...st, status: "locked" }], actions: [client] });
+      expect(res.status).toBe(200);
+      expect(await byRuleKey("rule_review:st_perakende_16")).toEqual([{ id: serverId, title: "Gözden geçir (istemci)", status: "open" }]);
+    });
+
+    it("400 for a non-rule action and for an empty body", async () => {
+      const manual = await request(app).post("/api/projects/p_garanti/steps/sync").send({ actions: [ruleAction({ source: "manual" })] });
+      expect(manual.status).toBe(400);
+      expect(errorOf(manual).field).toBe("actions.0.ruleKey");
+      expect((await request(app).post("/api/projects/p_garanti/steps/sync").send({ actions: [ruleAction({ ruleKey: undefined })] })).status).toBe(400);
+      expect((await request(app).post("/api/projects/p_garanti/steps/sync").send({})).status).toBe(400);
+    });
   });
 
   it("400 for a step of another project", async () => {

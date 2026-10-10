@@ -17,8 +17,15 @@ import { todayISO } from "@rabbitqa/shared/domain/labels";
 import { buildReportSnapshot, defaultNextWeek } from "@rabbitqa/shared/domain/reports";
 import { weekStartOf } from "@rabbitqa/shared/domain/alerts";
 import { applyInstallType, applyLlmChoice, applyMeetingHeldRules, ensureReviewAction, installChoiceError, setStepByKey } from "@rabbitqa/shared/domain/rules";
-import type { TemplateVersion } from "@rabbitqa/shared";
-import { fetchTemplate } from "@/data/template";
+import type { RuleEffects, TemplateVersion } from "@rabbitqa/shared";
+import { fetchTemplate } from "@/lib/api/template";
+import { ApiError, apiErrorMessage } from "@/lib/api";
+import { getPhases, patchPhase, syncProject } from "@/lib/api/projects";
+import { currentRuleActions } from "@rabbitqa/shared/domain/rule-actions";
+import { diffProject, emptyView, mergeEffects, projectsIn, recordRuleActions, recordSteps, replaceProjectPlan, type ServerView, canon } from "./server-sync";
+
+/** Debounce of the client-rule bridge (docs/PLAN.md M2b). */
+export const BRIDGE_DEBOUNCE_MS = 300;
 
 /** Active template version from the API (not persisted); null while unknown or when the API is unreachable. */
 export type TemplateMeta = Omit<TemplateVersion, "phases">;
@@ -45,10 +52,8 @@ const ENTITY: Record<Coll, string> = {
 interface Ctx {
   state: RqState;
   userId: string;
-  createProject: (p: Pick<Project, "customerName" | "name" | "csmId" | "salespersonId" | "licenseModel" | "purchasedModules" | "startDate" | "goLiveDate">) => string;
   updateProject: (id: string, patch: Partial<Project>, reason?: string) => void;
   updatePhase: (id: string, patch: Partial<Phase>, reason?: string) => string | null;
-  completePhase: (id: string) => string | null;
   updateStep: (id: string, patch: Partial<Step>, reason?: string) => string | null;
   addAction: (a: Omit<Action, "id" | "createdAt" | "isCustomerVisible"> & { isCustomerVisible?: boolean }) => void;
   updateAction: (id: string, patch: Partial<Action>, reason?: string) => void;
@@ -99,6 +104,10 @@ interface Ctx {
   /** Template comes from the API (docs/PLAN.md M1); `state.template` is its copy for creating projects. */
   templateVersion: TemplateMeta | null;
   applyTemplateVersion: (tv: TemplateVersion) => void;
+  /** Puts an API response (RuleEffects) into the store and the bridge's server view; does not trigger a sync of its own. */
+  applyServerEffects: (e: RuleEffects) => void;
+  /** Projects the API does not know (created offline before M2b): not bridged. */
+  isLocalOnly: (projectId: string) => boolean;
 }
 
 const RqContext = createContext<Ctx | null>(null);
@@ -143,6 +152,99 @@ export function RqProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     fetchTemplate().then(applyTemplateVersion, () => {});
   }, [applyTemplateVersion]);
+
+  // ---- API bridge (docs/PLAN.md M2b) ----
+  // views: last server picture per project (only bridged projects have one). The bridge sends what the store
+  // has beyond it; server responses update it first, so their own records never count as changes.
+  const views = useRef(new Map<string, ServerView>());
+  const [localOnly, setLocalOnly] = useState<ReadonlySet<string>>(() => new Set());
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
+  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const queues = useRef(new Map<string, Promise<void>>());
+  const lastSent = useRef(new Map<string, string>());
+
+  const applyServerEffects = useCallback((e: RuleEffects) => {
+    for (const pid of projectsIn(e)) {
+      const view = views.current.get(pid) ?? (e.project?.id === pid ? emptyView() : null);
+      if (!view) continue;
+      recordSteps(view, e.steps.filter((x) => x.projectId === pid));
+      recordRuleActions(view, e.actions.filter((x) => x.projectId === pid));
+      views.current.set(pid, view);
+    }
+    setState((s) => mergeEffects(s, e));
+  }, [setState]);
+
+  /** Loads a project's phases and steps from the API (server wins) and starts bridging it. */
+  const hydrate = useCallback(async (pid: string): Promise<"ok" | "missing" | "offline"> => {
+    try {
+      const data = await getPhases(pid);
+      const view = emptyView();
+      recordSteps(view, data.steps);
+      // no actions endpoint yet (M3): the store's rule actions are taken as the server's
+      recordRuleActions(view, [...currentRuleActions(stateRef.current.actions, pid).values()]);
+      views.current.set(pid, view);
+      lastSent.current.delete(pid);
+      setState((s) => replaceProjectPlan(s, pid, data));
+      return "ok";
+    } catch (e) {
+      views.current.delete(pid);
+      if (e instanceof ApiError && e.status === 404) {
+        setLocalOnly((cur) => new Set(cur).add(pid));
+        console.warn(`Proje ${pid} API'de yok; yalnız yerel, sunucuya yazılmaz.`);
+        return "missing";
+      }
+      return "offline";
+    }
+  }, [setState]);
+
+  const hydrateAll = useCallback(async (ids: string[]) => {
+    const results = await Promise.all(ids.map(hydrate));
+    if (results.includes("offline")) console.warn("API'ye ulaşılamadı; aşama/adım köprüsü kapalı, mockup verisiyle devam ediliyor.");
+  }, [hydrate]);
+
+  useEffect(() => {
+    void hydrateAll(stateRef.current.projects.map((p) => p.id));
+  }, [hydrateAll]);
+
+  const flush = useCallback((pid: string) => {
+    const run = async () => {
+      const view = views.current.get(pid);
+      if (!view) return;
+      const diff = diffProject(stateRef.current, pid, view);
+      if (!diff.steps.length && !diff.actions.length) return;
+      const payload = canon(diff);
+      if (lastSent.current.get(pid) === payload) {
+        console.warn(`Köprü: ${pid} için aynı değişiklik tekrar oluştu, gönderilmedi (sunucu farklı tutuyor).`);
+        return;
+      }
+      lastSent.current.set(pid, payload);
+      // optimistic: what is in flight is not sent again while waiting
+      recordSteps(view, diff.steps);
+      recordRuleActions(view, diff.actions);
+      try {
+        applyServerEffects(await syncProject(pid, diff));
+      } catch (e) {
+        toast.error(`Değişiklik sunucuya yazılamadı: ${apiErrorMessage(e)}`);
+        await hydrate(pid);
+      }
+    };
+    const next = (queues.current.get(pid) ?? Promise.resolve()).then(run, run);
+    queues.current.set(pid, next);
+  }, [applyServerEffects, hydrate]);
+
+  // Every store change: diff bridged projects against their server view; send after a short pause.
+  useEffect(() => {
+    for (const [pid, view] of views.current) {
+      if (localOnly.has(pid)) continue;
+      const d = diffProject(state, pid, view);
+      if (!d.steps.length && !d.actions.length) continue;
+      clearTimeout(timers.current.get(pid));
+      timers.current.set(pid, setTimeout(() => { timers.current.delete(pid); flush(pid); }, BRIDGE_DEBOUNCE_MS));
+    }
+  }, [state, localOnly, flush]);
+
+  useEffect(() => () => { for (const t of timers.current.values()) clearTimeout(t); }, []);
 
   const mkAudit = useCallback(
     (e: Omit<AuditEntry, "id" | "at" | "userId">): AuditEntry => ({ ...e, id: uid("au"), at: new Date().toISOString(), userId }),
@@ -217,32 +319,6 @@ export function RqProvider({ children }: { children: ReactNode }) {
     const api: Ctx = {
     state,
     userId,
-    createProject: (input) => {
-      const project: Project = {
-        ...input, id: uid("p"), health: "green", healthReason: "", teams: [], desiredModules: [], discoveryAnswers: {}, teamInfo: {},
-        installType: null, llmChoice: null, createdAt: new Date().toISOString(),
-        integrations: structuredClone(DEFAULT_PROJECT_INTEGRATIONS), noCommitments: false,
-      };
-      setState((s) => {
-        const { phases, steps } = buildFromTemplate(project, s.users, {}, s.template);
-        const plan = projectPlan(phases, steps, project.startDate);
-        phases.forEach((ph) => {
-          const d = plan.phases[ph.id];
-          if (!d) return;
-          ph.planStart = ph.planStart ?? d.start;
-          ph.planEnd = ph.planEnd ?? d.end;
-          ph.baselineEnd = ph.baselineEnd ?? d.end;
-        });
-        return {
-          ...s,
-          projects: [...s.projects, project],
-          phases: [...s.phases, ...phases],
-          steps: [...s.steps, ...steps],
-          audit: [...s.audit, mkAudit({ projectId: project.id, kind: "create", entity: "project", entityId: project.id, label: `Proje oluşturuldu — aşamalar ve adımlar şablondan kopyalandı, akış başlatıldı` })],
-        };
-      });
-      return project.id;
-    },
     updateProject: (id, p, reason) => patch<Project>("projects", id, p, reason, (base, old, next) => {
       if (next.health === "red" && old.health !== "red") {
         const alert: Alert = {
@@ -262,15 +338,6 @@ export function RqProvider({ children }: { children: ReactNode }) {
         if (p.status === "late" || p.status === "at_risk") return "\"Gecikti\" ve \"Risk altında\" uyarılardan otomatik belirlenir";
       }
       patch<Phase>("phases", id, p, reason);
-      return null;
-    },
-    completePhase: (id) => {
-      const ph = state.phases.find((x) => x.id === id);
-      if (!ph) return "Aşama bulunamadı";
-      if (ph.status === "locked") return "Aşamanın sırası gelmedi";
-      const open = state.steps.filter((s) => s.phaseId === id && s.required && s.status !== "done" && s.status !== "out_of_scope");
-      if (open.length) return `${open.length} zorunlu adım tamamlanmadı`;
-      patch<Phase>("phases", id, { status: "done", actualEnd: todayISO(), actualStart: ph.actualStart ?? todayISO(), approvedBy: userId, approvedAt: new Date().toISOString() });
       return null;
     },
     updateStep: (id, p, reason) => {
@@ -723,7 +790,18 @@ export function RqProvider({ children }: { children: ReactNode }) {
         }
         case "health_change": api.updateProject(ins.projectId, { health: v.health, healthReason: v.healthReason ?? "" }, reason); break;
         case "date_change":
-          if (v.phaseId) { applied = v.phaseId; api.updatePhase(v.phaseId, { planEnd: v.planEnd }, reason); }
+          if (v.phaseId) {
+            applied = v.phaseId;
+            api.updatePhase(v.phaseId, { planEnd: v.planEnd }, reason);
+            // phases are not part of the bridge; write the plan date through the API as well
+            if (views.current.has(ins.projectId)) {
+              const pid = ins.projectId;
+              patchPhase(v.phaseId, { planEnd: v.planEnd ?? null, reason: reason || "AI önerisi onaylandı" }).then(applyServerEffects, (e: unknown) => {
+                toast.error(`Plan tarihi sunucuya yazılamadı: ${apiErrorMessage(e)}`);
+                void hydrate(pid);
+              });
+            }
+          }
           else api.updateProject(ins.projectId, { goLiveDate: v.goLiveDate }, reason);
           break;
       }
@@ -772,12 +850,21 @@ export function RqProvider({ children }: { children: ReactNode }) {
       setState((s) => ({ ...s, unmatchedEmails: [ue, ...s.unmatchedEmails], audit: [...s.audit, sysAudit(`E-posta eşleşmedi, kuyruğa alındı — ${mail.subject}`)] }));
       return { projectId: null, created: 0 };
     },
-    reset: () => setState(createSeed()),
+    reset: () => {
+      // views first: until rehydrated nothing is bridged, so the seed is never pushed over server data
+      views.current.clear();
+      setLocalOnly(new Set());
+      const seed = createSeed();
+      setState(seed);
+      void hydrateAll(seed.projects.map((p) => p.id));
+    },
     templateVersion,
     applyTemplateVersion,
+    applyServerEffects,
+    isLocalOnly: (pid) => localOnly.has(pid),
     };
     return api;
-  }, [state, userId, patch, add, mkAudit, templateVersion, applyTemplateVersion]);
+  }, [state, userId, patch, add, mkAudit, templateVersion, applyTemplateVersion, applyServerEffects, hydrate, hydrateAll, localOnly]);
 
   return <RqContext.Provider value={value}>{children}</RqContext.Provider>;
 }

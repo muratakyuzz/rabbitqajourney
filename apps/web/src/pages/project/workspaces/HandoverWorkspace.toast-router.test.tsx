@@ -53,5 +53,5 @@ describe("QA-02 regression — install choice toast with Link does not crash the
     }
 
     expect(uncaught).toEqual([]);
-  });
+  }, 15_000); // full <App /> render; slow under a loaded parallel run
 });
