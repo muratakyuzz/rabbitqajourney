@@ -23,7 +23,7 @@ export async function listActions(db: Db, projectId: string): Promise<ActionList
 export async function createAction(db: Db, projectId: string, input: ActionCreate): Promise<Effects> {
   return db.transaction((tx) => changeProject(tx, projectId, (s) => {
     const action: Action = {
-      id: uid("a"), projectId, title: input.title.trim(), ownerId: input.ownerId, ball: ballForOwner(input.ownerId, s.users, input.ball),
+      id: uid("a"), projectId, title: input.title, ownerId: input.ownerId, ball: ballForOwner(input.ownerId, s.users, input.ball),
       due: input.due, priority: input.priority, status: input.status, source: "manual", meetingId: null,
       createdAt: new Date().toISOString(), isCustomerVisible: input.isCustomerVisible ?? defaultCustomerVisible(),
     };

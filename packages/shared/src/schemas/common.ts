@@ -5,3 +5,6 @@ import { z } from "zod";
 export const IdSchema = z.string().min(1);
 export const IsoDateSchema = z.iso.date();
 export const IsoDateTimeSchema = z.iso.datetime();
+
+/** A required text field: trimmed, and blank (or whitespace only) is a 400 with this message. */
+export const requiredText = (message: string) => z.string().trim().min(1, message);

@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { ActionStatusSchema, BallSchema, PrioritySchema } from "../enums";
-import { IdSchema, IsoDateSchema } from "./common";
+import { IdSchema, IsoDateSchema, requiredText } from "./common";
 
 // API_CONTRACT #6. `source`, `ruleKey`, `insightId` and `meetingId` are server-assigned and not part of the request.
 // `ball` is only used when there is no owner; otherwise it follows the owner (domain/ball.ts).
 export const ActionCreateSchema = z.object({
-  title: z.string().min(1),
+  title: requiredText("Aksiyon başlığı boş olamaz."),
   ownerId: IdSchema.nullable(), // user id or contact id
   ball: BallSchema,
   due: IsoDateSchema.nullable(),
@@ -17,7 +17,7 @@ export type ActionCreate = z.infer<typeof ActionCreateSchema>;
 
 /** PATCH /api/actions/:id (#7). A due change and cancelling need a reason; completing does not. */
 export const ActionPatchSchema = z.object({
-  title: z.string().trim().min(1, "Başlık boş olamaz.").optional(),
+  title: requiredText("Aksiyon başlığı boş olamaz.").optional(),
   ownerId: IdSchema.nullable().optional(),
   /** only used while the action has no owner; otherwise the ball follows the owner (domain/ball.ts) */
   ball: BallSchema.optional(),

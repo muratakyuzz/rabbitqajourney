@@ -49,15 +49,12 @@ export async function createMeeting(db: Db, projectId: string, input: MeetingCre
       };
       checkHeld(m);
       const now = new Date().toISOString();
-      const actions = input.actions.map((a, i): Action => {
-        const title = a.title.trim();
-        if (!title) throw badRequest("Aksiyon başlığı boş olamaz.", `actions.${i}.title`);
-        return {
-          id: uid("a"), projectId, title, ownerId: a.ownerId, ball: ballForOwner(a.ownerId, s.users, a.ball),
-          due: a.due, priority: a.priority, status: a.status, source: "meeting", meetingId: m.id, createdAt: now,
-          isCustomerVisible: a.isCustomerVisible ?? defaultCustomerVisible(),
-        };
-      });
+      // titles are trimmed and non-blank by MeetingCreateSchema (400 with field actions.N.title)
+      const actions = input.actions.map((a): Action => ({
+        id: uid("a"), projectId, title: a.title, ownerId: a.ownerId, ball: ballForOwner(a.ownerId, s.users, a.ball),
+        due: a.due, priority: a.priority, status: a.status, source: "meeting", meetingId: m.id, createdAt: now,
+        isCustomerVisible: a.isCustomerVisible ?? defaultCustomerVisible(),
+      }));
       meeting = m;
       const next = { ...s, meetings: [...s.meetings, m], actions: [...s.actions, ...actions] };
       return applyMeetingHeldRules(next, m, noAudit);

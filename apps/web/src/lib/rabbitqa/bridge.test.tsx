@@ -146,6 +146,24 @@ describe("API bridge", () => {
     expect(api.callsTo("POST", /steps\/sync$/)).toEqual([]);
   });
 
+  it("hydration: a response that breaks the schema is not silent — console names the field, a toast is shown (review O1)", async () => {
+    const api = fakeApi({
+      "GET /projects/p_garanti/actions": () => json(200, {
+        items: api.server.actions.filter((a) => a.projectId === "p_garanti").map((a, i) => (i === 0 ? { ...a, title: "" } : a)),
+      }),
+    });
+    const bad = api.server.actions.find((a) => a.projectId === "p_garanti")!;
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { result } = await setup(api);
+    expect(error).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^Proje p_garanti: sunucu yanıtı şemaya uymuyor — items\\.0\\.title — .+ \\(id ${bad.id}\\)`)));
+    expect(toast.error).toHaveBeenCalledWith("Garanti Teknoloji: sunucudan gelen veri okunamadı (items.0.title). Bu projedeki değişiklikler sunucuya yazılmıyor.");
+    // not bridged: a change is not sent
+    act(() => { result.current.updateStep(STEP, { ball: "care" }); });
+    await pause(BRIDGE_DEBOUNCE_MS + 150);
+    expect(api.callsTo("POST", /p_garanti\/steps\/sync$/)).toEqual([]);
+    error.mockRestore();
+  });
+
   it("a project the API does not know stays local-only and is never synced", async () => {
     const api = fakeApi({ "GET /projects/p_ornek/phases": () => apiError(404, "NOT_FOUND", "Proje bulunamadı.") });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});

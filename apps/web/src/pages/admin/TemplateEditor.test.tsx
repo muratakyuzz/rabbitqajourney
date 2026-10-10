@@ -15,10 +15,12 @@ const version = (n: number, phases: PhaseTpl[] = PHASE_TEMPLATE): TemplateVersio
   ({ version: n, createdAt: "2026-10-10T09:00:00.000Z", createdBy: "u_admin", phases });
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
-/** Routes fetch by method; returns the mock so tests can read calls. */
+/** Routes the template endpoint by method; other calls (project hydration) get 404. Returns the mock so tests can read calls. */
 function mockApi(handlers: { get: () => Response | Promise<Response>; put?: (body: { baseVersion: number; phases: PhaseTpl[] }) => Response }) {
-  const fn = vi.fn(async (_url: string, init?: RequestInit) =>
-    init?.method === "PUT" ? handlers.put!(JSON.parse(String(init.body))) : handlers.get());
+  const fn = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url !== "/api/config/template") return json(404, { error: { code: "NOT_FOUND", message: "Uç bulunamadı." } });
+    return init?.method === "PUT" ? handlers.put!(JSON.parse(String(init.body))) : handlers.get();
+  });
   vi.stubGlobal("fetch", fn);
   return fn;
 }

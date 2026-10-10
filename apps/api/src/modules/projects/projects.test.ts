@@ -95,6 +95,16 @@ describe("POST /api/projects", () => {
     expect(errorOf(res).field).toBe("customerName");
   });
 
+  it("blank customer or project name → 400 with the field; names are trimmed (review O1)", async () => {
+    for (const field of ["customerName", "name"] as const) {
+      const res = await request(app).post("/api/projects").send(input({ [field]: "   " }));
+      expect(res.status).toBe(400);
+      expect(errorOf(res)).toMatchObject({ code: "VALIDATION", field });
+    }
+    const { project } = await create({ customerName: "  Boşluklu A.Ş. ", name: " Proje " });
+    expect(project).toMatchObject({ customerName: "Boşluklu A.Ş.", name: "Proje" });
+  });
+
   it("400 when goLiveDate is not after startDate", async () => {
     const res = await request(app).post("/api/projects").send(input({ goLiveDate: TODAY }));
     expect(res.status).toBe(400);
@@ -232,6 +242,22 @@ describe("POST /api/projects/:projectId/steps/sync (client-rule bridge)", () => 
     expect(e.steps.find((s) => s.id === ordered[1].id)).toMatchObject({ status: "pending", due: addBusinessDays(TODAY, ordered[1].durationDays) });
     expect(e.steps.find((s) => s.id === "st_added")).toMatchObject({ status: "pending", activatedAt: NOW.toISOString() });
     expect((await stepOf(project.id, "st_added")).status).toBe("pending");
+  });
+
+  it("a blank step or action title → 400 with the field, nothing written (review O1)", async () => {
+    const st = await stepOf("p_garanti", "st_garanti_18");
+    const step = await request(app).post("/api/projects/p_garanti/steps/sync").send({ steps: [{ ...st, title: "  " }] });
+    expect(step.status).toBe(400);
+    expect(errorOf(step).field).toBe("steps.0.title");
+    expect(await stepOf("p_garanti", "st_garanti_18")).toEqual(st);
+
+    const action: Action = {
+      id: "a_client_1", projectId: "p_garanti", title: " ", ownerId: null, ball: "csm", due: null, priority: "medium",
+      status: "open", source: "manual", meetingId: null, createdAt: NOW.toISOString(), isCustomerVisible: true,
+    };
+    const res = await request(app).post("/api/projects/p_garanti/steps/sync").send({ actions: [action] });
+    expect(res.status).toBe(400);
+    expect(errorOf(res).field).toBe("actions.0.title");
   });
 
   it("in a done phase a step asked back into scope stays out of scope and gets a review action", async () => {

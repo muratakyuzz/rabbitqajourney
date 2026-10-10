@@ -175,7 +175,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
   }, [setState]);
 
   /** Loads a project's phases, steps, actions and meetings from the API (server wins) and starts bridging it. */
-  const hydrate = useCallback(async (pid: string): Promise<"ok" | "missing" | "offline"> => {
+  const hydrate = useCallback(async (pid: string): Promise<"ok" | "missing" | "invalid" | "offline"> => {
     try {
       const [plan, actions, meetingList] = await Promise.all([getPhases(pid), getActions(pid), getMeetings(pid)]);
       const meetings = meetingList.map(({ actions: _a, ...m }) => m);
@@ -192,6 +192,13 @@ export function RqProvider({ children }: { children: ReactNode }) {
         setLocalOnly((cur) => new Set(cur).add(pid));
         console.warn(`Proje ${pid} API'de yok; yalnız yerel, sunucuya yazılmaz.`);
         return "missing";
+      }
+      if (e instanceof ApiError && e.code === "INVALID_RESPONSE") {
+        // not silent (review O1): which field broke, and a toast, since the project is not bridged until reload
+        const name = stateRef.current.projects.find((p) => p.id === pid)?.customerName ?? pid;
+        console.error(`Proje ${pid}: sunucu yanıtı şemaya uymuyor — ${e.detail ?? e.field ?? "?"}. Proje sunucuya bağlanmadı.`);
+        toast.error(`${name}: sunucudan gelen veri okunamadı (${e.field ?? "gövde"}). Bu projedeki değişiklikler sunucuya yazılmıyor.`);
+        return "invalid";
       }
       return "offline";
     }

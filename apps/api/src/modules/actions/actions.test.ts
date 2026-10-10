@@ -91,6 +91,14 @@ describe("POST /api/projects/:projectId/actions (#6)", () => {
     expect(errorOf(bad).field).toBe("due");
     expect((await request(app).post("/api/projects/p_yok/actions").send(draft())).status).toBe(404);
   });
+
+  it("a whitespace-only title → 400 with field title, nothing written (review O1)", async () => {
+    const before = await list("p_garanti");
+    const res = await request(app).post("/api/projects/p_garanti/actions").send(draft({ title: "   " }));
+    expect(res.status).toBe(400);
+    expect(errorOf(res)).toEqual({ code: "VALIDATION", message: "Aksiyon başlığı boş olamaz.", field: "title" });
+    expect(await list("p_garanti")).toEqual(before);
+  });
 });
 
 describe("PATCH /api/actions/:id (#7)", () => {
@@ -140,6 +148,14 @@ describe("PATCH /api/actions/:id (#7)", () => {
     const res = await patch(a.id, { title: a.title, due: a.due, status: "open" });
     expect(res.status).toBe(200);
     expect(effects(res).actions).toEqual([]);
+  });
+
+  it("a blank title → 400 with field title; a padded title is trimmed (review O1)", async () => {
+    const a = await create();
+    const blank = await patch(a.id, { title: "  " });
+    expect(blank.status).toBe(400);
+    expect(errorOf(blank)).toMatchObject({ code: "VALIDATION", field: "title" });
+    expect(effects(await patch(a.id, { title: "  Yeni başlık " })).actions[0].title).toBe("Yeni başlık");
   });
 
   it("404 for an unknown action; 400 for an unknown status", async () => {

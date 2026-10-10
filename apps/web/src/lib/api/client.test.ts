@@ -36,9 +36,14 @@ describe("api", () => {
     await expect(api("/x")).rejects.toMatchObject({ status: 0, code: "NETWORK", message: "Sunucuya ulaşılamıyor." });
   });
 
-  it("throws when the success body does not match the schema", async () => {
-    mockFetch(async () => json(200, { id: 1 }));
-    await expect(api("/x", { schema: z.object({ id: z.string() }) })).rejects.toThrow();
+  it("a success body that breaks the schema → ApiError INVALID_RESPONSE with the field and the record id", async () => {
+    mockFetch(async () => json(200, { items: [{ id: "a_1", title: "ok" }, { id: "a_2", title: "" }] }));
+    const schema = z.object({ items: z.array(z.object({ id: z.string(), title: z.string().min(1) })) });
+    const err = await api("/x", { schema }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ status: 200, code: "INVALID_RESPONSE", field: "items.1.title" });
+    expect((err as ApiError).message).toBe("Sunucu yanıtı beklenen biçimde değil (items.1.title).");
+    expect((err as ApiError).detail).toMatch(/^items\.1\.title — .+ \(id a_2\)$/);
   });
 
   it("apiErrorMessage shows ApiError messages and hides anything else", () => {

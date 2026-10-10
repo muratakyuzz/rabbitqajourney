@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { BallSchema, DependencySchema, MeetingTypeSchema, StepCompletionSchema } from "../enums";
+import { requiredText } from "./common";
 
 // Phase/step template (Ayarlar → Aşama şablonu, docs/PLAN.md M1). StepTpl/PhaseTpl in domain/types are these types.
 
 export const StepTplSchema = z.object({
-  title: z.string().trim().min(1, "Adım başlığı boş olamaz."),
+  title: requiredText("Adım başlığı boş olamaz."),
   ball: BallSchema,
   required: z.boolean(),
   ownerRole: z.literal("manager").optional(),
@@ -23,7 +24,7 @@ export type StepTpl = z.infer<typeof StepTplSchema>;
 
 export const PhaseTplSchema = z.object({
   code: z.string().min(1),
-  name: z.string().trim().min(1, "Aşama adı boş olamaz."),
+  name: requiredText("Aşama adı boş olamaz."),
   dependency: DependencySchema,
   steps: z.array(StepTplSchema),
 });

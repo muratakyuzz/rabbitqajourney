@@ -3,7 +3,7 @@ import {
   ActionSourceSchema, ActionStatusSchema, BallSchema, DependencySchema, InstallTypeSchema, LlmChoiceSchema,
   MeetingTypeSchema, PhaseStatusSchema, PrioritySchema, StepCompletionSchema, StepStatusSchema,
 } from "../enums";
-import { IdSchema, IsoDateSchema, IsoDateTimeSchema } from "./common";
+import { IdSchema, IsoDateSchema, IsoDateTimeSchema, requiredText } from "./common";
 import { MeetingSchema } from "./meeting";
 
 // Projects, phases, steps and the actions the flow engine opens (docs/PLAN.md M2).
@@ -12,8 +12,8 @@ import { MeetingSchema } from "./meeting";
 export const PhaseSchema = z.object({
   id: IdSchema,
   projectId: IdSchema,
-  code: z.string().min(1),
-  name: z.string().min(1),
+  code: requiredText("Aşama kodu boş olamaz."),
+  name: requiredText("Aşama adı boş olamaz."),
   order: z.number().int(),
   status: PhaseStatusSchema,
   planStart: IsoDateSchema.nullable(),
@@ -32,7 +32,7 @@ export const StepSchema = z.object({
   id: IdSchema,
   projectId: IdSchema,
   phaseId: IdSchema,
-  title: z.string().min(1),
+  title: requiredText("Adım başlığı boş olamaz."),
   required: z.boolean(),
   ownerId: IdSchema.nullable(), // user id or contact id
   ball: BallSchema,
@@ -52,7 +52,7 @@ export type Step = z.infer<typeof StepSchema>;
 export const ActionSchema = z.object({
   id: IdSchema,
   projectId: IdSchema,
-  title: z.string().min(1),
+  title: requiredText("Aksiyon başlığı boş olamaz."),
   ownerId: IdSchema.nullable(), // user id or contact id
   ball: BallSchema,
   due: IsoDateSchema.nullable(),
@@ -74,8 +74,8 @@ export type ActionList = z.infer<typeof ActionListSchema>;
 /** The project fields the API owns. Health, handover, discovery, integrations … stay in the web store (Faz 1). */
 export const ProjectCoreSchema = z.object({
   id: IdSchema,
-  customerName: z.string().min(1),
-  name: z.string().min(1),
+  customerName: requiredText("Müşteri adı boş olamaz."),
+  name: requiredText("Proje adı boş olamaz."),
   csmId: IdSchema.nullable(),
   salespersonId: IdSchema.nullable(),
   licenseModel: z.string(),
@@ -93,8 +93,8 @@ export type ProjectCore = z.infer<typeof ProjectCoreSchema>;
 
 /** POST /api/projects (#1). */
 export const ProjectCreateSchema = z.object({
-  customerName: z.string().trim().min(1, "Müşteri adı boş olamaz."),
-  name: z.string().trim().min(1, "Proje adı boş olamaz."),
+  customerName: requiredText("Müşteri adı boş olamaz."),
+  name: requiredText("Proje adı boş olamaz."),
   csmId: IdSchema.nullable(),
   salespersonId: IdSchema.nullable(),
   licenseModel: z.string(),
