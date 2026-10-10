@@ -192,13 +192,13 @@ function NewProjectDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>Yeni onboarding projesi</DialogTitle></DialogHeader>
         <div className="grid gap-4">
-          <div className="grid gap-2"><Label>Müşteri adı</Label><Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} /></div>
-          <div className="grid gap-2"><Label>Proje adı</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+          <div className="grid gap-2"><Label htmlFor="np-customer">Müşteri adı</Label><Input id="np-customer" value={customerName} onChange={(e) => setCustomerName(e.target.value)} /></div>
+          <div className="grid gap-2"><Label htmlFor="np-name">Proje adı</Label><Input id="np-name" value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
-              <Label>CSM</Label>
+              <Label htmlFor="np-csm">CSM</Label>
               <Select value={csmId} onValueChange={setCsmId} disabled={!canAssignCsm}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="np-csm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Atanmadı</SelectItem>
                   {selectableCsms(state).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
@@ -206,9 +206,9 @@ function NewProjectDialog({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Satışçı</Label>
+              <Label htmlFor="np-salesperson">Satışçı</Label>
               <Select value={salespersonId} onValueChange={setSalespersonId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="np-salesperson"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Seçilmedi</SelectItem>
                   {state.salespeople.filter((s) => s.active !== false).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
@@ -216,10 +216,10 @@ function NewProjectDialog({
               </Select>
             </div>
           </div>
-          <div className="grid gap-2"><Label>Lisans modeli</Label><Input value={licenseModel} onChange={(e) => setLicenseModel(e.target.value)} /></div>
+          <div className="grid gap-2"><Label htmlFor="np-license">Lisans modeli</Label><Input id="np-license" value={licenseModel} onChange={(e) => setLicenseModel(e.target.value)} /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-2"><Label>Başlangıç</Label><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
-            <div className="grid gap-2"><Label>Hedef Go-Live</Label><Input type="date" value={goLiveDate} onChange={(e) => setGoLiveDate(e.target.value)} /></div>
+            <div className="grid gap-2"><Label htmlFor="np-start">Başlangıç</Label><Input id="np-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
+            <div className="grid gap-2"><Label htmlFor="np-golive">Hedef Go-Live</Label><Input id="np-golive" type="date" value={goLiveDate} onChange={(e) => setGoLiveDate(e.target.value)} /></div>
           </div>
           <div className="grid gap-2">
             <Label>Satın alınan modüller</Label>
