@@ -239,7 +239,8 @@ describe("POST /api/projects/:projectId/steps/sync (client-rule bridge)", () => 
     const res = await request(app).post("/api/projects/p_perakende/steps/sync").send({ steps: [{ ...st, status: "locked" }] });
     expect(res.status).toBe(200);
     const e = effects(res);
-    expect(e.steps).toEqual([]);
+    // nothing was written to the step, but its server version comes back so the client can correct its copy
+    expect(e.steps).toEqual([st]);
     expect(e.actions).toHaveLength(1);
     expect(e.actions[0]).toMatchObject({ ruleKey: "rule_review:st_perakende_16", status: "open", source: "rule" });
     expect((await stepOf("p_perakende", "st_perakende_16")).status).toBe("out_of_scope");
@@ -283,6 +284,13 @@ describe("POST /api/projects/:projectId/steps/sync (client-rule bridge)", () => 
       expect((await request(app).post("/api/projects/p_garanti/steps/sync").send({ actions: [ruleAction({ ruleKey: undefined })] })).status).toBe(400);
       expect((await request(app).post("/api/projects/p_garanti/steps/sync").send({})).status).toBe(400);
     });
+  });
+
+  it("the response carries every sent step and rule action, changed or not", async () => {
+    const st = await stepOf("p_garanti", "st_garanti_18");
+    const res = await request(app).post("/api/projects/p_garanti/steps/sync").send({ steps: [st] });
+    expect(res.status).toBe(200);
+    expect(effects(res).steps).toEqual([st]);
   });
 
   it("400 for a step of another project", async () => {

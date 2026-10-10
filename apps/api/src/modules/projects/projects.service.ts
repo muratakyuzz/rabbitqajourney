@@ -3,7 +3,7 @@ import { manualStatusError, stepLockError } from "@rabbitqa/shared/domain/comple
 import { advanceFlow, projectPlan } from "@rabbitqa/shared/domain/flow";
 import { todayISO } from "@rabbitqa/shared/domain/labels";
 import { cancelReviewAction, ensureReviewAction } from "@rabbitqa/shared/domain/rules";
-import { currentRuleAction, isRuleAction } from "@rabbitqa/shared/domain/rule-actions";
+import { currentRuleAction, currentRuleActions, isRuleAction } from "@rabbitqa/shared/domain/rule-actions";
 import { buildFromTemplate, uid } from "@rabbitqa/shared/domain/seed";
 import type { Phase, RqState } from "@rabbitqa/shared/domain/types";
 import type { Db, Queryable } from "../../db";
@@ -194,7 +194,7 @@ export async function syncSteps(db: Db, projectId: string, { steps: incoming, ac
       const owner = (await tx.query<{ project_id: string }>("SELECT project_id FROM steps WHERE id = $1", [st.id])).rows[0];
       if (owner && owner.project_id !== projectId) throw badRequest("Adım bu projeye ait değil.", `steps.${i}.id`);
     }
-    return changeProject(tx, projectId, (s) => {
+    const effects = await changeProject(tx, projectId, (s) => {
       let next = s;
       for (const [i, st] of incoming.entries()) {
         const phase = next.phases.find((p) => p.id === st.phaseId);
@@ -227,5 +227,26 @@ export async function syncSteps(db: Db, projectId: string, { steps: incoming, ac
       }
       return next;
     });
+    return withSentRecords(tx, projectId, effects, incoming, incomingActions);
   });
+}
+
+/**
+ * The sync response also carries the server's final version of every step and action that was sent, changed
+ * or not: where the server kept its own value (e.g. a done phase), the client's copy is corrected.
+ */
+async function withSentRecords(tx: Queryable, projectId: string, effects: Effects, steps: Step[], actions: Action[]): Promise<Effects> {
+  const { state } = (await loadProjectState(tx, projectId))!;
+  const add = <T extends { id: string }>(into: T[], items: (T | undefined)[]) => {
+    const known = new Set(into.map((x) => x.id));
+    for (const x of items) if (x && !known.has(x.id)) { known.add(x.id); into.push(x); }
+    return into;
+  };
+  const stepIds = new Set(steps.map((x) => x.id));
+  const rules = currentRuleActions(state.actions, projectId);
+  return {
+    phases: effects.phases,
+    steps: add([...effects.steps], state.steps.filter((x) => stepIds.has(x.id))),
+    actions: add([...effects.actions], actions.map((a) => (isRuleAction(a) ? rules.get(a.ruleKey) : state.actions.find((x) => x.id === a.id)))),
+  };
 }

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
-import { apiError, fakeApi } from "@/test/fake-api";
+import { apiError, fakeApi, json } from "@/test/fake-api";
 import { BRIDGE_DEBOUNCE_MS, RqProvider, useRq } from "./store";
 
 vi.mock("@/lib/auth-context", () => ({
@@ -63,6 +63,21 @@ describe("API bridge", () => {
     const { result } = await setup(api);
     act(() => { result.current.updateStep(STEP, { ball: "care" }); });
     await waitFor(() => expect(result.current.state.steps.find((s) => s.id === STEP)?.title).toBe("Sunucunun başlığı"));
+    await pause(BRIDGE_DEBOUNCE_MS + 100);
+    expect(api.callsTo("POST", /steps\/sync$/)).toHaveLength(1);
+  });
+
+  it("the server keeps its own value (done phase) → the echoed step corrects the store, nothing is resent", async () => {
+    const OOS = "st_perakende_16"; // out of scope, phase 04 done
+    const api = fakeApi({
+      // like the API: the step stays out of scope and comes back in the response although nothing was written
+      "POST /projects/p_perakende/steps/sync": () => json(200, { phases: [], steps: [api.server.steps.find((s) => s.id === OOS)], actions: [] }),
+    });
+    const { result } = await setup(api);
+    act(() => { expect(result.current.updateStep(OOS, { status: "pending" }, "Geri al")).toBeNull(); });
+    expect(result.current.state.steps.find((s) => s.id === OOS)?.status).toBe("pending");
+    await waitFor(() => expect(api.callsTo("POST", /p_perakende\/steps\/sync$/)).toHaveLength(1));
+    await waitFor(() => expect(result.current.state.steps.find((s) => s.id === OOS)?.status).toBe("out_of_scope"));
     await pause(BRIDGE_DEBOUNCE_MS + 100);
     expect(api.callsTo("POST", /steps\/sync$/)).toHaveLength(1);
   });
