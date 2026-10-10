@@ -39,4 +39,22 @@ describe("error shape", () => {
     expect(res.status).toBe(400);
     expect(ApiErrorBodySchema.parse(res.body).error.code).toBe("VALIDATION");
   });
+
+  it("a body over the 100 kB limit → 413, not 500 (review D5)", async () => {
+    const res = await request(createApp({ db, bootId: "b", startedAt: "" }))
+      .post("/api/projects/p_garanti/actions")
+      .set("Content-Type", "application/json")
+      .send(JSON.stringify({ title: "x".repeat(200_000) }));
+    expect(res.status).toBe(413);
+    expect(ApiErrorBodySchema.parse(res.body).error).toEqual({ code: "VALIDATION", message: "İstek gövdesi çok büyük." });
+  });
+
+  it("an unsupported body charset → 415 VALIDATION, not 500", async () => {
+    const res = await request(createApp({ db, bootId: "b", startedAt: "" }))
+      .post("/api/projects/p_garanti/actions")
+      .set("Content-Type", "application/json; charset=latin1")
+      .send("{}");
+    expect(res.status).toBe(415);
+    expect(ApiErrorBodySchema.parse(res.body).error).toEqual({ code: "VALIDATION", message: "İstek gövdesi okunamadı." });
+  });
 });

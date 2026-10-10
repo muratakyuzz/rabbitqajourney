@@ -40,6 +40,13 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   } else if (err?.type === "entity.parse.failed") {
     status = 400;
     body = { error: { code: "VALIDATION", message: "İstek gövdesi geçerli JSON değil." } };
+  } else if (err?.type === "entity.too.large") {
+    status = 413;
+    body = { error: { code: "VALIDATION", message: "İstek gövdesi çok büyük." } };
+  } else if (typeof err?.type === "string" && Number.isInteger(err?.status) && err.status >= 400 && err.status < 500) {
+    // other body-parser rejections (unsupported charset/encoding, aborted request …) keep their 4xx
+    status = err.status;
+    body = { error: { code: "VALIDATION", message: "İstek gövdesi okunamadı." } };
   } else {
     console.error(err);
   }
