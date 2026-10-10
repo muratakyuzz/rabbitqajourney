@@ -319,8 +319,8 @@ export interface CustomerReport {
 }
 export interface GoLiveApproval { contactId: string; approvedAt: string; recordedBy: string; recordedAt: string }
 
-export interface StepTpl { title: string; ball: Ball; required: boolean; ownerRole?: "manager"; key?: string; dependency: Dependency; durationDays: number; completion?: StepCompletion; meetingType?: MeetingType }
-export interface PhaseTpl { code: string; name: string; dependency: Dependency; steps: StepTpl[] }
+import type { PhaseTpl } from "../schemas/template";
+export type { PhaseTpl, StepTpl } from "../schemas/template";
 
 export interface RqState {
   version: number;

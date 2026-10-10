@@ -17,6 +17,11 @@ import { todayISO } from "@rabbitqa/shared/domain/labels";
 import { buildReportSnapshot, defaultNextWeek } from "@rabbitqa/shared/domain/reports";
 import { weekStartOf } from "@rabbitqa/shared/domain/alerts";
 import { applyInstallType, applyLlmChoice, applyMeetingHeldRules, ensureReviewAction, installChoiceError, setStepByKey } from "@rabbitqa/shared/domain/rules";
+import type { TemplateVersion } from "@rabbitqa/shared";
+import { fetchTemplate } from "@/data/template";
+
+/** Active template version from the API (not persisted); null while unknown or when the API is unreachable. */
+export type TemplateMeta = Omit<TemplateVersion, "phases">;
 
 function load(): RqState {
   try {
@@ -78,7 +83,7 @@ interface Ctx {
   updateUser: (id: string, patch: Partial<Pick<User, "role" | "active" | "name">>) => string | null;
   updateRisk: (id: string, patch: Partial<RiskDecision>, reason?: string) => string | null;
   approveGoLive: (projectId: string, contactId: string, approvedAt: string, reason: string) => string | null;
-  setConfig: <K extends "modules" | "questions" | "template" | "integrations" | "salespeople" | "alertThresholds" | "holidays" | "users">(key: K, value: RqState[K], label: string) => void;
+  setConfig: <K extends "modules" | "questions" | "integrations" | "salespeople" | "alertThresholds" | "holidays" | "users">(key: K, value: RqState[K], label: string) => void;
   testConnection: (kind: "teams" | "email", override?: IntegrationConfig) => Promise<{ ok: boolean; message: string; channels?: ChatChannel[] }>;
   disconnect: (kind: "teams" | "email") => void;
   logSecretView: (field: string) => void;
@@ -91,6 +96,9 @@ interface Ctx {
   simulateIncoming: (projectId: string, source: InsightSource, text: string, meta: IncomingMeta) => { created: AiInsight[]; message?: string };
   receiveEmail: (mail: { from: string; to: string[]; cc: string[]; subject: string; text: string; direction: "in" | "out" }) => { projectId: string | null; created: number };
   reset: () => void;
+  /** Template comes from the API (docs/PLAN.md M1); `state.template` is its copy for creating projects. */
+  templateVersion: TemplateMeta | null;
+  applyTemplateVersion: (tv: TemplateVersion) => void;
 }
 
 const RqContext = createContext<Ctx | null>(null);
@@ -99,6 +107,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const userId = user?.id ?? "system";
   const [state, setRaw] = useState<RqState>(() => { const s = load(); setActiveHolidays(s.holidays); return s; });
+  const [templateVersion, setTemplateVersion] = useState<TemplateMeta | null>(null);
   const mkRef = useRef<(e: Omit<AuditEntry, "id" | "at" | "userId">) => AuditEntry>(() => { throw new Error("mk"); });
   const flowMsgs = useRef<string[]>([]);
 
@@ -123,6 +132,17 @@ export function RqProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem(STATE_KEY, JSON.stringify(state));
   }, [state]);
+
+  const applyTemplateVersion = useCallback((tv: TemplateVersion) => {
+    const { phases, ...meta } = tv;
+    setState((s) => ({ ...s, template: phases }));
+    setTemplateVersion(meta);
+  }, [setState]);
+
+  // Template hydration after boot; API unreachable → keep the stored template (mockup behaviour).
+  useEffect(() => {
+    fetchTemplate().then(applyTemplateVersion, () => {});
+  }, [applyTemplateVersion]);
 
   const mkAudit = useCallback(
     (e: Omit<AuditEntry, "id" | "at" | "userId">): AuditEntry => ({ ...e, id: uid("au"), at: new Date().toISOString(), userId }),
@@ -753,9 +773,11 @@ export function RqProvider({ children }: { children: ReactNode }) {
       return { projectId: null, created: 0 };
     },
     reset: () => setState(createSeed()),
+    templateVersion,
+    applyTemplateVersion,
     };
     return api;
-  }, [state, userId, patch, add, mkAudit]);
+  }, [state, userId, patch, add, mkAudit, templateVersion, applyTemplateVersion]);
 
   return <RqContext.Provider value={value}>{children}</RqContext.Provider>;
 }

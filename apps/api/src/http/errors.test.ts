@@ -27,11 +27,17 @@ describe("errorHandler", () => {
     expect(res.body).toEqual({ error: { code: "CONFLICT", message: "Adımın sırası gelmedi" } });
   });
 
-  it("ZodError → 400 VALIDATION with the first failing field path", async () => {
-    const parsed = z.object({ phase: z.object({ planEnd: z.string() }) }).safeParse({ phase: { planEnd: 1 } });
+  it("ZodError → 400 VALIDATION with the first issue's message and field path", async () => {
+    const parsed = z.object({ phase: z.object({ name: z.string().min(1, "Aşama adı boş olamaz.") }) }).safeParse({ phase: { name: "" } });
     const res = await request(appThrowing(parsed.error)).get("/x");
     expect(res.status).toBe(400);
-    expect(res.body).toEqual({ error: { code: "VALIDATION", message: "Geçersiz istek.", field: "phase.planEnd" } });
+    expect(res.body).toEqual({ error: { code: "VALIDATION", message: "Aşama adı boş olamaz.", field: "phase.name" } });
+  });
+
+  it("default zod messages are Turkish", async () => {
+    const parsed = z.object({ n: z.number() }).safeParse({ n: "x" });
+    const res = await request(appThrowing(parsed.error)).get("/x");
+    expect(res.body.error.message).toMatch(/^Geçersiz değer/);
   });
 
   it("unknown error → 500 INTERNAL without leaking the message", async () => {

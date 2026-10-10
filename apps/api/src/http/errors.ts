@@ -1,5 +1,9 @@
 import type { ErrorRequestHandler } from "express";
+import { z } from "zod";
 import type { ApiErrorBody, ApiErrorCode } from "@rabbitqa/shared";
+
+// Default zod messages in Turkish; schemas in @rabbitqa/shared override them where it matters.
+z.config(z.locales.tr());
 
 export class HttpError extends Error {
   constructor(
@@ -14,6 +18,7 @@ export class HttpError extends Error {
 
 export const notFound = (message = "Kayıt bulunamadı.") => new HttpError(404, "NOT_FOUND", message);
 export const conflict = (message: string) => new HttpError(409, "CONFLICT", message);
+export const badRequest = (message: string, field?: string) => new HttpError(400, "VALIDATION", message, field);
 export const reasonRequired = (field = "reason") => new HttpError(400, "REASON_REQUIRED", "Gerekçe zorunludur.", field);
 
 interface ZodLikeError { name: "ZodError"; issues: { path: PropertyKey[]; message: string }[] }
@@ -29,8 +34,9 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     body = { error: { code: err.code, message: err.message, ...(err.field ? { field: err.field } : {}) } };
   } else if (isZodError(err)) {
     status = 400;
-    const field = err.issues[0]?.path.map(String).join(".");
-    body = { error: { code: "VALIDATION", message: "Geçersiz istek.", ...(field ? { field } : {}) } };
+    const issue = err.issues[0];
+    const field = issue?.path.map(String).join(".");
+    body = { error: { code: "VALIDATION", message: issue?.message || "Geçersiz istek.", ...(field ? { field } : {}) } };
   } else if (err?.type === "entity.parse.failed") {
     status = 400;
     body = { error: { code: "VALIDATION", message: "İstek gövdesi geçerli JSON değil." } };

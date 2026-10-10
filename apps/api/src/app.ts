@@ -2,6 +2,7 @@ import express from "express";
 import type { HealthResponse } from "@rabbitqa/shared";
 import type { Db } from "./db";
 import { errorHandler, notFound } from "./http/errors";
+import { templateRouter } from "./modules/template/template.routes";
 
 export interface AppDeps {
   db: Db;
@@ -9,7 +10,7 @@ export interface AppDeps {
   startedAt: string;
 }
 
-export function createApp({ bootId, startedAt }: AppDeps) {
+export function createApp({ db, bootId, startedAt }: AppDeps) {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json());
@@ -19,6 +20,7 @@ export function createApp({ bootId, startedAt }: AppDeps) {
     const body: HealthResponse = { status: "ok", bootId, startedAt };
     res.json(body);
   });
+  api.use("/config/template", templateRouter(db));
 
   app.use("/api", api);
   app.use("/api", () => {

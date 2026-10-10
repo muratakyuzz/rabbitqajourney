@@ -45,16 +45,22 @@ describe("createDb", () => {
 });
 
 describe("db.transaction", () => {
-  it("rolls back every write when the callback throws", async () => {
-    const before = await count("actions");
+  it("error inside a transaction → data is exactly as before it", async () => {
+    const snapshot = async () => ({
+      actions: (await db.query("SELECT * FROM actions ORDER BY id")).rows,
+      templates: (await db.query("SELECT * FROM template_versions ORDER BY version")).rows,
+    });
+    const before = await snapshot();
     await expect(db.transaction(async (tx) => {
       await tx.query(
         "INSERT INTO actions (id, project_id, title, ball, priority, status, source) VALUES ('a_tx', $1, 'x', 'csm', 'medium', 'open', 'manual')",
         [seed.projects[0].id],
       );
+      await tx.query("UPDATE actions SET title = 'changed' WHERE id = $1", [seed.actions[0].id]);
+      await tx.query("INSERT INTO template_versions (version, phases) VALUES (99, '[]')");
       throw new Error("boom");
     })).rejects.toThrow("boom");
-    expect(await count("actions")).toBe(before);
+    expect(await snapshot()).toEqual(before);
   });
 
   it("keeps committed writes and the queue keeps working after a failure", async () => {
