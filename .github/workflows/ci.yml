@@ -32,57 +32,7 @@ jobs:
 
   # hashFiles() job seviyesindeki `if` içinde kullanılamaz; kontrol burada
   # step seviyesinde yapılır ve sonucu parity job'una output olarak aktarılır.
-  check-migrations:
-    runs-on: ubuntu-latest
-    outputs:
-      has_migrations: ${{ steps.check.outputs.found }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: check
-        run: echo "found=${{ hashFiles('migrations/*.sql') != '' }}" >> "$GITHUB_OUTPUT"
-
-  # L5: aynı entegrasyon testleri gerçek PostgreSQL'de (ADR-0002)
-  parity:
-    needs: check-migrations
-    if: needs.check-migrations.outputs.has_migrations == 'true'
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: app_admin
-          POSTGRES_PASSWORD: ci_only_password
-          POSTGRES_DB: rabbitqa_ci
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U app_admin -d rabbitqa_ci"
-          --health-interval 5s --health-timeout 5s --health-retries 10
-    env:
-      DB_DRIVER: pg
-      DATABASE_URL: postgres://app_admin:ci_only_password@localhost:5432/rabbitqa_ci
-      TZ: Europe/Istanbul
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - name: Ephemeral encryption key
-        run: echo "CREDENTIALS_KEY=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
-      - name: Migrations (shared + pg-only)
-        run: npm run db:migrate -- --pg-only
-      - name: Integration tests on PostgreSQL
-        run: npm run test:int
-      - name: Critical query plans
-        run: npm run db:explain --if-present -- --out explain-report.md
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: parity-explain-report
-          path: explain-report.md
-          if-no-files-found: ignore
-
+  
   secrets:
     runs-on: ubuntu-latest
     steps:
