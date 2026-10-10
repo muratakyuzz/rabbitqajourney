@@ -38,17 +38,25 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 ---
 
 ## M0 — Süreç sadeleştirme + API iskeleti
-- [ ] `.claude/` sadeleşir: guard yalnızca `.env*` ve gizli anahtar dosyalarını korur; rol ve commit denetimi kalkar; `plan/gate/phase-close/fix` komutları ve ajanlar silinir; `build` = "PLAN.md'deki sıradaki maddeyi uygula"
-- [ ] `CLAUDE.md` / `AGENTS.md`: rol, gate, branch, yazma yetkisi bölümleri kaldırılır; bu dosyadaki çalışma kuralları yazılır
-- [ ] Kök `npm run check`; `docs/PHASES.md` başına "yerine docs/PLAN.md geçti" notu; BACKLOG'da GATE-01..03 "süreç değişti" ile kapanır
-- [ ] `ci.yml`: parity ve check-migrations job'ları kaldırılır (Murat elle)
-- [ ] `apps/api`: Express 5, `/api` router, zod doğrulama + hata middleware'i, `GET /api/health` (`bootId`)
-- [ ] `apps/api/src/db`: pg-mem, `schema.sql` (bu kapsamın tabloları: users, projects, template_versions, phases, steps, actions, meetings, meeting_participants), açılışta şema + seed
-- [ ] `seed.ts` → `packages/shared`; web import'ları güncellenir; seed API'ye yüklenir
-- [ ] `npm run dev` (API + web), Vite proxy; Vitest + supertest API'de
-- [ ] Web: küçük `api` istemcisi (`fetch` + hata çevirisi), `bootId` kontrolü
+- [x] `.claude/` sadeleşir: guard yalnızca `.env*` ve gizli anahtar dosyalarını korur; rol ve commit denetimi kalkar; `plan/gate/phase-close/fix` komutları ve ajanlar silinir; `build` = "PLAN.md'deki sıradaki maddeyi uygula"
+- [x] `CLAUDE.md` / `AGENTS.md`: rol, gate, branch, yazma yetkisi bölümleri kaldırılır; bu dosyadaki çalışma kuralları yazılır
+- [x] Kök `npm run check`; `docs/PHASES.md` başına "yerine docs/PLAN.md geçti" notu; BACKLOG'da GATE-01..03 "süreç değişti" ile kapanır
+- [ ] `ci.yml`: parity ve check-migrations job'ları kaldırılır (Murat elle — gerekli değişiklik M0 kapanışında iletildi)
+- [x] `apps/api`: Express 5, `/api` router, zod doğrulama + hata middleware'i, `GET /api/health` (`bootId`)
+- [x] `apps/api/src/db`: pg-mem, `schema.sql` (bu kapsamın tabloları: users, projects, template_versions, phases, steps, actions, meetings, meeting_participants), açılışta şema + seed
+- [x] `seed.ts` → `packages/shared`; web import'ları güncellenir; seed API'ye yüklenir
+- [x] `npm run dev` (API + web), Vite proxy; Vitest + supertest API'de
+- [x] Web: küçük `api` istemcisi (`fetch` + hata çevirisi), `bootId` kontrolü
 - **Kabul:** `npm run check` yeşil · `GET /api/health` 200 · mockup ekranlar önceki gibi çalışır
-- **Notlar:**
+- **Notlar:** 2026-10-10, tag `m0`.
+  - `npm run check` yeşil: lint 0 hata / 27 uyarı; test sayıları api 18, web 227, shared 276.
+  - `GET /api/health` 200, hem doğrudan hem Vite proxy üzerinden.
+  - Tarayıcıda admin girişi, Genel bakış ve proje detayı (İş Yatırım) önceki gibi çalışıyor; konsolda hata yok.
+  - bootId değişince store seed'e dönüyor, oturum korunuyor.
+  - Seed ile birlikte iş kuralları da shared'a taşındı (M2'nin ilk maddesi).
+  - pg-mem `ROLLBACK` desteklemiyor; yerine snapshot tabanlı `db.transaction` (bkz. Kararlar).
+  - Yeni paketler: express, pg-mem, tsx, supertest (+ tipler).
+  - Açık: `ci.yml` (Murat elle).
 
 ## M1 — Ayarlar → Aşama şablonu
 - [ ] `GET /api/config/template` (aktif sürüm), `PUT /api/config/template` → yeni sürüm (#39a); sistem adımı silinemez (`409`), yalnızca yeni projeler etkilenir
@@ -59,7 +67,7 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 - **Notlar:**
 
 ## M2 — Proje açılışı + Aşamalar ve adımlar
-- [ ] İş kuralları `packages/shared`'a taşınır (`flow`, `rules`, `completion`, `business-days`); web testleri yeşil kalır
+- [x] İş kuralları `packages/shared`'a taşınır (`flow`, `rules`, `completion`, `business-days`); web testleri yeşil kalır — M0'da yapıldı (bkz. Kararlar)
 - [ ] `POST /api/projects` (#1): şablondan kopyalama (INV-10), kurulum tipi/LLM koşullu adımlar, iş günü termini, plan tahmini
 - [ ] `GET /api/projects/:projectId/phases` (`PhaseWithSteps[]`, türetilmiş durum + `ConditionResult`)
 - [ ] `PATCH /api/phases/:id` (#3; plan bitişi gerekçeli), `POST /api/phases/:id/complete` (#4; aşama onayı, sonraki aşama açılır, onaylayan + tarih)
