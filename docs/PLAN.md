@@ -113,13 +113,47 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
     - Tatiller yalnız seed'den; Ayarlar → Tatiller sunucuya gitmez.
 
 ## M3 — Aksiyonlar
-- [ ] `GET /api/projects/:projectId/actions`, `POST /api/projects/:projectId/actions` (#6), `PATCH /api/actions/:id` (#7; termin ve iptalde gerekçe zorunlu)
-- [ ] "Aşama onayı bekliyor" kural aksiyonu sunucuda (M2'deki adım/aşama değişiklikleriyle)
-- [ ] Sahip kullanıcı veya müşteri kişisi olabilir: kişi id'si FK'siz saklanır (kişiler mockup'ta kalır), top sahibin tipinden türetilir
-- [ ] Aksiyonlar sekmesi + aksiyon paneli API'ye bağlanır
-- [ ] Testler: oluşturma, gerekçe zorunluluğu, tamamlama, kural aksiyonunun açılıp kapanması
+- [x] `GET /api/projects/:projectId/actions`, `POST /api/projects/:projectId/actions` (#6), `PATCH /api/actions/:id` (#7; termin ve iptalde gerekçe zorunlu) — M3a
+- [x] "Aşama onayı bekliyor" kural aksiyonu sunucuda (M2'deki adım/aşama değişiklikleriyle). M2'de `advanceFlow` ile geldi; aksiyon yazmaları da `changeProject`'ten geçiyor, testleri M3a'da.
+- [x] Sahip kullanıcı veya müşteri kişisi olabilir: kişi id'si FK'siz saklanır (kişiler mockup'ta kalır), top sahibin tipinden türetilir (`domain/ball.ts`)
+- [x] Aksiyonlar sekmesi + aksiyon paneli API'ye bağlanır — M3b
+- [x] Testler: oluşturma, gerekçe zorunluluğu, tamamlama, kural aksiyonunun açılıp kapanması
 - **Kabul:** sekmedeki tüm filtreler ve panel API verisiyle çalışır
-- **Notlar:**
+- **Notlar:** 2026-10-10, tag `m3`.
+  - **Önce iki düzeltme:**
+    - `steps/sync` yanıtı, gönderilen tüm adım ve aksiyonların sunucudaki son halini de taşır (değişmemiş olsa bile). Sunucu bir değeri kabul etmeyip kendininkini korursa (ör. tamamlanmış aşamada `out_of_scope` adım) istemcinin kopyası düzelir.
+    - `guard.mjs` Bash'te yalnız dosya yolu gibi görünen parçaları kontrol eder. `${x.key}`, `console.log(obj.key)` ve jq yolu (`.data.key`) engellenmez; özel anahtar adları (`id_rsa`), `server.key` ve `certs/a.pem` engellenir. Tek başına duran `obj.key` kelimesi dosya adından ayırt edilemediği için engellenir. Testi `.claude/hooks/guard.test.mjs`, kök `npm test`'e eklendi.
+  - **M3a (API):**
+    - Yeni modül: `apps/api/src/modules/actions/` (`listActions`, `createAction`, `updateAction`).
+    - `changeProject`, `projectIdOf`, `requireReason`, `replace` → `projects/project-state.ts` (iki modül ortak kullanıyor).
+    - Liste termine göre sıralı (terminsiz en sonda, sonra oluşturma zamanı).
+    - Yazmalar `RuleEffects` döner; `POST` 201.
+    - `last_reason` aksiyonda da saklanır.
+    - `actions.meeting_id` FK'sı kaldırıldı (`owner_id` zaten FK'sızdı).
+    - Shared: `ActionPatchSchema`, `ActionListSchema`, `domain/ball.ts` (`ballForOwner`), `defaultCustomerVisible`.
+    - `steps/sync` her kaynaktan aksiyon kabul eder (bkz. Kararlar).
+  - **M3b (web):**
+    - `lib/api/actions.ts` (`getActions`, `createAction`, `patchAction`).
+    - Aksiyonlar sekmesi ve paneli (`ActionDialog`) API'yi çağırır (`useServerAction`); hata panelde gösterilir.
+    - Satırdaki "Tamamlandı" kutusu `PATCH status` gönderir (done ↔ open).
+    - Filtreler store'dan çalışır.
+    - Köprü: `ServerView.actions` (id → kanonik JSON) eklendi; `diffProject` kural dışı aksiyonları da gönderir.
+    - Hidrasyon: proje başına `GET phases` + `GET actions` paralel; projenin aksiyonları sunucununkiyle değiştirilir (`replaceProjectData`). Hata sonrası yeniden yükleme de aksiyonları kapsar.
+    - Store'daki `addAction`/`updateAction` çağıranları:
+      - Önce: `addAction` ← Aksiyonlar sekmesi; `updateAction` ← aksiyon paneli ve AI `action_update` onayı (`approveInsight`).
+      - Şimdi: `addAction` kaldırıldı (çağıran kalmadı). `updateAction` yalnız AI onayı için kaldı; değişikliği köprüden gider.
+      - Toplantı diyaloğu (`addMeeting`) ve AI `action_create` onayının aksiyonları da köprüden gider.
+  - Tarayıcıda denendi (Deniz Uzun, İş Yatırım):
+    - Aksiyon ekle → `POST` 201 → yenileme → duruyor.
+    - Termin değişti, gerekçe panelde soruldu, sonra kaydedildi.
+    - Sahip müşteri kişisi (Sevcan Vural) yapıldı → top "Müşteri" (sunucuda `customer`).
+    - "Tamamlandı" kutusu → `done`.
+    - İptal → gerekçe soruldu → `cancelled`.
+    - Toplantı kaydet diyaloğundan aksiyon → tek `steps/sync` → yenileme → aksiyon duruyor (`source: meeting`, `meetingId` yerel toplantının id'si).
+    - Yenilemelerde sync gitmedi.
+    - API restart → aksiyonlar seed'e döndü.
+    - Konsolda hata yok.
+  - `npm run check` yeşil: lint 0 hata / 27 uyarı; test sayıları api 85, web 259, shared 279, guard 3.
 
 ## M4 — Toplantılar
 - [ ] `GET /api/projects/:projectId/meetings`, `POST /api/projects/:projectId/meetings` (#8), `PATCH /api/meetings/:id` (#19; iptalde gerekçe)
@@ -175,3 +209,25 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 - 2026-10-10 (M2b): API'nin döndürdüğü proje store'da var olan projeyle birleşirken `installType`, `llmChoice`, `teams` ezilmez (bu alanlar Faz 1'de store'da değişiyor, API'ye yazılmıyor).
 - 2026-10-10 (M2b): "Demo verisini sıfırla" artık store'u seed'e döndürüp projeleri API'den yeniden yükler (sunucu kazanır). Sıfırlama sunucuyu sıfırlamaz; bunun için API restart gerekir.
 - 2026-10-10 (M2b): Yalnız yerel projeler (API'de 404) ekranlarda API çağrısı yapınca hata toast'ı görür; yerel yedek yol yok.
+- 2026-10-10 (M3): Brief, aksiyon panelinde filtreler, "Tamamlandı" kutusu ve bir top türetme mantığı varmış gibi yazıyordu. Kodda yoktu: sekme filtresiz bir tabloydu, top elle seçiliyordu. M3b'de eklendi:
+  - Filtreler:
+    - Açık = `open`/`in_progress`
+    - Geciken = açık + termini geçmiş
+    - Top müşteride = açık + `ball: customer`
+    - Bana atanan = açık + sahibi giriş yapan kullanıcı
+    - Tamamlanan = `done`
+    - Tümü
+    - Varsayılan "Açık".
+  - "Tamamlandı" kutusu satırda: `done` ↔ `open`. İptal edilmiş aksiyonda kapalı.
+  - Top türetmesi `ai-mock.ts`'teki "kişi → müşteri" kuralı genişletilerek `domain/ball.ts`'e yazıldı:
+    - Kullanıcı sahip → rolüne göre (csm/manager/admin → CSM, devops → DevOps, care → Customer Care).
+    - Kullanıcı olmayan id → Müşteri (kişiler store'da, API tanımaz).
+    - Sahip yoksa top elle seçilir.
+- 2026-10-10 (M3): Top yalnız sahip değişince (ve oluşturmada) türetilir. Sahip aynı kalırsa top değişmez; istekteki `ball` yalnız sahipsiz aksiyonda uygulanır. Gerekçe: kural aksiyonlarında sahip ile top bilerek farklı olabilir (`llm_endpoint`: sahip CSM, top müşteri).
+- 2026-10-10 (M3): `PATCH /actions/:id` gerekçeyi yalnız termin değişikliğinde ve `cancelled`'a geçişte ister. Tamamlama, yeniden açma ve `in_progress` gerekçesizdir. API_CONTRACT #7 her durum değişikliğinde istiyordu; brief'e göre daraltıldı. Panel de aynı kuralı uygular.
+- 2026-10-10 (M3): Köprü (`steps/sync`) artık her kaynaktan aksiyon taşır:
+  - Kural aksiyonları eskisi gibi `projectId` + `ruleKey` ile eşleşir.
+  - Diğerleri istemcinin id'siyle, gönderildiği gibi upsert edilir.
+  - 400 durumları: başka projenin id'si, bir kural aksiyonunun id'si, yabancı `projectId`, aynı id'nin iki kez gelmesi.
+  - Köprü yolunda #7'nin gerekçe kuralları uygulanmaz (adımlardaki gibi; ekran API'ye geçince köprü kalkar).
+- 2026-10-10 (M3): Elle tamamlanan ya da iptal edilen "Aşama onayı bekliyor" aksiyonu, aşama hâlâ onaya hazırsa akış motoru tarafından hemen yeniden açılır. Bu, mockup ve API_CONTRACT #7 ile aynı davranış; aşama "Aşamayı tamamla" ile kapanır.
