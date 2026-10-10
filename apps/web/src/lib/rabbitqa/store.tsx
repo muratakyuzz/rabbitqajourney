@@ -193,6 +193,11 @@ export function RqProvider({ children }: { children: ReactNode }) {
   const paused = useRef(new Map<string, "resend" | "reload">());
   /** Set once hydrate exists (it is declared below); resume needs it for "reload". */
   const hydrateRef = useRef<(pid: string) => Promise<unknown>>(async () => {});
+  /**
+   * API responses that arrive while a project is being hydrated (review D1): its GETs may have been read before
+   * that write, so these are applied again on top of the hydrated data, in order.
+   */
+  const hydrating = useRef(new Map<string, RuleEffects[]>());
   /** The persistent "cannot write" toast is up (dismissed on resume). */
   const downToast = useRef(false);
   const showDownToast = useCallback(() => {
@@ -220,6 +225,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
   const applyServerEffects = useCallback((e: RuleEffects) => {
     resumeBridge();
     for (const pid of projectsIn(e)) {
+      hydrating.current.get(pid)?.push(e);
       const view = views.current.get(pid) ?? (e.project?.id === pid ? emptyView() : null);
       if (!view) continue;
       recordSteps(view, e.steps.filter((x) => x.projectId === pid));
@@ -231,20 +237,28 @@ export function RqProvider({ children }: { children: ReactNode }) {
 
   /** Loads a project's phases, steps, actions and meetings from the API (server wins) and starts bridging it. */
   const hydrate = useCallback(async (pid: string): Promise<"ok" | "missing" | "invalid" | "offline"> => {
+    if (!hydrating.current.has(pid)) hydrating.current.set(pid, []);
     try {
       const [plan, actions, meetingList] = await Promise.all([getPhases(pid), getActions(pid), getMeetings(pid)]);
+      const late = hydrating.current.get(pid) ?? [];
+      hydrating.current.delete(pid);
       const meetings = meetingList.map(({ actions: _a, ...m }) => m);
       const view = emptyView();
       recordSteps(view, plan.steps);
       recordActions(view, actions);
+      for (const e of late) {
+        recordSteps(view, e.steps.filter((x) => x.projectId === pid));
+        recordActions(view, e.actions.filter((x) => x.projectId === pid));
+      }
       views.current.set(pid, view);
       lastSent.current.delete(pid);
-      setState((s) => replaceProjectData(s, pid, { ...plan, actions, meetings }));
+      setState((s) => late.reduce(mergeEffects, replaceProjectData(s, pid, { ...plan, actions, meetings })));
       // this project bridges again; the persistent toast goes once no project is waiting to resend
       paused.current.delete(pid);
       if (![...paused.current.values()].includes("resend")) hideDownToast();
       return "ok";
     } catch (e) {
+      hydrating.current.delete(pid);
       views.current.delete(pid);
       if (e instanceof ApiError && e.status === 404) {
         setLocalOnly((cur) => new Set(cur).add(pid));

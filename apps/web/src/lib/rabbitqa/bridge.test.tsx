@@ -192,6 +192,28 @@ describe("API bridge", () => {
     });
   });
 
+  it("hydration: an API write that lands while the project loads is applied again on top of the loaded data (review D1)", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const api = fakeApi({
+      "GET /projects/p_garanti/phases": async () => {
+        await gate; // read before the write below, answered after it
+        return json(200, {
+          phases: api.server.phases.filter((p) => p.projectId === "p_garanti").map((p, i) => (i === 0 ? { ...p, name: "Hidrasyondan" } : p)),
+          steps: api.server.steps.filter((s) => s.projectId === "p_garanti"),
+        });
+      },
+    });
+    const { result } = await setup(api);
+    const step = api.server.steps.find((s) => s.id === STEP)!;
+    act(() => { result.current.applyServerEffects({ phases: [], steps: [{ ...step, title: "Yazmadan gelen" }], actions: [] }); });
+    release();
+    await waitFor(() => expect(result.current.state.phases.find((p) => p.projectId === "p_garanti" && p.name === "Hidrasyondan")).toBeDefined());
+    expect(result.current.state.steps.find((s) => s.id === STEP)?.title).toBe("Yazmadan gelen");
+    await pause(BRIDGE_DEBOUNCE_MS + 100);
+    expect(api.callsTo("POST", /steps\/sync$/)).toEqual([]); // the write is part of the server view
+  });
+
   it("hydration: the project's actions become the server's (server wins)", async () => {
     // the store has a local-only action and an old title; the server has neither
     const seed = createSeed();
