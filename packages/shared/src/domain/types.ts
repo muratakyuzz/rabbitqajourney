@@ -118,60 +118,8 @@ export interface Project {
   noCommitments: boolean;
 }
 
-export interface Phase {
-  id: string;
-  projectId: string;
-  code: string;
-  name: string;
-  order: number;
-  status: PhaseStatus;
-  planStart: string | null;
-  planEnd: string | null;
-  baselineEnd: string | null;
-  actualStart: string | null;
-  actualEnd: string | null;
-  approvedBy: string | null;
-  approvedAt: string | null;
-  dependency: Dependency;
-  activatedAt: string | null;
-}
 
-export interface Step {
-  id: string;
-  projectId: string;
-  phaseId: string;
-  title: string;
-  required: boolean;
-  ownerId: string | null;
-  ball: Ball;
-  ballSince: string;
-  due: string | null;
-  status: StepStatus;
-  order: number;
-  key?: string;
-  dependency: Dependency;
-  durationDays: number;
-  activatedAt: string | null;
-  completion: StepCompletion;
-  meetingType?: MeetingType;
-}
 
-export interface Action {
-  id: string;
-  projectId: string;
-  title: string;
-  ownerId: string | null; // user id or contact id
-  ball: Ball;
-  due: string | null;
-  priority: Priority;
-  status: ActionStatus;
-  source: ActionSource;
-  meetingId: string | null;
-  createdAt: string;
-  ruleKey?: string;
-  insightId?: string;
-  isCustomerVisible: boolean;
-}
 
 export interface MeetingTraining { trainerId: string | null; modules: string[]; recordingUrl: string }
 
@@ -321,6 +269,8 @@ export interface GoLiveApproval { contactId: string; approvedAt: string; recorde
 
 import type { PhaseTpl } from "../schemas/template";
 export type { PhaseTpl, StepTpl } from "../schemas/template";
+import type { Action, Phase, Step } from "../schemas/project";
+export type { Action, Phase, Step } from "../schemas/project";
 
 export interface RqState {
   version: number;

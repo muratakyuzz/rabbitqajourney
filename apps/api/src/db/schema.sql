@@ -13,6 +13,13 @@ CREATE TABLE users (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Business-day calendar for flow due dates (seed: TR holidays). Admin edits stay in the web store in Faz 1.
+CREATE TABLE holidays (
+  date date PRIMARY KEY,
+  name text NOT NULL,
+  half_day boolean NOT NULL DEFAULT false
+);
+
 CREATE TABLE template_versions (
   version integer PRIMARY KEY,
   phases jsonb NOT NULL, -- PhaseTpl[]
@@ -25,6 +32,9 @@ CREATE TABLE projects (
   customer_name text NOT NULL,
   name text NOT NULL,
   csm_id text REFERENCES users(id),
+  salesperson_id text, -- salespeople stay in the web store
+  license_model text NOT NULL DEFAULT '',
+  purchased_modules jsonb NOT NULL DEFAULT '[]',
   start_date date NOT NULL,
   go_live_date date,
   install_type text CHECK (install_type IS NULL OR install_type IN ({{InstallType}})),
@@ -63,7 +73,7 @@ CREATE TABLE steps (
   phase_id text NOT NULL REFERENCES phases(id),
   title text NOT NULL,
   required boolean NOT NULL,
-  owner_id text REFERENCES users(id),
+  owner_id text, -- user or contact id
   ball text NOT NULL CHECK (ball IN ({{Ball}})),
   ball_since timestamptz NOT NULL,
   due date,

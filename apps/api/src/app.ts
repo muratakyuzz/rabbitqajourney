@@ -3,6 +3,7 @@ import type { HealthResponse } from "@rabbitqa/shared";
 import type { Db } from "./db";
 import { errorHandler, notFound } from "./http/errors";
 import { templateRouter } from "./modules/template/template.routes";
+import { projectsRouter } from "./modules/projects/projects.routes";
 
 export interface AppDeps {
   db: Db;
@@ -21,6 +22,7 @@ export function createApp({ db, bootId, startedAt }: AppDeps) {
     res.json(body);
   });
   api.use("/config/template", templateRouter(db));
+  api.use(projectsRouter(db));
 
   app.use("/api", api);
   app.use("/api", () => {

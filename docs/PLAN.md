@@ -31,7 +31,7 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 - **API'ye ait dilimler:** `template`, `phases`, `steps`, `actions`, `meetings`. Diğer dilimler store'da kalır.
 - **Hidrasyon:** uygulama açılınca (ve proje açılınca) bu dilimler API'den okunup store'a yazılır. Bu modüllerdeki her değişiklik önce API'ye gider, dönen kayıt (+ `RuleEffects`) store'a uygulanır.
 - **Yeni proje:** proje oluşturma diyaloğu `POST /api/projects` çağırır (şablondan kopyalama sunucuda). Proje kaydının diğer alanları (sağlık, satış devri, keşif…) store'da kalır.
-- **Mockup ekranlardan gelen adım değişiklikleri** (veriyle tamamlanan adımlar, kurulum tipi/LLM kuralları, takım ekleme vb.) store'da hesaplanır ve `PATCH /api/steps/:id` ile `origin: "client-rule"` olarak sunucuya yazılır. Bu yol kilit kontrolünü atlar (INV-25). İlgili ekran API'ye geçince köprü kalkar.
+- **Mockup ekranlardan gelen adım değişiklikleri** (veriyle tamamlanan adımlar, kurulum tipi/LLM kuralları, takım ekleme vb.) store'da hesaplanır ve `POST /api/projects/:projectId/steps/sync` ile (origin client-rule) sunucuya yazılır. Bu yol kilit kontrolünü atlar (INV-25). (M2a kararı; ilk taslakta `PATCH /api/steps/:id` + `origin` alanıydı.) İlgili ekran API'ye geçince köprü kalkar.
 - **Restart tespiti:** `GET /api/health` bir `bootId` döner. Kayıtlı `bootId` farklıysa store seed'e sıfırlanır (localStorage temizlenir), böylece iki taraf aynı seed'den başlar.
 - **Bilinen kısıtlar (Faz 2'de kalkar):** API'ye giden değişiklikler Geçmiş sekmesinde, "Son değişiklikler"de ve aksiyon geçmişinde görünmez. API restart olunca tüm veri seed'e döner.
 
@@ -74,14 +74,20 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 
 ## M2 — Proje açılışı + Aşamalar ve adımlar
 - [x] İş kuralları `packages/shared`'a taşınır (`flow`, `rules`, `completion`, `business-days`); web testleri yeşil kalır — M0'da yapıldı (bkz. Kararlar)
-- [ ] `POST /api/projects` (#1): şablondan kopyalama (INV-10), kurulum tipi/LLM koşullu adımlar, iş günü termini, plan tahmini
-- [ ] `GET /api/projects/:projectId/phases` (`PhaseWithSteps[]`, türetilmiş durum + `ConditionResult`)
-- [ ] `PATCH /api/phases/:id` (#3; plan bitişi gerekçeli), `POST /api/phases/:id/complete` (#4; aşama onayı, sonraki aşama açılır, onaylayan + tarih)
-- [ ] `PATCH /api/steps/:id` (#5): durum (gerekçeli), termin (gerekçeli), sorumlu/top; kilitli adıma elle değişiklik `409`; `origin: "client-rule"` köprüsü
+- [x] `POST /api/projects` (#1): şablondan kopyalama (INV-10), kurulum tipi/LLM koşullu adımlar, iş günü termini, plan tahmini — M2a. Kurulum tipi/LLM koşullu adımlar açılışta yok (proje `installType: null` ile açılır; kurallar istemcide, sync ile gelir)
+- [x] `GET /api/projects/:projectId/phases` — M2a. Yanıt `{ phases, steps }`; türetilmiş durum ve `ConditionResult` istemcide kalır (Kararlar)
+- [x] `PATCH /api/phases/:id` (#3; plan bitişi gerekçeli), `POST /api/phases/:id/complete` (#4; aşama onayı, sonraki aşama açılır, onaylayan + tarih) — M2a
+- [x] `PATCH /api/steps/:id` (#5): durum (gerekçeli), termin (gerekçeli), sorumlu/top; kilitli adıma elle değişiklik `409`; köprü `POST /api/projects/:projectId/steps/sync` — M2a
 - [ ] Store köprüsü: phases/steps hidrasyonu, yeni proje diyaloğu → API, mockup kurallarının adım değişikliklerini API'ye yazması
-- [ ] Testler: kopyalama, sıralı açılış, kilit, aşama onayı, gerekçe zorunluluğu, iş günü (tatil dahil)
+- [ ] Testler: kopyalama, sıralı açılış, kilit, aşama onayı, gerekçe zorunluluğu, iş günü (tatil dahil) — API tarafı M2a'da tamam; web köprüsü testleri M2b
 - **Kabul:** yeni proje → Aşamalar sekmesi API'den gelir; adım tamamla, termin değiştir, aşamayı onayla → sayfa yenilenince durur; uyarılar ve diğer sekmeler bozulmaz
 - **Notlar:**
+  - **M2a (API, 2026-10-10):** web'e dokunulmadı.
+    - Desen: `apps/api/src/modules/projects/`. `loadProjectState` (kısmi `RqState`) → shared kural fonksiyonları aynen (`advanceFlow`, `buildFromTemplate`, `projectPlan`, `stepLockError`, `manualStatusError`, `ensureReviewAction`/`cancelReviewAction`; audit no-op) → `persistDiff` (yalnızca değişen/yeni aşama, adım, aksiyon) tek `db.transaction`'da.
+    - Her yazma ucu `RuleEffects` = yalnızca değişen kayıtlar döner (`POST /projects`'te `project` dahil).
+    - Şema: `projects`'e `salesperson_id`, `license_model`, `purchased_modules`; yeni `holidays` tablosu (seed: TR tatilleri); `steps.owner_id` FK'sı kaldırıldı (sahip kişi de olabilir).
+    - Shared: `ProjectCore`, `ProjectCreate`, `Phase`/`Step`/`Action`, `PhasePatch`, `StepPatch`, `StepsSync`, `RuleEffects`, `PhasesWithSteps` şemaları. Domain'deki `Phase`/`Step`/`Action` tipleri bu şemalardan türetiliyor.
+    - `npm run check` yeşil: lint 0 hata / 27 uyarı; test sayıları api 62, web 232, shared 276. API testleri `TZ=UTC` ile de geçiyor.
 
 ## M3 — Aksiyonlar
 - [ ] `GET /api/projects/:projectId/actions`, `POST /api/projects/:projectId/actions` (#6), `PATCH /api/actions/:id` (#7; termin ve iptalde gerekçe zorunlu)
@@ -127,3 +133,15 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 - 2026-10-10 (M1): Doğrulama sırası: şema (`400`) → `baseVersion` (`409`, `field: "baseVersion"`) → yapı (`400`) → sistem adımı (`409`). İstemci "Yenile"yi yalnızca `field: "baseVersion"` olan `409`'da gösterir.
 - 2026-10-10 (M1): API'de zod varsayılan mesajları Türkçe (`z.locales.tr()`); `400` mesajı ilk hatanın mesajı, `field` ilk hatanın yolu (ör. `phases.6.steps.0.durationDays`).
 - 2026-10-10 (M1): API'ye ulaşılamazsa editör yerel şablonu gösterir, "Şablonu kaydet" kapalıdır (yerel kayıt yolu yok).
+- 2026-10-10 (M2a): Mockup kurallarının adım değişiklikleri için köprü `PATCH /api/steps/:id` + `origin: "client-rule"` değil, ayrı uç: `POST /api/projects/:projectId/steps/sync` (body `{ steps: Step[] }`, id'ye göre upsert, yeni adım eklenebilir, kilit kontrolü yok). Gerekçe: elle yapılan değişikliğin kuralları (kilit, gerekçe) ile kural sonucunun yazılması aynı uçta bayrakla ayrılmasın; köprü kalkınca uç silinir.
+- 2026-10-10 (M2a): Sunucu `applyStepCompletion`/`stepConditionResult` çalıştırmaz (veri istemcide); `derivePhaseStatus` ve `ConditionResult` istemcide kalır. Bu yüzden `POST /projects` sonrası veri adımları (ör. `csm`) sunucuda `pending` kalır, istemci tamamlayıp sync ile yazar (store'daki `settleAll` bunu aynı anda yapıyordu).
+- 2026-10-10 (M2a): Store'dan bilerek ayrılan noktalar:
+  - `PATCH /phases/:id` `status: "done"`'ı `409` ile reddeder ("Aşamayı tamamla" kullanılır, INV-08).
+  - Durum değişikliği de gerekçe ister (UI zaten istiyordu; store zorlamıyordu).
+  - `baselineEnd` istekte kabul edilmez; boşsa `planEnd`'den bir kez yazılır (INV-07).
+  - `POST /phases/:id/complete` zaten `done` aşamada `409`.
+  - `PATCH /steps/:id`'de `done` gerekçesiz (K1); diğer elle durum değişiklikleri ve termin değişikliği gerekçeli (UI her durum değişikliğinde istiyordu).
+  - Aynı müşteri adıyla ikinci proje `409` (adlar `trim` + Türkçe küçük harfle karşılaştırılır).
+  - `csmId` olmayan bir kullanıcıysa `400`.
+- 2026-10-10 (M2a): Sync'te aşaması `done` olan adımın durumu değişmez (RUL-05 Seçenek A). Kapsam dışından geri istenen adım için `ensureReviewAction`, kapsam dışına alınan adım için `cancelReviewAction` çalışır. Tamamlanmış aşamaya `out_of_scope` gelen yeni adım (`saas_env`) eklenir ve inceleme aksiyonu açılır.
+- 2026-10-10 (M2a): Tatil takvimi sunucuda `holidays` tablosundan okunur (seed: TR tatilleri). Ayarlar → Tatiller hâlâ store'da; oradaki değişiklik sunucuya gitmez (ekran API'ye geçince kalkar).

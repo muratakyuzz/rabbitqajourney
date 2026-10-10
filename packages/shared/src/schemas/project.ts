@@ -1,0 +1,147 @@
+import { z } from "zod";
+import {
+  ActionSourceSchema, ActionStatusSchema, BallSchema, DependencySchema, InstallTypeSchema, LlmChoiceSchema,
+  MeetingTypeSchema, PhaseStatusSchema, PrioritySchema, StepCompletionSchema, StepStatusSchema,
+} from "../enums";
+import { IdSchema, IsoDateSchema, IsoDateTimeSchema } from "./common";
+
+// Projects, phases, steps and the actions the flow engine opens (docs/PLAN.md M2).
+// Phase/Step/Action in domain/types are these types.
+
+export const PhaseSchema = z.object({
+  id: IdSchema,
+  projectId: IdSchema,
+  code: z.string().min(1),
+  name: z.string().min(1),
+  order: z.number().int(),
+  status: PhaseStatusSchema,
+  planStart: IsoDateSchema.nullable(),
+  planEnd: IsoDateSchema.nullable(),
+  baselineEnd: IsoDateSchema.nullable(),
+  actualStart: IsoDateSchema.nullable(),
+  actualEnd: IsoDateSchema.nullable(),
+  approvedBy: IdSchema.nullable(),
+  approvedAt: IsoDateTimeSchema.nullable(),
+  dependency: DependencySchema,
+  activatedAt: IsoDateTimeSchema.nullable(),
+});
+export type Phase = z.infer<typeof PhaseSchema>;
+
+export const StepSchema = z.object({
+  id: IdSchema,
+  projectId: IdSchema,
+  phaseId: IdSchema,
+  title: z.string().min(1),
+  required: z.boolean(),
+  ownerId: IdSchema.nullable(), // user id or contact id
+  ball: BallSchema,
+  ballSince: IsoDateTimeSchema,
+  due: IsoDateSchema.nullable(),
+  status: StepStatusSchema,
+  order: z.number().int(),
+  key: z.string().min(1).optional(),
+  dependency: DependencySchema,
+  durationDays: z.number().int().min(1).max(60),
+  activatedAt: IsoDateTimeSchema.nullable(),
+  completion: StepCompletionSchema,
+  meetingType: MeetingTypeSchema.optional(),
+});
+export type Step = z.infer<typeof StepSchema>;
+
+export const ActionSchema = z.object({
+  id: IdSchema,
+  projectId: IdSchema,
+  title: z.string().min(1),
+  ownerId: IdSchema.nullable(), // user id or contact id
+  ball: BallSchema,
+  due: IsoDateSchema.nullable(),
+  priority: PrioritySchema,
+  status: ActionStatusSchema,
+  source: ActionSourceSchema,
+  meetingId: IdSchema.nullable(),
+  createdAt: IsoDateTimeSchema,
+  ruleKey: z.string().optional(),
+  insightId: z.string().optional(),
+  isCustomerVisible: z.boolean(),
+});
+export type Action = z.infer<typeof ActionSchema>;
+
+/** The project fields the API owns. Health, handover, discovery, integrations … stay in the web store (Faz 1). */
+export const ProjectCoreSchema = z.object({
+  id: IdSchema,
+  customerName: z.string().min(1),
+  name: z.string().min(1),
+  csmId: IdSchema.nullable(),
+  salespersonId: IdSchema.nullable(),
+  licenseModel: z.string(),
+  purchasedModules: z.array(z.string()),
+  startDate: IsoDateSchema,
+  goLiveDate: IsoDateSchema,
+  installType: InstallTypeSchema.nullable(),
+  llmChoice: LlmChoiceSchema.nullable(),
+  teams: z.array(z.string()),
+  /** Template version the phases and steps were copied from (INV-10). */
+  templateVersion: z.number().int().positive().nullable(),
+  createdAt: IsoDateTimeSchema,
+});
+export type ProjectCore = z.infer<typeof ProjectCoreSchema>;
+
+/** POST /api/projects (#1). */
+export const ProjectCreateSchema = z.object({
+  customerName: z.string().trim().min(1, "Müşteri adı boş olamaz."),
+  name: z.string().trim().min(1, "Proje adı boş olamaz."),
+  csmId: IdSchema.nullable(),
+  salespersonId: IdSchema.nullable(),
+  licenseModel: z.string(),
+  purchasedModules: z.array(z.string()),
+  startDate: IsoDateSchema,
+  goLiveDate: IsoDateSchema,
+}).refine((p) => p.goLiveDate > p.startDate, { message: "Hedef Go-Live tarihi başlangıç tarihinden sonra olmalı.", path: ["goLiveDate"] });
+export type ProjectCreate = z.infer<typeof ProjectCreateSchema>;
+
+const ReasonSchema = z.string().optional();
+
+/** PATCH /api/phases/:id (#3). `baselineEnd` is not patchable; the server fills it once from planEnd (INV-07). */
+export const PhasePatchSchema = z.object({
+  status: PhaseStatusSchema.optional(),
+  planStart: IsoDateSchema.nullable().optional(),
+  planEnd: IsoDateSchema.nullable().optional(),
+  actualStart: IsoDateSchema.nullable().optional(),
+  actualEnd: IsoDateSchema.nullable().optional(),
+  reason: ReasonSchema,
+});
+export type PhasePatch = z.infer<typeof PhasePatchSchema>;
+
+/** PATCH /api/steps/:id (#5). */
+export const StepPatchSchema = z.object({
+  ownerId: IdSchema.nullable().optional(),
+  ball: BallSchema.optional(),
+  due: IsoDateSchema.nullable().optional(),
+  status: StepStatusSchema.optional(),
+  dependency: DependencySchema.optional(),
+  durationDays: z.number().int().min(1).max(60).optional(),
+  reason: ReasonSchema,
+});
+export type StepPatch = z.infer<typeof StepPatchSchema>;
+
+/** POST /api/projects/:projectId/steps/sync — bridge for step changes computed by client-side rules (origin client-rule). */
+export const StepsSyncSchema = z.object({
+  steps: z.array(StepSchema).min(1),
+});
+export type StepsSync = z.infer<typeof StepsSyncSchema>;
+
+/** Response of every phase/step write: only the records that changed (including rule/flow effects). */
+export const RuleEffectsSchema = z.object({
+  project: ProjectCoreSchema.optional(),
+  phases: z.array(PhaseSchema),
+  steps: z.array(StepSchema),
+  actions: z.array(ActionSchema),
+});
+export type RuleEffects = z.infer<typeof RuleEffectsSchema>;
+
+/** GET /api/projects/:projectId/phases. */
+export const PhasesWithStepsSchema = z.object({
+  phases: z.array(PhaseSchema),
+  steps: z.array(StepSchema),
+});
+export type PhasesWithSteps = z.infer<typeof PhasesWithStepsSchema>;
