@@ -1,17 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { projectPlan } from "@rabbitqa/shared/domain/flow";
 import { allAlerts, computeAlerts, type AlertView } from "@rabbitqa/shared/domain/alerts";
 import { setActiveHolidays } from "@rabbitqa/shared/domain/business-days";
 import { ADAPTATION_ITEM_LABEL, fmtDate } from "@rabbitqa/shared/domain/labels";
 import { useAuth } from "@/lib/auth-context";
-import { DEFAULT_PROJECT_INTEGRATIONS, STATE_KEY, STATE_VERSION, buildFromTemplate, createSeed, uid } from "@rabbitqa/shared/domain/seed";
+import { STATE_KEY, STATE_VERSION, createSeed, uid } from "@rabbitqa/shared/domain/seed";
 import { analyzeText, type IncomingMeta } from "./ai-mock";
 import { matchEmail } from "./email-match";
 import { isAutoStep, manualStatusError, settleAll, stepLockError } from "@rabbitqa/shared/domain/completion";
 import type {
   AiInsight, ChatChannel, InsightProposedAny, InsightSource, IntegrationConfig, ProjectIntegrations, UnmatchedEmail,
-  CustomerReport, User, Action, Adaptation, AdaptationItem, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RiskDecision, RqState, Step, SupportTicket,
+  CustomerReport, User, Action, Adaptation, AdaptationItem, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Phase, Project, RiskDecision, RqState, Step, SupportTicket,
 } from "@rabbitqa/shared/domain/types";
 import { todayISO } from "@rabbitqa/shared/domain/labels";
 import { buildReportSnapshot, defaultNextWeek } from "@rabbitqa/shared/domain/reports";
@@ -123,8 +122,6 @@ interface Ctx {
   applyTemplateVersion: (tv: TemplateVersion) => void;
   /** Puts an API response (RuleEffects) into the store and the bridge's server view; does not trigger a sync of its own. */
   applyServerEffects: (e: RuleEffects) => void;
-  /** Projects the API does not know (created offline before M2b): not bridged. */
-  isLocalOnly: (projectId: string) => boolean;
 }
 
 const RqContext = createContext<Ctx | null>(null);
@@ -948,10 +945,9 @@ export function RqProvider({ children }: { children: ReactNode }) {
     templateVersion,
     applyTemplateVersion,
     applyServerEffects,
-    isLocalOnly: (pid) => localOnly.has(pid),
     };
     return api;
-  }, [state, userId, patch, add, mkAudit, templateVersion, applyTemplateVersion, applyServerEffects, hydrate, hydrateAll, localOnly, nextCommit, flushNow]);
+  }, [state, userId, patch, add, mkAudit, templateVersion, applyTemplateVersion, applyServerEffects, hydrate, hydrateAll, nextCommit, flushNow]);
 
   return <RqContext.Provider value={value}>{children}</RqContext.Provider>;
 }

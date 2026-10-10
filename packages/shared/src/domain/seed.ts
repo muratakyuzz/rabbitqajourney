@@ -3,6 +3,7 @@ import { DEFAULT_THRESHOLDS, weekStartOf } from "./alerts";
 import { settleAll } from "./completion";
 import { projectPlan } from "./flow";
 import { buildReportSnapshot } from "./reports";
+import type { ProjectCore } from "../schemas/project";
 import type { AuditEntry, Action, Adaptation, AiInsight, Ball, Contact, DocumentRec, IntegrationConfig, Kpi, Meeting, ProjectIntegrations, UnmatchedEmail, DiscoveryQuestion, Phase, PhaseTpl, Project, RqState, Salesperson, Step, StepTpl, User } from "./types";
 
 export const SEED_USERS: User[] = [
@@ -99,6 +100,19 @@ export const DEFAULT_PROJECT_INTEGRATIONS: ProjectIntegrations = {
   chat: { provider: "teams", channelId: null, active: false, since: null },
   email: { active: false, extraDomains: [], since: null },
 };
+
+/**
+ * A store Project from the fields the API owns (ProjectCore). Health, discovery, integrations … stay in the web
+ * store in Faz 1 and get their defaults here; used by the API's rule functions and the web bridge alike.
+ */
+export const projectFromCore = ({ templateVersion: _v, ...core }: ProjectCore): Project => ({
+  ...core, health: "green", healthReason: "", desiredModules: [], discoveryAnswers: {}, teamInfo: {},
+  integrations: {
+    chat: { ...DEFAULT_PROJECT_INTEGRATIONS.chat },
+    email: { ...DEFAULT_PROJECT_INTEGRATIONS.email, extraDomains: [...DEFAULT_PROJECT_INTEGRATIONS.email.extraDomains] },
+  },
+  noCommitments: false,
+});
 
 export const SEED_INTEGRATIONS: IntegrationConfig = {
   chat: {

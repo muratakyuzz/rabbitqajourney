@@ -4,15 +4,15 @@ import { advanceFlow, projectPlan } from "@rabbitqa/shared/domain/flow";
 import { todayISO } from "@rabbitqa/shared/domain/labels";
 import { cancelReviewAction, ensureReviewAction } from "@rabbitqa/shared/domain/rules";
 import { currentRuleAction, currentRuleActions, isRuleAction } from "@rabbitqa/shared/domain/rule-actions";
-import { buildFromTemplate, uid } from "@rabbitqa/shared/domain/seed";
-import type { Phase, RqState } from "@rabbitqa/shared/domain/types";
+import { buildFromTemplate, projectFromCore, uid } from "@rabbitqa/shared/domain/seed";
+import type { Phase } from "@rabbitqa/shared/domain/types";
 import type { Db, Queryable } from "../../db";
 import { currentUserId } from "../../core/current-user";
 import { HttpError, badRequest, conflict, notFound } from "../../http/errors";
 import { insertRow, projectToRow } from "../../db/rows";
 import {
   type Effects, changeProject, findProjectCore, loadCommon, loadProjectState, noAudit, partialState, persistDiff, projectIdOf,
-  replace, requireReason, setLastReason, toDomainProject,
+  replace, requireReason, setLastReason,
 } from "./project-state";
 
 // #1, #3, #4, #5 and the client-rule bridge (docs/PLAN.md M2a). Same rules as the web store unless noted
@@ -35,7 +35,7 @@ export async function createProject(db: Db, input: ProjectCreate): Promise<RuleE
       ...input, id: uid("p"), installType: null, llmChoice: null, teams: [],
       templateVersion: common.templateVersion, createdAt: new Date().toISOString(),
     };
-    const project = toDomainProject(core);
+    const project = projectFromCore(core);
     const { phases, steps } = buildFromTemplate(project, common.users, {}, common.template);
     const plan = projectPlan(phases, steps, project.startDate);
     for (const ph of phases) {

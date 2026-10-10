@@ -1,7 +1,7 @@
-import type { PhasesWithSteps, ProjectCore, RuleEffects } from "@rabbitqa/shared";
+import type { PhasesWithSteps, RuleEffects } from "@rabbitqa/shared";
 import { currentRuleAction, currentRuleActions, isRuleAction } from "@rabbitqa/shared/domain/rule-actions";
-import { DEFAULT_PROJECT_INTEGRATIONS } from "@rabbitqa/shared/domain/seed";
-import type { Action, Meeting, Project, RqState, Step } from "@rabbitqa/shared/domain/types";
+import { projectFromCore } from "@rabbitqa/shared/domain/seed";
+import type { Action, Meeting, RqState, Step } from "@rabbitqa/shared/domain/types";
 
 // Store ↔ API bridge, pure part (docs/PLAN.md M2b, M3, M4). The API owns phases, steps, actions and meetings of a
 // project; the store keeps a copy. Per project we remember the last server picture ("view") and send whatever the
@@ -57,12 +57,6 @@ export const projectsIn = (e: RuleEffects) =>
     ...(e.project ? [e.project.id] : []), ...e.phases.map((x) => x.projectId), ...e.steps.map((x) => x.projectId),
     ...e.actions.map((x) => x.projectId), ...(e.meetings ?? []).map((x) => x.projectId),
   ]);
-
-/** A store Project from the API's fields; the fields the API does not own get the store's defaults. */
-export const projectFromCore = ({ templateVersion: _v, ...core }: ProjectCore): Project => ({
-  ...core, health: "green", healthReason: "", desiredModules: [], discoveryAnswers: {}, teamInfo: {},
-  integrations: structuredClone(DEFAULT_PROJECT_INTEGRATIONS), noCommitments: false,
-});
 
 const upsert = <T extends { id: string }>(list: T[], items: T[]) => {
   if (!items.length) return list;

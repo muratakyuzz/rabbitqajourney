@@ -3,8 +3,8 @@ import { DEFAULT_THRESHOLDS } from "@rabbitqa/shared/domain/alerts";
 import { setActiveHolidays } from "@rabbitqa/shared/domain/business-days";
 import { applyStepCompletion } from "@rabbitqa/shared/domain/completion";
 import { advanceFlow, type MkAudit } from "@rabbitqa/shared/domain/flow";
-import { DEFAULT_PROJECT_INTEGRATIONS, SEED_INTEGRATIONS, STATE_VERSION } from "@rabbitqa/shared/domain/seed";
-import type { Holiday, PhaseTpl, Project, RqState, User } from "@rabbitqa/shared/domain/types";
+import { SEED_INTEGRATIONS, STATE_VERSION, projectFromCore } from "@rabbitqa/shared/domain/seed";
+import type { Holiday, PhaseTpl, RqState, User } from "@rabbitqa/shared/domain/types";
 import type { Queryable } from "../../db";
 import { notFound, reasonRequired } from "../../http/errors";
 import {
@@ -16,15 +16,6 @@ import {
 // functions unchanged, then write back only what changed. Audit is Faz 2, so rule audits are dropped.
 
 export const noAudit: MkAudit = (e) => ({ ...e, id: "", at: "", userId: "" });
-
-/** A Project for the shared rule functions; fields the API does not own get neutral defaults. */
-export function toDomainProject(p: ProjectCore): Project {
-  const { templateVersion: _v, ...core } = p;
-  return {
-    ...core, health: "green", healthReason: "", desiredModules: [], discoveryAnswers: {}, teamInfo: {},
-    integrations: structuredClone(DEFAULT_PROJECT_INTEGRATIONS), noCommitments: false,
-  };
-}
 
 /** RqState with only the slices the API owns; everything else empty. */
 export function partialState(s: Pick<RqState, "users" | "holidays" | "template"> & Partial<RqState>): RqState {
@@ -67,7 +58,7 @@ export async function loadProjectState(q: Queryable, projectId: string): Promise
     [projectId],
   )).rows;
   const meetings = meetingRows.map((r) => rowToMeeting(r, parts.filter((p) => p.meeting_id === r.id)));
-  const state = partialState({ ...common, projects: [toDomainProject(project)], phases, steps, actions, meetings });
+  const state = partialState({ ...common, projects: [projectFromCore(project)], phases, steps, actions, meetings });
   return { state, project };
 }
 

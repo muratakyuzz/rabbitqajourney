@@ -332,7 +332,7 @@ describe("API bridge", () => {
     const api = fakeApi({ "GET /projects/p_ornek/phases": () => apiError(404, "NOT_FOUND", "Proje bulunamadı.") });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { result } = await setup(api);
-    expect(result.current.isLocalOnly("p_ornek")).toBe(true);
+    expect(warn).toHaveBeenCalledWith("Proje p_ornek API'de yok; yalnız yerel, sunucuya yazılmaz.");
     const step = result.current.state.steps.find((s) => s.projectId === "p_ornek" && s.status === "pending" && s.completion === "manual")
       ?? result.current.state.steps.find((s) => s.projectId === "p_ornek" && s.status === "pending")!;
     act(() => { result.current.updateStep(step.id, { ball: step.ball === "care" ? "devops" : "care" }); });
