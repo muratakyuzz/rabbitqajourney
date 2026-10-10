@@ -11,7 +11,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "npm run dev -w @rabbitqa/web --",
+    "dev": "node scripts/dev.mjs",
     "build": "npm run build --workspaces --if-present",
     "preview": "npm run preview -w @rabbitqa/web --",
     "lint": "eslint .",
