@@ -15,8 +15,8 @@ import { useAuth } from "@/lib/auth-context";
 import { canManageIntegrations, canSetProjectIntegration } from "@/lib/rabbitqa/perm";
 import { useRq } from "@/lib/rabbitqa/store";
 import { projectDomains } from "@/lib/rabbitqa/email-match";
-import { fmtDate } from "@/lib/rabbitqa/labels";
-import type { Project } from "@/lib/rabbitqa/types";
+import { fmtDate } from "@rabbitqa/shared/domain/labels";
+import type { Project } from "@rabbitqa/shared/domain/types";
 
 function SystemWarning({ text, isAdmin }: { text: string; isAdmin: boolean }) {
   return (

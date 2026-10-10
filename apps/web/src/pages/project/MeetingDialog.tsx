@@ -13,8 +13,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Pill } from "@/components/rq/Badges";
 import { personName, useRq } from "@/lib/rabbitqa/store";
 import { selectableUsers } from "@/lib/rabbitqa/perm";
-import { ACTION_STATUS_LABEL, BALL_LABEL, MEETING_STATUS_LABEL, MEETING_TYPE_LABEL, PRIORITY_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
-import type { ActionStatus, Ball, MeetingStatus, MeetingType, Priority, Project } from "@/lib/rabbitqa/types";
+import { ACTION_STATUS_LABEL, BALL_LABEL, MEETING_STATUS_LABEL, MEETING_TYPE_LABEL, PRIORITY_LABEL, fmtDate, todayISO } from "@rabbitqa/shared/domain/labels";
+import type { ActionStatus, Ball, MeetingStatus, MeetingType, Priority, Project } from "@rabbitqa/shared/domain/types";
 
 export const NONE = "__none";
 

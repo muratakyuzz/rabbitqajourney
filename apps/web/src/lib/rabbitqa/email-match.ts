@@ -1,4 +1,4 @@
-import type { RqState } from "./types";
+import type { RqState } from "@rabbitqa/shared/domain/types";
 
 export interface IncomingEmail { from: string; to: string[]; cc: string[] }
 

@@ -1,6 +1,6 @@
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { fmtDate } from "@/lib/rabbitqa/labels";
-import type { Kpi } from "@/lib/rabbitqa/types";
+import { fmtDate } from "@rabbitqa/shared/domain/labels";
+import type { Kpi } from "@rabbitqa/shared/domain/types";
 
 /** KPI ölçümlerinin zaman grafiği; hedef değer yatay referans çizgisi. */
 export function KpiChart({ kpi }: { kpi: Kpi }) {

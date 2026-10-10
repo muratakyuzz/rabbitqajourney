@@ -13,10 +13,10 @@ import { HealthBadge, PhaseStatusBadge, Pill } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { canEditReport, canMarkReportSent } from "@/lib/rabbitqa/perm";
 import { personName, useRq } from "@/lib/rabbitqa/store";
-import { weekStartOf } from "@/lib/rabbitqa/alerts";
-import { PRIORITY_LABEL, REPORT_STATUS_LABEL, fmtDate, fmtDateTime, todayISO } from "@/lib/rabbitqa/labels";
-import type { ReportSnapshot } from "@/lib/rabbitqa/reports";
-import type { CustomerReport as Rep, PhaseStatus, Priority } from "@/lib/rabbitqa/types";
+import { weekStartOf } from "@rabbitqa/shared/domain/alerts";
+import { PRIORITY_LABEL, REPORT_STATUS_LABEL, fmtDate, fmtDateTime, todayISO } from "@rabbitqa/shared/domain/labels";
+import type { ReportSnapshot } from "@rabbitqa/shared/domain/reports";
+import type { CustomerReport as Rep, PhaseStatus, Priority } from "@rabbitqa/shared/domain/types";
 
 export default function CustomerReport() {
   const { id } = useParams();

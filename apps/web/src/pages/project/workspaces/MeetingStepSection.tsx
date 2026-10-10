@@ -3,9 +3,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Pill, StepStatusBadge } from "@/components/rq/Badges";
 import { personName, useRq } from "@/lib/rabbitqa/store";
-import { latestHeldMeeting } from "@/lib/rabbitqa/completion";
-import { fmtDate } from "@/lib/rabbitqa/labels";
-import type { MeetingType, Project } from "@/lib/rabbitqa/types";
+import { latestHeldMeeting } from "@rabbitqa/shared/domain/completion";
+import { fmtDate } from "@rabbitqa/shared/domain/labels";
+import type { MeetingType, Project } from "@rabbitqa/shared/domain/types";
 import { MeetingDialog, MeetingDetailDialog } from "../MeetingDialog";
 
 /** Bir aşama panelindeki tek toplantı adımı: yapıldı toplantıyı gösterir, planlıysa "Yapıldı" işaretler, yoksa kaydet. */

@@ -16,15 +16,15 @@ import { VisibleIcon } from "@/components/rq/VisibleIcon";
 import { useAuth } from "@/lib/auth-context";
 import { personName, useAlertViews, useRq } from "@/lib/rabbitqa/store";
 import { AlertActionDialog } from "@/components/rq/AlertActionDialog";
-import type { AlertView } from "@/lib/rabbitqa/alerts";
+import type { AlertView } from "@rabbitqa/shared/domain/alerts";
 import { canHandleAlert, canManageProject, canManageTickets, selectableUsers } from "@/lib/rabbitqa/perm";
 import {
   ALERT_LEVEL_LABEL, ALERT_STATE_LABEL, ALERT_TYPE_LABEL, COMMIT_STATUS_LABEL, PRIORITY_LABEL, RISK_KIND_LABEL, RISK_STATUS_LABEL,
   TICKET_STATUS_LABEL, TICKET_TYPE_LABEL, BOARD_DECISION_LABEL, PROBABILITY_LABEL, MEETING_TYPE_LABEL, fmtDate, fmtDateTime, todayISO,
-} from "@/lib/rabbitqa/labels";
+} from "@rabbitqa/shared/domain/labels";
 import type {
   AlertSeverity, BoardDecision, Priority, Project, RiskDecision, RiskKind, RiskStatus, SupportTicket, TicketStatus, TicketType,
-} from "@/lib/rabbitqa/types";
+} from "@rabbitqa/shared/domain/types";
 
 /* ── Uyarılar ───────────────────────────────────────────── */
 /** Proje uyarı paneli (rozetten açılan Sheet içinde) ve eski "Uyarılar" sekmesi için aynı içerik. */

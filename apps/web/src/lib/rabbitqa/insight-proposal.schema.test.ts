@@ -1,7 +1,7 @@
 import { InsightProposalSchema, InsightKindSchema } from "@rabbitqa/shared";
 import { analyzeText, type InsightDraft } from "./ai-mock";
-import { createSeed } from "./seed";
-import type { AiInsight } from "./types";
+import { createSeed } from "@rabbitqa/shared/domain/seed";
+import type { AiInsight } from "@rabbitqa/shared/domain/types";
 
 // F0-04a AC7 (L2c precursor): seed insights and ai-mock drafts already fit the shared InsightProposal schema,
 // and parsing drops nothing (toEqual input). Mock behaviour is unchanged; runtime parsing comes in 04h / F8-03.

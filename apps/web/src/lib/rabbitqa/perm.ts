@@ -1,5 +1,5 @@
 import type { AuthUser } from "@/lib/auth-api";
-import type { AiInsight, ComputedAlert, Project, RqState } from "./types";
+import type { AiInsight, ComputedAlert, Project, RqState } from "@rabbitqa/shared/domain/types";
 
 export const isAllSeeing = (u: AuthUser | null) => u?.role === "manager" || u?.role === "admin";
 

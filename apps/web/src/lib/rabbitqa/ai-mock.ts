@@ -1,4 +1,4 @@
-import type { AiInsight, InsightKind, InsightSource, RqState } from "./types";
+import type { AiInsight, InsightKind, InsightSource, RqState } from "@rabbitqa/shared/domain/types";
 
 export type InsightDraft = Omit<AiInsight, "id" | "status" | "createdAt" | "reviewedBy" | "reviewedAt" | "reviewNote" | "appliedEntityId">;
 export interface IncomingMeta { title: string; from: string; at?: string; link?: string; direction?: "in" | "out" }

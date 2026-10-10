@@ -11,9 +11,9 @@ import { Progress } from "@/components/ui/progress";
 import { HealthBadge, Pill } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { isAllSeeing, visibleProjects } from "@/lib/rabbitqa/perm";
-import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
+import { businessDaysBetween } from "@rabbitqa/shared/domain/business-days";
 import { activePhase, personName, projectProgress, useRq , useAlertViews } from "@/lib/rabbitqa/store";
-import { BALL_LABEL, MEETING_TYPE_LABEL, ROLE_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
+import { BALL_LABEL, MEETING_TYPE_LABEL, ROLE_LABEL, fmtDate, todayISO } from "@rabbitqa/shared/domain/labels";
 
 type Item = { id: string; title: string; projectId: string; due?: string | null; late?: boolean };
 

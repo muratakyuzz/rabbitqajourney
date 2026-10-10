@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { adaptationCondition, applyStepCompletion, conditionFor, isAutoStep, latestHeldMeeting, manualStatusError, settleAll, settleProject, stepConditionResult, STEP_CONDITIONS } from "./completion";
-import { applyInstallType, applyLlmChoice, cancelReviewAction, ensureReviewAction, installChoiceError, applyMeetingHeldRules } from "./rules";
+import { adaptationCondition, applyStepCompletion, conditionFor, isAutoStep, latestHeldMeeting, manualStatusError, settleAll, settleProject, stepConditionResult, STEP_CONDITIONS } from "@rabbitqa/shared/domain/completion";
+import { applyInstallType, applyLlmChoice, cancelReviewAction, ensureReviewAction, installChoiceError, applyMeetingHeldRules } from "@rabbitqa/shared/domain/rules";
 import { analyzeText } from "./ai-mock";
-import { computeAlerts } from "./alerts";
-import { addBusinessDays } from "./business-days";
-import { buildFromTemplate, createSeed, PHASE_TEMPLATE } from "./seed";
-import { todayISO } from "./labels";
-import type { AuditEntry, RqState } from "./types";
+import { computeAlerts } from "@rabbitqa/shared/domain/alerts";
+import { addBusinessDays } from "@rabbitqa/shared/domain/business-days";
+import { buildFromTemplate, createSeed, PHASE_TEMPLATE } from "@rabbitqa/shared/domain/seed";
+import { todayISO } from "@rabbitqa/shared/domain/labels";
+import type { AuditEntry, RqState } from "@rabbitqa/shared/domain/types";
 
 const NOW = new Date("2026-10-05T09:00:00");
 
@@ -587,7 +587,7 @@ describe("RUL-09 — meeting step reopen reason", () => {
 
 describe("seed invariants (AC16)", () => {
   it("PHASE_TEMPLATE'te ve seed'deki hiçbir projede support_track adımı yoktur (S7)", async () => {
-    const { PHASE_TEMPLATE } = await import("./seed");
+    const { PHASE_TEMPLATE } = await import("@rabbitqa/shared/domain/seed");
     expect(PHASE_TEMPLATE.some((p) => p.steps.some((s) => s.key === "support_track"))).toBe(false);
     const s = createSeed();
     expect(s.steps.some((st) => st.key === "support_track")).toBe(false);
@@ -984,8 +984,8 @@ describe("buildReportSnapshot — p_perakende Uyarlama: Mobil (AC18)", () => {
   afterEach(() => { vi.useRealTimers(); });
 
   it("a step completed this week via an 'adapt:<team>' audit appears in the completed list; phases 04/05 are present with the right status", async () => {
-    const { buildReportSnapshot } = await import("./reports");
-    const { weekStartOf } = await import("./alerts");
+    const { buildReportSnapshot } = await import("@rabbitqa/shared/domain/reports");
+    const { weekStartOf } = await import("@rabbitqa/shared/domain/alerts");
     const s = createSeed();
     const pid = "p_perakende";
     const today = todayISO();

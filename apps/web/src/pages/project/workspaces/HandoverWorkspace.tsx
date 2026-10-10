@@ -13,8 +13,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Pill, StepStatusBadge } from "@/components/rq/Badges";
 import { personName, useRq } from "@/lib/rabbitqa/store";
 import { selectableCsms } from "@/lib/rabbitqa/perm";
-import { ACTION_STATUS_LABEL, COMMIT_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, fmtDate } from "@/lib/rabbitqa/labels";
-import type { Commitment, CommitmentStatus, InstallType, LlmChoice } from "@/lib/rabbitqa/types";
+import { ACTION_STATUS_LABEL, COMMIT_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, fmtDate } from "@rabbitqa/shared/domain/labels";
+import type { Commitment, CommitmentStatus, InstallType, LlmChoice } from "@rabbitqa/shared/domain/types";
 import { DocumentUploadDialog } from "../Phase2Tabs";
 import { MeetingStepSection } from "./MeetingStepSection";
 import type { WorkspaceProps } from "./index";

@@ -8,9 +8,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRq } from "@/lib/rabbitqa/store";
-import { uid } from "@/lib/rabbitqa/seed";
-import { fmtDate } from "@/lib/rabbitqa/labels";
-import type { AlertThresholds, Holiday, Salesperson } from "@/lib/rabbitqa/types";
+import { uid } from "@rabbitqa/shared/domain/seed";
+import { fmtDate } from "@rabbitqa/shared/domain/labels";
+import type { AlertThresholds, Holiday, Salesperson } from "@rabbitqa/shared/domain/types";
 
 const THRESHOLD_ROWS: { key: keyof AlertThresholds; label: string; unit: string }[] = [
   { key: "phaseRiskDays", label: "Aşama risk altında — plan bitişine kalan", unit: "iş günü" },

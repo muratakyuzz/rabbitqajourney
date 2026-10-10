@@ -11,11 +11,11 @@ import { HealthBadge, Pill } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { canSeeManagementReport, isWorkforceUser } from "@/lib/rabbitqa/perm";
 import { activePhase, personName, projectProgress, useAlertViews, useRq } from "@/lib/rabbitqa/store";
-import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
-import { isOpenStep } from "@/lib/rabbitqa/flow";
-import { weekStartOf } from "@/lib/rabbitqa/alerts";
-import { TICKET_TYPE_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
-import type { TicketType } from "@/lib/rabbitqa/types";
+import { businessDaysBetween } from "@rabbitqa/shared/domain/business-days";
+import { isOpenStep } from "@rabbitqa/shared/domain/flow";
+import { weekStartOf } from "@rabbitqa/shared/domain/alerts";
+import { TICKET_TYPE_LABEL, fmtDate, todayISO } from "@rabbitqa/shared/domain/labels";
+import type { TicketType } from "@rabbitqa/shared/domain/types";
 
 type Period = "week" | "month" | "3m" | "custom";
 const shift = (iso: string, days: number) => new Date(new Date(iso + "T00:00:00Z").getTime() + days * 86400000).toISOString().slice(0, 10);

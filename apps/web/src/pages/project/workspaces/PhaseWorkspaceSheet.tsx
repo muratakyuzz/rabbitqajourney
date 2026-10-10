@@ -4,10 +4,10 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { PhaseStatusBadge } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { personName, useComputedAlerts, useRq } from "@/lib/rabbitqa/store";
-import { derivePhaseStatus } from "@/lib/rabbitqa/alerts";
-import { stepConditionResult } from "@/lib/rabbitqa/completion";
+import { derivePhaseStatus } from "@rabbitqa/shared/domain/alerts";
+import { stepConditionResult } from "@rabbitqa/shared/domain/completion";
 import { canAssignCsm, canManageProject } from "@/lib/rabbitqa/perm";
-import type { MeetingType, Phase, Project, RqState, Step } from "@/lib/rabbitqa/types";
+import type { MeetingType, Phase, Project, RqState, Step } from "@rabbitqa/shared/domain/types";
 import { PHASE_WORKSPACES } from "./index";
 import { highlightField } from "./highlight";
 

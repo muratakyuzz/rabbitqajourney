@@ -11,8 +11,8 @@ import { Pill } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { canManageProject } from "@/lib/rabbitqa/perm";
 import { personName, useRq } from "@/lib/rabbitqa/store";
-import { RISK_STATUS_LABEL, TICKET_STATUS_LABEL, TICKET_TYPE_LABEL, fmtDate } from "@/lib/rabbitqa/labels";
-import type { Meeting, Project, TicketType } from "@/lib/rabbitqa/types";
+import { RISK_STATUS_LABEL, TICKET_STATUS_LABEL, TICKET_TYPE_LABEL, fmtDate } from "@rabbitqa/shared/domain/labels";
+import type { Meeting, Project, TicketType } from "@rabbitqa/shared/domain/types";
 
 /* ── Süreklilik ─────────────────────────────────────────── */
 export function ContinuityTab({ project, renderCheckinDialog }: { project: Project; renderCheckinDialog: (close: () => void) => ReactNode }) {

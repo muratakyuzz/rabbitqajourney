@@ -29,23 +29,23 @@ import { Switch } from "@/components/ui/switch";
 import { IntegrationsTab } from "./project/IntegrationsTab";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
-import { stepConditionResult } from "@/lib/rabbitqa/completion";
+import { stepConditionResult } from "@rabbitqa/shared/domain/completion";
 import {
   ActionStatusBadge, HealthBadge, PhaseStatusBadge, Pill, PriorityBadge, StepStatusBadge, isOverdue,
 } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { personName, projectProgress, useAlertViews, useComputedAlerts, useRq } from "@/lib/rabbitqa/store";
-import { derivePhaseStatus } from "@/lib/rabbitqa/alerts";
+import { derivePhaseStatus } from "@rabbitqa/shared/domain/alerts";
 import { canEditFlow, canEditItem, canManageProject, canSeeCredentials, selectableUsers } from "@/lib/rabbitqa/perm";
-import { isActivePhase, isOpenStep, previousStep } from "@/lib/rabbitqa/flow";
-import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
+import { isActivePhase, isOpenStep, previousStep } from "@rabbitqa/shared/domain/flow";
+import { businessDaysBetween } from "@rabbitqa/shared/domain/business-days";
 import {
   ACTION_STATUS_LABEL, BALL_LABEL, COMMIT_STATUS_LABEL, COMPLETION_LABEL, CONTACT_ROLE_LABEL, ENTITY_LABEL, HEALTH_LABEL, MEETING_STATUS_LABEL, MEETING_TYPE_LABEL,
   PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, SOURCE_LABEL, fmtDate, fmtDateTime, todayISO,
-} from "@/lib/rabbitqa/labels";
+} from "@rabbitqa/shared/domain/labels";
 import type {
   Action, ActionStatus, Ball, ContactRole, Dependency, Health, MeetingStatus, MeetingType, Phase, PhaseStatus, Priority, Project, Step, StepStatus,
-} from "@/lib/rabbitqa/types";
+} from "@rabbitqa/shared/domain/types";
 
 function AiSourceBadge({ action }: { action: Action }) {
   const { state } = useRq();

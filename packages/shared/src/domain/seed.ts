@@ -127,7 +127,9 @@ function prevBusinessDay(iso: string) {
 export const STATE_VERSION = 11;
 export const STATE_KEY = `rabbitqa-demo-state-v${STATE_VERSION}`;
 
-export const uid = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
+const randomId = (p: string) => `${p}_${Math.random().toString(36).slice(2, 10)}`;
+let nextId = randomId;
+export const uid = (p: string) => nextId(p);
 
 export function ownerFor(ball: Ball, csmId: string | null, users: User[], ownerRole?: "manager") {
   if (ownerRole === "manager") return users.find((u) => u.role === "manager")?.id ?? null;
@@ -137,14 +139,14 @@ export function ownerFor(ball: Ball, csmId: string | null, users: User[], ownerR
 }
 
 /** Copies the phase/step template into a new project (template changes never affect existing projects). */
-export function buildFromTemplate(project: Project, users: User[], planEnds: Record<string, string | null> = {}, template: PhaseTpl[] = PHASE_TEMPLATE) {
+export function buildFromTemplate(project: Project, users: User[], planEnds: Record<string, string | null> = {}, template: PhaseTpl[] = PHASE_TEMPLATE, newId: (prefix: "ph" | "st") => string = uid) {
   const phases: Phase[] = [];
   const steps: Step[] = [];
   let prevEnd: string | null = project.startDate;
   template.forEach((pt, i) => {
     const end = planEnds[pt.code] ?? null;
     const phase: Phase = {
-      id: uid("ph"), projectId: project.id, code: pt.code, name: pt.name, order: i,
+      id: newId("ph"), projectId: project.id, code: pt.code, name: pt.name, order: i,
       status: "locked", planStart: prevEnd, planEnd: end, baselineEnd: end,
       actualStart: null, actualEnd: null, approvedBy: null, approvedAt: null, dependency: pt.dependency ?? "previous", activatedAt: null,
     };
@@ -155,7 +157,7 @@ export function buildFromTemplate(project: Project, users: User[], planEnds: Rec
       : pt.steps;
     tpl.forEach((st, j) => {
       steps.push({
-        id: uid("st"), projectId: project.id, phaseId: phase.id, title: st.title, required: st.required,
+        id: newId("st"), projectId: project.id, phaseId: phase.id, title: st.title, required: st.required,
         ownerId: ownerFor(st.ball, project.csmId, users, (st as StepTpl).ownerRole), ball: st.ball,
         ballSince: project.createdAt, due: null, status: "locked", order: j, key: (st as StepTpl).key,
         dependency: st.dependency ?? "previous", durationDays: st.durationDays ?? 2, activatedAt: null,
@@ -166,8 +168,26 @@ export function buildFromTemplate(project: Project, users: User[], planEnds: Rec
   return { phases, steps };
 }
 
+/** Seed ids are deterministic so web and API, each building the seed on its own, share the same ids. */
+function seedIds(projectId: string) {
+  const n = { ph: 0, st: 0 };
+  return (prefix: "ph" | "st") => `${prefix}_${projectId.replace(/^p_/, "")}_${String(++n[prefix]).padStart(2, "0")}`;
+}
+
+/** Builds the demo state. Every id generated meanwhile (rule actions, audits) is sequential, so web and API get identical seeds. */
 export function createSeed(): RqState {
+  let n = 0;
+  nextId = (p) => `${p}_seed${String(++n).padStart(4, "0")}`;
+  try {
+    return buildSeed();
+  } finally {
+    nextId = randomId;
+  }
+}
+
+function buildSeed(): RqState {
   const users = SEED_USERS;
+  const build = (p: Project, planEnds: Record<string, string | null> = {}) => buildFromTemplate(p, users, planEnds, PHASE_TEMPLATE, seedIds(p.id));
   const project: Project = {
     id: "p_isyatirim",
     customerName: "İş Yatırım",
@@ -204,7 +224,7 @@ export function createSeed(): RqState {
     },
     noCommitments: false,
   };
-  const { phases, steps } = buildFromTemplate(project, users, {
+  const { phases, steps } = build(project, {
     "00": "2026-08-27", "01": "2026-08-28", "02": "2026-08-28", "03": "2026-09-04", "04": "2026-09-11",
     "05": "2026-09-18", "06": "2026-09-25", "07": "2026-10-02", "08": null,
   });
@@ -288,7 +308,7 @@ export function createSeed(): RqState {
     },
     noCommitments: true,
   };
-  const b2 = buildFromTemplate(p2, users, { "00": "2026-09-22", "01": "2026-10-02", "02": "2026-10-09", "03": "2026-10-20", "04": "2026-10-27", "05": "2026-11-05", "06": "2026-11-13", "07": "2026-11-20", "08": "2026-12-20" });
+  const b2 = build(p2, { "00": "2026-09-22", "01": "2026-10-02", "02": "2026-10-09", "03": "2026-10-20", "04": "2026-10-27", "05": "2026-11-05", "06": "2026-11-13", "07": "2026-11-20", "08": "2026-12-20" });
   {
     const today = localToday();
     const back = (n: number) => { let d = today; for (let k = 0; k < n; k++) d = prevBusinessDay(d); return d; };
@@ -334,7 +354,7 @@ export function createSeed(): RqState {
     integrations: { chat: { provider: "teams", channelId: null, active: false, since: null }, email: { active: false, extraDomains: [], since: null } },
     noCommitments: false,
   };
-  const b3 = buildFromTemplate(p3, users, { "00": "2026-09-03", "01": "2026-09-08", "02": "2026-09-15" });
+  const b3 = build(p3, { "00": "2026-09-03", "01": "2026-09-08", "02": "2026-09-15" });
   b3.phases.forEach((ph) => {
     const ps = b3.steps.filter((x) => x.phaseId === ph.id);
     if (["00", "01"].includes(ph.code)) {
@@ -379,7 +399,7 @@ export function createSeed(): RqState {
     integrations: { chat: { provider: "teams", channelId: null, active: false, since: null }, email: { active: false, extraDomains: [], since: null } },
     noCommitments: false,
   };
-  const b4 = buildFromTemplate(p4, users);
+  const b4 = build(p4);
   const p4Plan = projectPlan(b4.phases, b4.steps, p4.startDate);
   b4.phases.forEach((ph) => {
     const d = p4Plan.phases[ph.id];
@@ -403,7 +423,7 @@ export function createSeed(): RqState {
     integrations: { chat: { provider: "teams", channelId: null, active: false, since: null }, email: { active: false, extraDomains: [], since: null } },
     noCommitments: true,
   };
-  const b5 = buildFromTemplate(p5, users, { "00": kickoffAgoDate });
+  const b5 = build(p5, { "00": kickoffAgoDate });
   b5.phases.forEach((ph) => {
     const ps = b5.steps.filter((x) => x.phaseId === ph.id);
     if (ph.code === "00") {
@@ -450,7 +470,7 @@ export function createSeed(): RqState {
     integrations: { chat: { provider: "teams", channelId: null, active: false, since: null }, email: { active: false, extraDomains: [], since: null } },
     noCommitments: true,
   };
-  const b6 = buildFromTemplate(p6, users, {
+  const b6 = build(p6, {
     "00": p6StartDate, "01": addBusinessDays(p6StartDate, 5), "02": addBusinessDays(p6StartDate, 12), "03": addBusinessDays(p6StartDate, 22), "04": addBusinessDays(p6StartDate, 32),
   });
   const p6OutOfScopeKeys = new Set(["reqdoc", "vpn_req", "vpn_info", "servers", "devops_handover", "model_install"]);

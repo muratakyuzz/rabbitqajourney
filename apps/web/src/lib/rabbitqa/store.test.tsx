@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { toast } from "sonner";
 import { RqProvider, useRq } from "./store";
-import { manualStatusError } from "./completion";
-import { createSeed, STATE_KEY } from "./seed";
-import type { StepCompletion, StepStatus } from "./types";
+import { manualStatusError } from "@rabbitqa/shared/domain/completion";
+import { createSeed, STATE_KEY } from "@rabbitqa/shared/domain/seed";
+import type { StepCompletion, StepStatus } from "@rabbitqa/shared/domain/types";
 import { loginApi } from "@/lib/auth-api";
 
 vi.mock("@/lib/auth-context", () => ({
@@ -626,7 +626,7 @@ describe("flowMessages — Tamamlandı toast (AC10)", () => {
 
 describe("state v11 + login (AC11, AC17)", () => {
   it("createSeed version is 11", async () => {
-    const { createSeed } = await import("./seed");
+    const { createSeed } = await import("@rabbitqa/shared/domain/seed");
     expect(createSeed().version).toBe(11);
   });
 

@@ -17,8 +17,8 @@ import { personName, useRq } from "@/lib/rabbitqa/store";
 import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
 import {
   ACTION_STATUS_LABEL, BALL_LABEL, HEALTH_LABEL, INSIGHT_KIND_LABEL, INSIGHT_SOURCE_LABEL, INSIGHT_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, fmtDate, fmtDateTime,
-} from "@/lib/rabbitqa/labels";
-import type { AiInsight, InsightKind, InsightProposedAny, RqState } from "@/lib/rabbitqa/types";
+} from "@rabbitqa/shared/domain/labels";
+import type { AiInsight, InsightKind, InsightProposedAny, RqState } from "@rabbitqa/shared/domain/types";
 
 const FIELD_LABEL: Record<string, string> = { status: "Durum", due: "Termin", health: "Sağlık", goLiveDate: "Go-Live", planEnd: "Plan bitiş", ownerId: "Sahip", priority: "Öncelik" };
 

@@ -1,8 +1,8 @@
 import type { ComponentType } from "react";
 import type { AuthUser } from "@/lib/auth-api";
-import { latestHeldMeeting, stepConditionResult } from "@/lib/rabbitqa/completion";
+import { latestHeldMeeting, stepConditionResult } from "@rabbitqa/shared/domain/completion";
 import { canSeeCredentials } from "@/lib/rabbitqa/perm";
-import type { MeetingType, Phase, Project, RqState, Step } from "@/lib/rabbitqa/types";
+import type { MeetingType, Phase, Project, RqState, Step } from "@rabbitqa/shared/domain/types";
 import { HandoverWorkspace } from "./HandoverWorkspace";
 import { DiscoveryWorkspace } from "./DiscoveryWorkspace";
 import { AccessWorkspace } from "./AccessWorkspace";

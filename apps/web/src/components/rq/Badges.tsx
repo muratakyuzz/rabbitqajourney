@@ -1,7 +1,7 @@
 import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ActionStatus, Health, PhaseStatus, Priority, StepStatus } from "@/lib/rabbitqa/types";
-import { ACTION_STATUS_LABEL, HEALTH_LABEL, PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL } from "@/lib/rabbitqa/labels";
+import type { ActionStatus, Health, PhaseStatus, Priority, StepStatus } from "@rabbitqa/shared/domain/types";
+import { ACTION_STATUS_LABEL, HEALTH_LABEL, PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL } from "@rabbitqa/shared/domain/labels";
 
 type Tone = "success" | "warning" | "danger" | "info" | "muted";
 const TONE: Record<Tone, string> = {

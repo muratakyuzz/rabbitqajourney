@@ -6,8 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useRq } from "@/lib/rabbitqa/store";
-import { todayISO } from "@/lib/rabbitqa/labels";
-import type { AlertView } from "@/lib/rabbitqa/alerts";
+import { todayISO } from "@rabbitqa/shared/domain/labels";
+import type { AlertView } from "@rabbitqa/shared/domain/alerts";
 
 /** Uyarı erteleme / kapatma — gerekçe zorunlu. */
 export function AlertActionDialog({ alert, mode, onClose }: { alert: AlertView; mode: "snooze" | "close"; onClose: () => void }) {

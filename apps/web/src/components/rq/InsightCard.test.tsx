@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { RqProvider } from "@/lib/rabbitqa/store";
-import { createSeed, STATE_KEY } from "@/lib/rabbitqa/seed";
+import { createSeed, STATE_KEY } from "@rabbitqa/shared/domain/seed";
 import { InsightCard } from "@/components/rq/InsightCard";
-import type { AiInsight } from "@/lib/rabbitqa/types";
+import type { AiInsight } from "@rabbitqa/shared/domain/types";
 import type { AuthUser } from "@/lib/auth-api";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));

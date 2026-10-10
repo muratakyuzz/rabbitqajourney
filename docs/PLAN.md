@@ -104,3 +104,5 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 
 ## Kararlar
 - 2026-10-10: Süreç sadeleşti (doğrudan main, gate yok). Faz 1 kapsamı yukarıdaki dört ekran. Audit ve roller Faz 2. pg-mem + seed, kalıcılık yok.
+- 2026-10-10 (M0): `seed.ts` tek başına taşınamadı (`completion`, `flow`, `alerts`, `reports`, `business-days`, `labels`, `types`'a bağlı). Bağımlılık kümesinin tamamı (+ `rules`) `packages/shared/src/domain/`'e taşındı, `@rabbitqa/shared/domain/<ad>` olarak import edilir. M2'nin "iş kuralları taşınır" maddesi böylece M0'da bitti. Testler web'de kaldı.
+- 2026-10-10 (M0): Seed id'leri deterministik: aşama/adım `ph_<proje>_NN` / `st_<proje>_NN`, seed sırasında kuralların ürettiği id'ler `<önek>_seedNNNN`. Çalışma anında yeni kayıtlar rastgele `uid()` almaya devam eder.

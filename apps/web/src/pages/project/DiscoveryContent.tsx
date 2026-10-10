@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useRq } from "@/lib/rabbitqa/store";
 import { canManageProject } from "@/lib/rabbitqa/perm";
 import { KpiSection, TeamRow } from "./Phase2Tabs";
-import type { Project } from "@/lib/rabbitqa/types";
+import type { Project } from "@rabbitqa/shared/domain/types";
 
 /** Keşif formu + Takımlar + KPI; sekmede ve 02 çalışma alanı panelinde aynı bileşen (AC1). */
 export function DiscoveryContent({ project, readOnly, layout }: { project: Project; readOnly: boolean; layout: "tab" | "panel" }) {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { stepClickTarget, workspaceAvailable } from "./index";
 import { highlightField } from "./highlight";
-import { createSeed } from "@/lib/rabbitqa/seed";
+import { createSeed } from "@rabbitqa/shared/domain/seed";
 import type { AuthUser } from "@/lib/auth-api";
 
 function step(s: ReturnType<typeof createSeed>, pid: string, key: string) {

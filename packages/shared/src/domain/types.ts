@@ -34,7 +34,7 @@ export type {
   InsightStatus,
   InsightSource,
   InsightProposedAny,
-} from "@rabbitqa/shared";
+} from "../index";
 import type {
   Role,
   Ball,
@@ -69,7 +69,7 @@ import type {
   InsightKind,
   InsightStatus,
   InsightSource,
-} from "@rabbitqa/shared";
+} from "../index";
 
 export interface User {
   id: string;

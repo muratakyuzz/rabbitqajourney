@@ -17,7 +17,7 @@ import { useAuth } from "@/lib/auth-context";
 import { activePhase, activePhaseCount, personName, projectProgress, useAlertViews, useRq } from "@/lib/rabbitqa/store";
 import { visibleProjects, canAssignCsm, canCreateProject, isCsmUser, selectableCsms } from "@/lib/rabbitqa/perm";
 import { Pill } from "@/components/rq/Badges";
-import { fmtDate, HEALTH_LABEL, todayISO } from "@/lib/rabbitqa/labels";
+import { fmtDate, HEALTH_LABEL, todayISO } from "@rabbitqa/shared/domain/labels";
 import { toast } from "sonner";
 
 export default function Projects() {

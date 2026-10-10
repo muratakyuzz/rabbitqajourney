@@ -9,8 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState } from "@/components/EmptyState";
 import { Pill } from "@/components/rq/Badges";
 import { useRq } from "@/lib/rabbitqa/store";
-import { ROLE_LABEL } from "@/lib/rabbitqa/labels";
-import type { Role } from "@/lib/rabbitqa/types";
+import { ROLE_LABEL } from "@rabbitqa/shared/domain/labels";
+import type { Role } from "@rabbitqa/shared/domain/types";
 
 export function UsersAdmin() {
   const { state, addUser, updateUser } = useRq();

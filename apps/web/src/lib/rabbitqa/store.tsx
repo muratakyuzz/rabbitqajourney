@@ -1,22 +1,22 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { projectPlan } from "./flow";
-import { allAlerts, computeAlerts, type AlertView } from "./alerts";
-import { setActiveHolidays } from "./business-days";
-import { ADAPTATION_ITEM_LABEL, fmtDate } from "./labels";
+import { projectPlan } from "@rabbitqa/shared/domain/flow";
+import { allAlerts, computeAlerts, type AlertView } from "@rabbitqa/shared/domain/alerts";
+import { setActiveHolidays } from "@rabbitqa/shared/domain/business-days";
+import { ADAPTATION_ITEM_LABEL, fmtDate } from "@rabbitqa/shared/domain/labels";
 import { useAuth } from "@/lib/auth-context";
-import { DEFAULT_PROJECT_INTEGRATIONS, STATE_KEY, STATE_VERSION, buildFromTemplate, createSeed, uid } from "./seed";
+import { DEFAULT_PROJECT_INTEGRATIONS, STATE_KEY, STATE_VERSION, buildFromTemplate, createSeed, uid } from "@rabbitqa/shared/domain/seed";
 import { analyzeText, type IncomingMeta } from "./ai-mock";
 import { matchEmail } from "./email-match";
-import { isAutoStep, manualStatusError, settleAll, stepLockError } from "./completion";
+import { isAutoStep, manualStatusError, settleAll, stepLockError } from "@rabbitqa/shared/domain/completion";
 import type {
   AiInsight, ChatChannel, InsightProposedAny, InsightSource, IntegrationConfig, ProjectIntegrations, UnmatchedEmail,
   CustomerReport, User, Action, Adaptation, AdaptationItem, Alert, AuditEntry, Commitment, Contact, Credential, DocumentRec, Kpi, Meeting, Phase, Project, RiskDecision, RqState, Step, SupportTicket,
-} from "./types";
-import { todayISO } from "./labels";
-import { buildReportSnapshot, defaultNextWeek } from "./reports";
-import { weekStartOf } from "./alerts";
-import { applyInstallType, applyLlmChoice, applyMeetingHeldRules, ensureReviewAction, installChoiceError, setStepByKey } from "./rules";
+} from "@rabbitqa/shared/domain/types";
+import { todayISO } from "@rabbitqa/shared/domain/labels";
+import { buildReportSnapshot, defaultNextWeek } from "@rabbitqa/shared/domain/reports";
+import { weekStartOf } from "@rabbitqa/shared/domain/alerts";
+import { applyInstallType, applyLlmChoice, applyMeetingHeldRules, ensureReviewAction, installChoiceError, setStepByKey } from "@rabbitqa/shared/domain/rules";
 
 function load(): RqState {
   try {

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Navigate } from "react-router";
 import { AlertTriangle, ArrowDown, ArrowUp, Info, Plus, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { projectPlan } from "@/lib/rabbitqa/flow";
+import { projectPlan } from "@rabbitqa/shared/domain/flow";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,15 +14,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useAuth } from "@/lib/auth-context";
 import { useRq } from "@/lib/rabbitqa/store";
-import { uid } from "@/lib/rabbitqa/seed";
-import { conditionFor } from "@/lib/rabbitqa/completion";
+import { uid } from "@rabbitqa/shared/domain/seed";
+import { conditionFor } from "@rabbitqa/shared/domain/completion";
 import { Pill } from "@/components/rq/Badges";
-import { BALL_LABEL, COMPLETION_LABEL, MEETING_TYPE_LABEL, QUESTION_TYPE_LABEL, fmtDateTime } from "@/lib/rabbitqa/labels";
+import { BALL_LABEL, COMPLETION_LABEL, MEETING_TYPE_LABEL, QUESTION_TYPE_LABEL, fmtDateTime } from "@rabbitqa/shared/domain/labels";
 import { IntegrationsAdmin } from "./admin/IntegrationsAdmin";
 import { AlertsAdmin, SalespeopleAdmin } from "./admin/AlertsAdmin";
 import { UsersAdmin } from "./admin/UsersAdmin";
 import { canAccessAdmin } from "@/lib/rabbitqa/perm";
-import type { Ball, Dependency, PhaseTpl, StepTpl } from "@/lib/rabbitqa/types";
+import type { Ball, Dependency, PhaseTpl, StepTpl } from "@rabbitqa/shared/domain/types";
 
 function completionText(s: StepTpl) {
   const c = s.completion ?? "manual";

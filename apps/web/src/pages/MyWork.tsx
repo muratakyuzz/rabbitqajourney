@@ -1,20 +1,20 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { previousStep } from "@/lib/rabbitqa/flow";
-import { businessDaysBetween } from "@/lib/rabbitqa/business-days";
+import { previousStep } from "@rabbitqa/shared/domain/flow";
+import { businessDaysBetween } from "@rabbitqa/shared/domain/business-days";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
 import { Pill, StepStatusBadge, ActionStatusBadge } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { useAlertViews, useRq } from "@/lib/rabbitqa/store";
-import { ALERT_LEVEL_LABEL } from "@/lib/rabbitqa/labels";
+import { ALERT_LEVEL_LABEL } from "@rabbitqa/shared/domain/labels";
 import { visibleProjects } from "@/lib/rabbitqa/perm";
 import { InsightCard } from "@/components/rq/InsightCard";
 import { visibleInsights } from "@/lib/rabbitqa/perm";
 import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
-import { BALL_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
+import { BALL_LABEL, fmtDate, todayISO } from "@rabbitqa/shared/domain/labels";
 
 interface Item { id: string; kind: "Adım" | "Aksiyon"; title: string; due: string | null; projectId: string; badge: React.ReactNode; ball: string; isNew?: boolean }
 

@@ -7,9 +7,9 @@ import { Progress } from "@/components/ui/progress";
 import { EmptyState } from "@/components/EmptyState";
 import { StepStatusBadge } from "@/components/rq/Badges";
 import { useRq } from "@/lib/rabbitqa/store";
-import { adaptationCondition } from "@/lib/rabbitqa/completion";
-import { ADAPTATION_ITEM_LABEL, fmtDate } from "@/lib/rabbitqa/labels";
-import type { AdaptationItem } from "@/lib/rabbitqa/types";
+import { adaptationCondition } from "@rabbitqa/shared/domain/completion";
+import { ADAPTATION_ITEM_LABEL, fmtDate } from "@rabbitqa/shared/domain/labels";
+import type { AdaptationItem } from "@rabbitqa/shared/domain/types";
 import { MeetingDialog } from "../MeetingDialog";
 import type { WorkspaceProps } from "./index";
 

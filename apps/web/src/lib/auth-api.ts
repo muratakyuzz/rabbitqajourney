@@ -1,5 +1,5 @@
-import { SEED_USERS, STATE_KEY, STATE_VERSION } from "@/lib/rabbitqa/seed";
-import type { Role, User } from "@/lib/rabbitqa/types";
+import { SEED_USERS, STATE_KEY, STATE_VERSION } from "@rabbitqa/shared/domain/seed";
+import type { Role, User } from "@rabbitqa/shared/domain/types";
 
 export type AppRole = Role;
 

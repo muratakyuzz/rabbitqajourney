@@ -16,7 +16,7 @@ Roller: `csm`, `devops`, `care`, `manager`, `admin` (enum değerleri mockup'taki
 **Yaklaşım:** FE mock veriyle tam mockup olarak tamamlandı. BE mockup'ın sözleşmesine (`docs/API_CONTRACT.md`) göre yazılır; ekranlar ekran ekran API'ye bağlanır (Faz 1 kapsamı ve store köprüsü: `docs/PLAN.md`). Mevcut durum: `docs/AUDIT.md`.
 
 ### Mockup kuralları (henüz API'ye bağlanmamış ekranlar)
-- Bu ekranların verisi `apps/web/src/lib/rabbitqa/` store'unda (`RqProvider`/`useRq`) ve seed'de.
+- Bu ekranların verisi `apps/web/src/lib/rabbitqa/` store'unda (`RqProvider`/`useRq`); seed ve saf iş mantığı `packages/shared/src/domain/` (`@rabbitqa/shared/domain/<ad>`).
 - Her veri değişikliği store fonksiyonundan geçer ve audit yazar; bileşende state doğrudan değişmez.
 - Gerekçe zorunlu: kurulum tipi/LLM değişikliği, tarih ve durum değişikliği, uyarı kapatma/erteleme.
 - Enum değerleri değiştirilmez/yeniden adlandırılmaz; yalnızca yeni değer eklenir. Model değişirse state sürümü +1 ve store KEY aynı sürüme.

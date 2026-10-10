@@ -17,8 +17,8 @@ import { useRq } from "@/lib/rabbitqa/store";
 import { canManageProject, canSeeCredentials } from "@/lib/rabbitqa/perm";
 import { KpiChart } from "@/components/rq/KpiChart";
 import { VisibleIcon } from "@/components/rq/VisibleIcon";
-import { DOC_TYPE_LABEL, INSTALL_LABEL, LLM_LABEL, MEETING_TYPE_LABEL, fmtDate, todayISO } from "@/lib/rabbitqa/labels";
-import type { DocType, Project } from "@/lib/rabbitqa/types";
+import { DOC_TYPE_LABEL, INSTALL_LABEL, LLM_LABEL, MEETING_TYPE_LABEL, fmtDate, todayISO } from "@rabbitqa/shared/domain/labels";
+import type { DocType, Project } from "@rabbitqa/shared/domain/types";
 
 /* ── KPI ────────────────────────────────────────────────── */
 export function KpiSection({ project }: { project: Project }) {

@@ -20,8 +20,8 @@ import { InsightCard } from "@/components/rq/InsightCard";
 import { useAuth } from "@/lib/auth-context";
 import { canSeeSecrets } from "@/lib/rabbitqa/perm";
 import { useRq } from "@/lib/rabbitqa/store";
-import { CONN_STATUS_LABEL, CONTACT_ROLE_LABEL, INSIGHT_KIND_LABEL, fmtDateTime } from "@/lib/rabbitqa/labels";
-import type { AiInsight, ChatChannel, ConnStatus, ContactRole, InsightKind, IntegrationConfig } from "@/lib/rabbitqa/types";
+import { CONN_STATUS_LABEL, CONTACT_ROLE_LABEL, INSIGHT_KIND_LABEL, fmtDateTime } from "@rabbitqa/shared/domain/labels";
+import type { AiInsight, ChatChannel, ConnStatus, ContactRole, InsightKind, IntegrationConfig } from "@rabbitqa/shared/domain/types";
 
 const connTone = { connected: "success", disconnected: "muted", error: "danger" } as const;
 const StatusPill = ({ s }: { s: ConnStatus }) => <Pill tone={connTone[s]}>{CONN_STATUS_LABEL[s]}</Pill>;

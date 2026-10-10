@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Pill } from "@/components/rq/Badges";
 import { personName, useRq } from "@/lib/rabbitqa/store";
-import { fmtDate } from "@/lib/rabbitqa/labels";
+import { fmtDate } from "@rabbitqa/shared/domain/labels";
 import { MeetingDialog } from "../MeetingDialog";
 import type { WorkspaceProps } from "./index";
 

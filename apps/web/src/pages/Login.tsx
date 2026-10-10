@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router";
 import { useAuth } from "@/lib/auth-context";
 import { demoUsers } from "@/lib/auth-api";
-import { ROLE_LABEL } from "@/lib/rabbitqa/labels";
+import { ROLE_LABEL } from "@rabbitqa/shared/domain/labels";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";

@@ -16,10 +16,10 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/lib/auth-context";
 import { useRq } from "@/lib/rabbitqa/store";
-import { ROLE_SHORT } from "@/lib/rabbitqa/labels";
+import { ROLE_SHORT } from "@rabbitqa/shared/domain/labels";
 import { canAccessAdmin, canSeeManagementReport, visibleInsights, visibleProjects } from "@/lib/rabbitqa/perm";
 import { useAlertViews } from "@/lib/rabbitqa/store";
-import { ALERT_LEVEL_LABEL } from "@/lib/rabbitqa/labels";
+import { ALERT_LEVEL_LABEL } from "@rabbitqa/shared/domain/labels";
 import type { AuthUser } from "@/lib/auth-api";
 import { effectiveStatus } from "@/lib/rabbitqa/ai-mock";
 import { toast } from "sonner";
