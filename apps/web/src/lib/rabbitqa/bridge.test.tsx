@@ -3,12 +3,13 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
 import { apiError, fakeApi, json } from "@/test/fake-api";
 import { STATE_KEY, createSeed } from "@rabbitqa/shared/domain/seed";
-import { BRIDGE_DEBOUNCE_MS, RqProvider, useRq } from "./store";
+import { bridgeRetry } from "./server-sync";
+import { BRIDGE_DEBOUNCE_MS, BRIDGE_DOWN_TOAST_ID, RqProvider, useRq } from "./store";
 
 vi.mock("@/lib/auth-context", () => ({
   useAuth: () => ({ user: { id: "u_manager", role: "manager", name: "Örnek Manager", email: "manager@virgosol.com" } }),
 }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), dismiss: vi.fn() } }));
 
 const pause = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)));
 const STEP = "st_garanti_18"; // manual, pending in p_garanti
@@ -91,13 +92,104 @@ describe("API bridge", () => {
     const serverBall = api.server.steps.find((s) => s.id === STEP)!.ball;
     act(() => { result.current.updateStep(STEP, { ball: serverBall === "care" ? "devops" : "care" }); });
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Değişiklik sunucuya yazılamadı: Çakışma"));
+    const title = api.server.steps.find((s) => s.id === STEP)!.title;
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      `Sunucu değişikliği reddetti ("${title}" adımı): Çakışma Bu projenin aşama, adım ve aksiyonları sunucudaki haline döndü.`,
+    ));
     await waitFor(() => expect(api.callsTo("GET", /^\/projects\/p_garanti\/phases$/)).toHaveLength(2));
     await waitFor(() => expect(api.callsTo("GET", /^\/projects\/p_garanti\/actions$/)).toHaveLength(2)); // the reload covers actions
     await waitFor(() => expect(api.callsTo("GET", /^\/projects\/p_garanti\/meetings$/)).toHaveLength(2)); // … and meetings
     await waitFor(() => expect(result.current.state.steps.find((s) => s.id === STEP)?.ball).toBe(serverBall));
     await pause(BRIDGE_DEBOUNCE_MS + 100);
     expect(api.callsTo("POST", /steps\/sync$/)).toHaveLength(1);
+  });
+
+  describe("network errors and 5xx (review O2)", () => {
+    const defaults = [...bridgeRetry.delaysMs];
+    beforeEach(() => { bridgeRetry.delaysMs = [20, 20, 20]; vi.mocked(toast.dismiss).mockClear(); });
+    afterEach(() => { bridgeRetry.delaysMs = defaults; });
+
+    it("waits 1 s, 3 s and 10 s between attempts by default", () => {
+      expect(defaults).toEqual([1000, 3000, 10000]);
+    });
+
+    it("the same diff is retried; after the last attempt a persistent toast, the bridge pauses, the next successful response resumes it", async () => {
+      let down = true;
+      const api = fakeApi({
+        "POST /projects/p_garanti/steps/sync": (c) => {
+          if (down) throw new TypeError("Failed to fetch");
+          const b = c.body as { steps: unknown[]; actions: unknown[] };
+          return json(200, { phases: [], steps: b.steps, actions: b.actions });
+        },
+      });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { result } = await setup(api);
+      act(() => { result.current.updateStep(STEP, { ball: "care" }); });
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Değişiklikler sunucuya yazılamıyor — sayfayı yenileyin", { id: BRIDGE_DOWN_TOAST_ID, duration: Infinity }));
+      const sent = api.callsTo("POST", /p_garanti\/steps\/sync$/);
+      expect(sent).toHaveLength(4); // first try + 3 retries
+      expect(new Set(sent.map((c) => JSON.stringify(c.body))).size).toBe(1); // the same diff each time
+      expect(api.callsTo("GET", /^\/projects\/p_garanti\/phases$/)).toHaveLength(1); // no reload: the change is kept
+
+      // paused: another change is not sent
+      act(() => { result.current.updateStep(STEP, { ownerId: "u_deniz" }); });
+      await pause(BRIDGE_DEBOUNCE_MS + 150);
+      expect(api.callsTo("POST", /p_garanti\/steps\/sync$/)).toHaveLength(4);
+      expect(result.current.state.steps.find((s) => s.id === STEP)).toMatchObject({ ball: "care", ownerId: "u_deniz" });
+
+      // the API is back; any successful response (here: a screen write's effects) resumes the bridge
+      down = false;
+      act(() => { result.current.applyServerEffects({ phases: [], steps: [], actions: [] }); });
+      expect(toast.dismiss).toHaveBeenCalledWith(BRIDGE_DOWN_TOAST_ID);
+      await waitFor(() => expect(api.callsTo("POST", /p_garanti\/steps\/sync$/)).toHaveLength(5));
+      const last = api.callsTo("POST", /p_garanti\/steps\/sync$/)[4].body as { steps: { id: string; ball: string; ownerId: string }[] };
+      expect(last.steps.find((s) => s.id === STEP)).toMatchObject({ ball: "care", ownerId: "u_deniz" }); // both changes go out
+      await pause(BRIDGE_DEBOUNCE_MS + 100);
+      expect(api.callsTo("POST", /p_garanti\/steps\/sync$/)).toHaveLength(5);
+      warn.mockRestore();
+    });
+
+    it("a 5xx that clears up on a retry: sent once more, no persistent toast", async () => {
+      let calls = 0;
+      const api = fakeApi({
+        "POST /projects/p_garanti/steps/sync": (c) => {
+          calls++;
+          if (calls === 1) return apiError(500, "INTERNAL", "Beklenmeyen bir hata oluştu.");
+          const b = c.body as { steps: unknown[]; actions: unknown[] };
+          return json(200, { phases: [], steps: b.steps, actions: b.actions });
+        },
+      });
+      const { result } = await setup(api);
+      act(() => { result.current.updateStep(STEP, { ball: "care" }); });
+      await waitFor(() => expect(api.callsTo("POST", /p_garanti\/steps\/sync$/)).toHaveLength(2));
+      await pause(BRIDGE_DEBOUNCE_MS + 100);
+      expect(api.callsTo("POST", /p_garanti\/steps\/sync$/)).toHaveLength(2);
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it("a project that could not be loaded is hydrated after the next successful response", async () => {
+      let down = true;
+      const real = fakeApi();
+      const api = fakeApi({ "GET /projects/p_garanti/(phases|actions|meetings)": (c) => {
+        if (down) throw new TypeError("Failed to fetch");
+        return real.fn(`/api${c.path}`, { method: "GET" });
+      } });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { result } = await setup(api);
+      act(() => { result.current.updateStep(STEP, { ball: "care" }); });
+      await pause(BRIDGE_DEBOUNCE_MS + 150);
+      expect(api.callsTo("POST", /p_garanti\/steps\/sync$/)).toEqual([]); // not bridged
+
+      down = false;
+      act(() => { result.current.applyServerEffects({ phases: [], steps: [], actions: [] }); });
+      await waitFor(() => expect(api.callsTo("GET", /^\/projects\/p_garanti\/phases$/)).toHaveLength(2));
+      // hydration: server wins, then the project is bridged again
+      await waitFor(() => expect(result.current.state.steps.find((s) => s.id === STEP)?.ball).toBe(api.server.steps.find((s) => s.id === STEP)!.ball));
+      act(() => { result.current.updateStep(STEP, { ball: "devops" }); });
+      await waitFor(() => expect(api.callsTo("POST", /p_garanti\/steps\/sync$/)).toHaveLength(1));
+      warn.mockRestore();
+    });
   });
 
   it("hydration: the project's actions become the server's (server wins)", async () => {

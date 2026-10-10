@@ -8,6 +8,12 @@ import type { Action, Meeting, Project, RqState, Step } from "@rabbitqa/shared/d
 // mockup screens changed since then (POST steps/sync). Meetings are not bridged: the screens write them through
 // the API directly. Everything the server returns is merged back here.
 
+/**
+ * A send that fails on the network or with a 5xx is retried after these pauses (review O2); tests shorten them.
+ * After the last one the project's bridge is paused until the next successful API response or hydration.
+ */
+export const bridgeRetry = { delaysMs: [1000, 3000, 10000] };
+
 /** Stable JSON: sorted keys, undefined dropped — so field order and missing optionals do not count as changes. */
 export function canon(v: unknown): string {
   return JSON.stringify(v, (_k, x) =>
@@ -110,4 +116,38 @@ export function replaceProjectData(s: RqState, projectId: string, data: PhasesWi
     actions: [...s.actions.filter((a) => a.projectId !== projectId), ...data.actions],
     meetings: [...s.meetings.filter((m) => m.projectId !== projectId), ...data.meetings],
   };
+}
+
+/**
+ * Remembers the view entries a send is about to overwrite (the send records its diff optimistically).
+ * The returned function puts them back, so a send that never reached the server is diffed and sent again.
+ */
+export function snapshotView(view: ServerView, diff: { steps: Step[]; actions: Action[] }): () => void {
+  const saved: [Map<string, string>, string, string | undefined][] = [
+    ...diff.steps.map((x): [Map<string, string>, string, string | undefined] => [view.steps, x.id, view.steps.get(x.id)]),
+    ...diff.actions.map((a): [Map<string, string>, string, string | undefined] =>
+      isRuleAction(a) ? [view.rule, a.ruleKey, view.rule.get(a.ruleKey)] : [view.actions, a.id, view.actions.get(a.id)]),
+  ];
+  return () => {
+    for (const [map, key, value] of saved) {
+      if (value === undefined) map.delete(key);
+      else map.set(key, value);
+    }
+  };
+}
+
+/**
+ * What a rejected send was, for the toast: the record the error field points at (`steps.N…`, `actions.N…`),
+ * else up to three titles of what was sent.
+ */
+export function describeSent(diff: { steps: Step[]; actions: Action[] }, field?: string): string {
+  const one = (kind: "steps" | "actions", i: number) => {
+    const x = diff[kind][i];
+    return x ? `"${x.title}" ${kind === "steps" ? "adımı" : "aksiyonu"}` : null;
+  };
+  const m = field?.match(/^(steps|actions)\.(\d+)/);
+  const pointed = m ? one(m[1] as "steps" | "actions", Number(m[2])) : null;
+  if (pointed) return pointed;
+  const all = [...diff.steps.map((_, i) => one("steps", i)!), ...diff.actions.map((_, i) => one("actions", i)!)];
+  return all.length > 3 ? `${all.slice(0, 3).join(", ")} ve ${all.length - 3} kayıt daha` : all.join(", ");
 }

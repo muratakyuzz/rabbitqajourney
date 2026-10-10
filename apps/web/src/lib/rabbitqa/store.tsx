@@ -23,10 +23,21 @@ import { ApiError, apiErrorMessage } from "@/lib/api";
 import { completePhase, getPhases, patchPhase, syncProject } from "@/lib/api/projects";
 import { getActions } from "@/lib/api/actions";
 import { getMeetings } from "@/lib/api/meetings";
-import { diffProject, emptyView, mergeEffects, projectsIn, recordActions, recordSteps, replaceProjectData, type ServerView, canon } from "./server-sync";
+import {
+  bridgeRetry, canon, describeSent, diffProject, emptyView, mergeEffects, projectsIn, recordActions, recordSteps, replaceProjectData, snapshotView,
+  type ServerView,
+} from "./server-sync";
 
 /** Debounce of the client-rule bridge (docs/PLAN.md M2b). */
 export const BRIDGE_DEBOUNCE_MS = 300;
+
+/** One persistent toast for "the bridge cannot write", whichever projects are paused. */
+export const BRIDGE_DOWN_TOAST_ID = "bridge-down";
+const BRIDGE_DOWN_MESSAGE = "Değişiklikler sunucuya yazılamıyor — sayfayı yenileyin";
+
+/** Network failure or a server error: worth trying again. 4xx and malformed responses are not. */
+const isTransient = (e: unknown) => e instanceof ApiError && (e.code === "NETWORK" || e.status >= 500);
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Active template version from the API (not persisted); null while unknown or when the API is unreachable. */
 export type TemplateMeta = Omit<TemplateVersion, "phases">;
@@ -175,8 +186,39 @@ export function RqProvider({ children }: { children: ReactNode }) {
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const queues = useRef(new Map<string, Promise<void>>());
   const lastSent = useRef(new Map<string, string>());
+  /**
+   * Projects whose bridge is paused (review O2). "resend": sends kept failing, the view was rolled back so the
+   * diff goes out again on resume. "reload": the project could not be loaded, resume hydrates it.
+   */
+  const paused = useRef(new Map<string, "resend" | "reload">());
+  /** Set once hydrate exists (it is declared below); resume needs it for "reload". */
+  const hydrateRef = useRef<(pid: string) => Promise<unknown>>(async () => {});
+  /** The persistent "cannot write" toast is up (dismissed on resume). */
+  const downToast = useRef(false);
+  const showDownToast = useCallback(() => {
+    downToast.current = true;
+    toast.error(BRIDGE_DOWN_MESSAGE, { id: BRIDGE_DOWN_TOAST_ID, duration: Infinity });
+  }, []);
+  const hideDownToast = useCallback(() => {
+    if (!downToast.current) return;
+    downToast.current = false;
+    toast.dismiss(BRIDGE_DOWN_TOAST_ID);
+  }, []);
+  /** Bumped on resume so the diff effect runs again for projects that were skipped while paused. */
+  const [resumed, setResumed] = useState(0);
+
+  /** The API answered: every paused project bridges again (resend → diff effect, reload → hydrate). */
+  const resumeBridge = useCallback(() => {
+    if (!paused.current.size) return;
+    const reload = [...paused.current].filter(([, mode]) => mode === "reload").map(([pid]) => pid);
+    paused.current.clear();
+    hideDownToast();
+    for (const pid of reload) void hydrateRef.current(pid);
+    setResumed((n) => n + 1);
+  }, [hideDownToast]);
 
   const applyServerEffects = useCallback((e: RuleEffects) => {
+    resumeBridge();
     for (const pid of projectsIn(e)) {
       const view = views.current.get(pid) ?? (e.project?.id === pid ? emptyView() : null);
       if (!view) continue;
@@ -185,7 +227,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
       views.current.set(pid, view);
     }
     setState((s) => mergeEffects(s, e));
-  }, [setState]);
+  }, [setState, resumeBridge]);
 
   /** Loads a project's phases, steps, actions and meetings from the API (server wins) and starts bridging it. */
   const hydrate = useCallback(async (pid: string): Promise<"ok" | "missing" | "invalid" | "offline"> => {
@@ -198,6 +240,9 @@ export function RqProvider({ children }: { children: ReactNode }) {
       views.current.set(pid, view);
       lastSent.current.delete(pid);
       setState((s) => replaceProjectData(s, pid, { ...plan, actions, meetings }));
+      // this project bridges again; the persistent toast goes once no project is waiting to resend
+      paused.current.delete(pid);
+      if (![...paused.current.values()].includes("resend")) hideDownToast();
       return "ok";
     } catch (e) {
       views.current.delete(pid);
@@ -213,9 +258,12 @@ export function RqProvider({ children }: { children: ReactNode }) {
         toast.error(`${name}: sunucudan gelen veri okunamadı (${e.field ?? "gövde"}). Bu projedeki değişiklikler sunucuya yazılmıyor.`);
         return "invalid";
       }
+      // unreachable: bridged again (hydrated) after the next successful API response
+      paused.current.set(pid, "reload");
       return "offline";
     }
-  }, [setState]);
+  }, [setState, hideDownToast]);
+  useEffect(() => { hydrateRef.current = hydrate; }, [hydrate]);
 
   const hydrateAll = useCallback(async (ids: string[]) => {
     const results = await Promise.all(ids.map(hydrate));
@@ -226,11 +274,15 @@ export function RqProvider({ children }: { children: ReactNode }) {
     void hydrateAll(stateRef.current.projects.map((p) => p.id));
   }, [hydrateAll]);
 
-  /** Sends the project's diff (queued per project). "unbridged": the project has no server view (offline, local-only). */
+  /**
+   * Sends the project's diff (queued per project). Network/5xx: retried (bridgeRetry), then the project is paused
+   * with a persistent toast. 4xx: toast naming what was rejected, then the project is reloaded (server wins).
+   * "unbridged": the project has no server view (offline, local-only) or is paused.
+   */
   const flush = useCallback((pid: string): Promise<FlushResult> => {
     const run = async (): Promise<FlushResult> => {
       const view = views.current.get(pid);
-      if (!view) return "unbridged";
+      if (!view || paused.current.has(pid)) return "unbridged";
       const diff = diffProject(stateRef.current, pid, view);
       if (!diff.steps.length && !diff.actions.length) return "nothing";
       const payload = canon(diff);
@@ -239,22 +291,39 @@ export function RqProvider({ children }: { children: ReactNode }) {
         return "nothing";
       }
       lastSent.current.set(pid, payload);
-      // optimistic: what is in flight is not sent again while waiting
+      // optimistic: what is in flight is not sent again while waiting; rolled back if it never arrives
+      const rollback = snapshotView(view, diff);
       recordSteps(view, diff.steps);
       recordActions(view, diff.actions);
-      try {
-        applyServerEffects(await syncProject(pid, diff));
-        return "sent";
-      } catch (e) {
-        toast.error(`Değişiklik sunucuya yazılamadı: ${apiErrorMessage(e)}`);
-        await hydrate(pid);
-        return "failed";
+      for (let attempt = 0; ; attempt++) {
+        try {
+          applyServerEffects(await syncProject(pid, diff));
+          return "sent";
+        } catch (e) {
+          if (isTransient(e) && attempt < bridgeRetry.delaysMs.length) {
+            await sleep(bridgeRetry.delaysMs[attempt]);
+            continue;
+          }
+          if (isTransient(e)) {
+            rollback();
+            lastSent.current.delete(pid);
+            paused.current.set(pid, "resend");
+            console.warn(`Köprü: ${pid} için değişiklik ${bridgeRetry.delaysMs.length + 1} denemede yazılamadı, köprü duraklatıldı: ${apiErrorMessage(e)}`);
+            showDownToast();
+            return "failed";
+          }
+          const field = e instanceof ApiError ? e.field : undefined;
+          toast.error(`Sunucu değişikliği reddetti (${describeSent(diff, field)}): ${apiErrorMessage(e)} Bu projenin aşama, adım ve aksiyonları sunucudaki haline döndü.`);
+          await hydrate(pid);
+          if (paused.current.has(pid)) showDownToast();
+          return "failed";
+        }
       }
     };
     const next = (queues.current.get(pid) ?? Promise.resolve()).then(run, run);
     queues.current.set(pid, next.then(() => {}));
     return next;
-  }, [applyServerEffects, hydrate]);
+  }, [applyServerEffects, hydrate, showDownToast]);
 
   /** Sends the project's pending diff now (no debounce) and waits for the answer. */
   const flushNow = useCallback((pid: string) => {
@@ -266,13 +335,13 @@ export function RqProvider({ children }: { children: ReactNode }) {
   // Every store change: diff bridged projects against their server view; send after a short pause.
   useEffect(() => {
     for (const [pid, view] of views.current) {
-      if (localOnly.has(pid)) continue;
+      if (localOnly.has(pid) || paused.current.has(pid)) continue;
       const d = diffProject(state, pid, view);
       if (!d.steps.length && !d.actions.length) continue;
       clearTimeout(timers.current.get(pid));
       timers.current.set(pid, setTimeout(() => { timers.current.delete(pid); flush(pid); }, BRIDGE_DEBOUNCE_MS));
     }
-  }, [state, localOnly, flush]);
+  }, [state, localOnly, flush, resumed]);
 
   useEffect(() => () => { for (const t of timers.current.values()) clearTimeout(t); }, []);
 

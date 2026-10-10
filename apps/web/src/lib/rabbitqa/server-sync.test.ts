@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ProjectCore } from "@rabbitqa/shared";
 import { createSeed } from "@rabbitqa/shared/domain/seed";
 import type { Action } from "@rabbitqa/shared/domain/types";
-import { canon, diffProject, emptyView, mergeEffects, recordActions, recordSteps, replaceProjectData } from "./server-sync";
+import { canon, describeSent, diffProject, emptyView, mergeEffects, recordActions, recordSteps, replaceProjectData, snapshotView } from "./server-sync";
 
 const rule = (over: Partial<Action>): Action => ({
   id: "a_x", projectId: "p_garanti", title: "Kural", ownerId: null, ball: "csm", due: null, priority: "medium",
@@ -117,5 +117,40 @@ describe("mergeEffects — meetings", () => {
     expect(out.meetings.find((m) => m.id === changed.id)?.notes).toBe("Sunucudan");
     expect(out.meetings).toHaveLength(s.meetings.length + 1);
     expect(mergeEffects(s, { phases: [], steps: [], actions: [] }).meetings).toBe(s.meetings);
+  });
+});
+
+describe("snapshotView", () => {
+  it("rolls back exactly the entries a send recorded: changed ones get their old value, new ones go away", () => {
+    const s = createSeed();
+    const [known, fresh] = s.steps.filter((x) => x.projectId === "p_garanti");
+    const other = { ...s.actions.find((a) => a.projectId === "p_garanti" && !a.ruleKey)!, title: "Yeni" };
+    const view = emptyView();
+    recordSteps(view, [known]);
+    recordActions(view, [rule({ status: "open" })]);
+    const before = { steps: new Map(view.steps), rule: new Map(view.rule), actions: new Map(view.actions) };
+
+    const diff = { steps: [{ ...known, ball: "care" as const }, fresh], actions: [rule({ status: "done" }), other] };
+    const rollback = snapshotView(view, diff);
+    recordSteps(view, diff.steps);
+    recordActions(view, diff.actions);
+    rollback();
+    expect(view).toEqual(before);
+  });
+});
+
+describe("describeSent", () => {
+  const s = createSeed();
+  const steps = s.steps.filter((x) => x.projectId === "p_garanti").slice(0, 4);
+  const action = s.actions.find((a) => a.projectId === "p_garanti")!;
+
+  it("names the record the error field points at", () => {
+    expect(describeSent({ steps, actions: [action] }, "steps.1.title")).toBe(`"${steps[1].title}" adımı`);
+    expect(describeSent({ steps, actions: [action] }, "actions.0.due")).toBe(`"${action.title}" aksiyonu`);
+  });
+
+  it("without a field: up to three titles, then a count", () => {
+    expect(describeSent({ steps: steps.slice(0, 1), actions: [action] })).toBe(`"${steps[0].title}" adımı, "${action.title}" aksiyonu`);
+    expect(describeSent({ steps, actions: [action] })).toBe(`${steps.slice(0, 3).map((x) => `"${x.title}" adımı`).join(", ")} ve 2 kayıt daha`);
   });
 });
