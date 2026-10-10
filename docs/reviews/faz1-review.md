@@ -190,3 +190,27 @@
 5. **O3**: `actualStart`/`actualEnd` gerekçesi + test. Aynı turda madde 4 tablosundaki eksik testler (aşama durumu gerekçesiz → 400, `planStart`, aşama `last_reason`).
 
 Düşükler M5 kapanışında tek bir "temizlik" commit'inde toplanabilir: D2, D3, D5, D7 ve D8'in PLAN düzeltmeleri. D1 ve D6 Faz 2'ye bırakılabilir; bırakılırsa Kararlar'a bir satır yazılmalı.
+
+---
+
+## Düzeltmeler (2026-10-11)
+
+Her madde ayrı commit; her commit öncesi `npm run check` yeşil. Kararlar ve bilinçli bırakılanlar `docs/PLAN.md` → "Kararlar"da (2026-10-11 satırları).
+
+| Bulgu | Durum | Commit | Ne yapıldı / test |
+|---|---|---|---|
+| Y2 | Düzeltildi | `22d5838` | API `API_HOST` (varsayılan `127.0.0.1`) üzerinde dinler, başlangıç mesajı gerçek adresi yazar. Vite dev/preview `localhost`, proxy hedefi API'nin adresi (`localhost` ::1'e çözülebildiği için). Doğrulama: `lsof` → `127.0.0.1:3001 (LISTEN)`. Playwright'ın API sağlık URL'si `127.0.0.1` oldu (`playwright.config.ts` henüz commit'lenmemiş M5 çalışmasının parçası, çalışma ağacında düzenlendi). |
+| O1 | Düzeltildi | `f0794d8` | Shared `requiredText` (trim + boşsa `400`, `field` ile): aksiyon başlığı (oluşturma, düzenleme, toplantı aksiyonları, köprü), adım başlığı, aşama kodu/adı, müşteri/proje adı, şablon adları. Web istemcisi şemaya uymayan yanıtı `ApiError` `INVALID_RESPONSE` olarak atar (alan yolu + kayıt id'si); hidrasyon bunu konsola yazar ve toast gösterir. Testler: API (aksiyon oluşturma/düzenleme, proje adları, sync adım/aksiyon başlığı), web (`client.test`, hidrasyon testi). |
+| Y1 | Düzeltildi | `a3b9aaf` | `approveGoLive` 07'yi store'da kapatmaz: onay + `customer_approval` store'da → köprü hemen gönderilir ve beklenir (`flushNow`) → `POST /phases/:07id/complete` → `applyServerEffects`. Tamamlama hatası (ör. `409`) uyarı olarak gösterilir, 07 açık kalır. Web testi: sync, sonra complete; 409 → bildirim. Sahte API'ye `complete` ucu eklendi, `steps/sync` artık yazdığını saklıyor. |
+| D4 | Düzeltildi (kısmen) | `a3b9aaf` | `PATCH /steps/:id` `customer_approval`'ı elle `done` yapmaz (`409 "Müşteri onayı Go-Live ekranından kaydedilir"`); köprü yolu çalışıyor (API testi). `commit_check` kuralı Faz 2'de (taahhütler store'da). |
+| O2 | Düzeltildi | `9e12d5a` | Ağ/5xx: aynı fark 1 s, 3 s, 10 s sonra yeniden gönderilir; hepsi başarısızsa görüntü geri alınır, proje duraklatılır, kalıcı toast gösterilir. Bir sonraki başarılı API yanıtında ya da hidrasyonda köprü geri açılır ve bekleyen fark gider. 4xx: toast reddedilen kaydı ve sunucu haline dönüşü söyler, sonra yeniden yükleme. Store'daki tetikleyici alanın geri alınmaması "Faz 1 bilinen kısıt" olarak Kararlar'da. Testler: yeniden deneme ve kalıcı uyarı, duraklatılmışken gönderim yok, geri açılınca iki değişiklik birlikte gider, geçici 5xx, yüklenemeyen projenin sonradan hidrate edilmesi, `snapshotView`/`describeSent`. |
+| O3 | Düzeltildi | `1dac437` | `actualStart`/`actualEnd` değişikliği gerekçe ister. Eksik üç test eklendi: aşama durumu gerekçesiz → 400, `planStart` gerekçesiz → 400, aşamada `last_reason` saklanır. **Rapordaki yanlış:** "PhaseDialog bu alanları göndermiyor" doğru değildi; diyalog `actualStart` gönderiyor. Diyalog artık bu alan değişince de gerekçe istiyor (web testi). |
+| D5 | Düzeltildi | `9eb79c8` | `entity.too.large` → `413`; diğer body-parser 4xx'leri (ör. desteklenmeyen charset `415`) kendi durumlarıyla, `VALIDATION`. Testler: `app.test.ts`. |
+| D3 | Düzeltildi | `ec9cf02` | Aksiyon `cancelled` olarak oluşturulamaz (`400`, `status` / `actions.N.status`). Kontrol serviste, çünkü AI `action_update` şeması aynı `status`'u kullanıyor. Yeni aksiyon diyaloğu "İptal"i sunmuyor. Testler: API (aksiyon, toplantı), web (seçenek listesi). |
+| D1 | Düzeltildi (API yazmaları) | `6a7ec67` | Hidrasyon sürerken gelen API yanıtları biriktirilip GET sonuçlarının üstüne sırayla yeniden uygulanıyor. Test, düzeltme olmadan düştüğü doğrulanarak eklendi. Hidrasyon sırasındaki yerel mockup değişikliklerinin sunucu verisiyle değişmesi bilinen kısıt (Kararlar). |
+| D7 | Düzeltildi | `1aea11c` | Kullanılmayan import'lar (`store.tsx`, `domain/types.ts`, `projects.service.ts`) silindi. `isLocalOnly` Ctx'ten çıkarıldı. `projectFromCore` shared'da tek fonksiyon; API ve web ondan kullanıyor (shared testi). |
+| D8 | Düzeltildi | `455c8ca` | PLAN: hidrasyon ifadesi koda uyduruldu, `ci.yml` kutusu işaretlendi (`44dd6ca`), `PATCH /steps` satırı "kilitli adımda yalnız durum `409`" olarak düzeltildi, yerel geliştirme satırına host bilgisi eklendi. `ci.yml:34`'teki eski yorum Murat'a önerildi. |
+| D2 | Bilerek bırakıldı | `455c8ca` (Kararlar) | Kilitli adımda termin değişikliği ileri planlama için serbest; gerekçe kuralı geçerli. |
+| D6 | Bırakıldı | `455c8ca` (Kararlar) | Oturum ortasında API restart'ı yalnız geliştirmede görülür, sayfa yenileme düzeltir; Faz 2'de kalıcı veritabanıyla kalkar. |
+
+Son doğrulama: `npm run check` ve `npm run e2e` arka arkaya iki kez yeşil. Lint 0 hata / 27 uyarı; test sayıları api 122, web 272, shared 286, guard 3; e2e 1/1. e2e senaryosu şimdilik yalnız 1. adımı (yeni proje) kapsıyor, M5 raporundaki duruma göre.
