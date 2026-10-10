@@ -30,8 +30,6 @@ jobs:
         run: |
           if npm ls xlsx --all >/dev/null 2>&1; then echo "::error::xlsx (SheetJS npm) yasaklı — ADR-0001"; exit 1; fi
 
-  # hashFiles() job seviyesindeki `if` içinde kullanılamaz; kontrol burada
-  # step seviyesinde yapılır ve sonucu parity job'una output olarak aktarılır.
   
   secrets:
     runs-on: ubuntu-latest
