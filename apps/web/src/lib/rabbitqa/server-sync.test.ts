@@ -95,12 +95,27 @@ describe("diffProject", () => {
 });
 
 describe("replaceProjectData", () => {
-  it("the project's phases, steps and actions become the server's; other projects stay", () => {
+  it("the project's phases, steps, actions and meetings become the server's; other projects stay", () => {
     const s = createSeed();
     const server = rule({ id: "a_server", source: "manual", ruleKey: undefined });
-    const out = replaceProjectData(s, "p_garanti", { phases: [], steps: [], actions: [server] });
+    const meeting = { ...s.meetings.find((m) => m.projectId === "p_garanti")!, id: "m_server" };
+    const out = replaceProjectData(s, "p_garanti", { phases: [], steps: [], actions: [server], meetings: [meeting] });
     expect(out.actions.filter((a) => a.projectId === "p_garanti")).toEqual([server]);
     expect(out.actions.filter((a) => a.projectId !== "p_garanti")).toEqual(s.actions.filter((a) => a.projectId !== "p_garanti"));
     expect(out.steps.some((x) => x.projectId === "p_garanti")).toBe(false);
+    expect(out.meetings.filter((m) => m.projectId === "p_garanti")).toEqual([meeting]);
+    expect(out.meetings.filter((m) => m.projectId !== "p_garanti")).toEqual(s.meetings.filter((m) => m.projectId !== "p_garanti"));
+  });
+});
+
+describe("mergeEffects — meetings", () => {
+  it("places meetings by id and adds new ones; a response without meetings leaves them as they are", () => {
+    const s = createSeed();
+    const changed = { ...s.meetings[0], notes: "Sunucudan" };
+    const added = { ...s.meetings[0], id: "m_new" };
+    const out = mergeEffects(s, { phases: [], steps: [], actions: [], meetings: [changed, added] });
+    expect(out.meetings.find((m) => m.id === changed.id)?.notes).toBe("Sunucudan");
+    expect(out.meetings).toHaveLength(s.meetings.length + 1);
+    expect(mergeEffects(s, { phases: [], steps: [], actions: [] }).meetings).toBe(s.meetings);
   });
 });

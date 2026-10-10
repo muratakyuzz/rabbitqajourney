@@ -18,6 +18,7 @@ async function setup(api: ReturnType<typeof fakeApi>) {
   const projects = hook.result.current.state.projects.length;
   await waitFor(() => expect(api.callsTo("GET", /^\/projects\/[^/]+\/phases$/)).toHaveLength(projects));
   await waitFor(() => expect(api.callsTo("GET", /^\/projects\/[^/]+\/actions$/)).toHaveLength(projects));
+  await waitFor(() => expect(api.callsTo("GET", /^\/projects\/[^/]+\/meetings$/)).toHaveLength(projects));
   await pause(BRIDGE_DEBOUNCE_MS + 100); // anything hydration itself might cause has settled
   return hook;
 }
@@ -93,6 +94,7 @@ describe("API bridge", () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Değişiklik sunucuya yazılamadı: Çakışma"));
     await waitFor(() => expect(api.callsTo("GET", /^\/projects\/p_garanti\/phases$/)).toHaveLength(2));
     await waitFor(() => expect(api.callsTo("GET", /^\/projects\/p_garanti\/actions$/)).toHaveLength(2)); // the reload covers actions
+    await waitFor(() => expect(api.callsTo("GET", /^\/projects\/p_garanti\/meetings$/)).toHaveLength(2)); // … and meetings
     await waitFor(() => expect(result.current.state.steps.find((s) => s.id === STEP)?.ball).toBe(serverBall));
     await pause(BRIDGE_DEBOUNCE_MS + 100);
     expect(api.callsTo("POST", /steps\/sync$/)).toHaveLength(1);
@@ -116,20 +118,32 @@ describe("API bridge", () => {
     expect(api.callsTo("POST", /p_isyatirim\/steps\/sync$/)).toEqual([]);
   });
 
-  it("an action from the meeting dialog (store addMeeting) goes to the server through sync, once", async () => {
+  it("hydration: the project's meetings become the server's (server wins)", async () => {
+    const seed = createSeed();
+    const local = { ...seed.meetings.find((m) => m.id === "m_2")!, id: "m_local_only" };
+    localStorage.setItem(STATE_KEY, JSON.stringify({ ...seed, meetings: [...seed.meetings, local] }));
+    const api = fakeApi({
+      "GET /projects/p_isyatirim/meetings": () => json(200, {
+        items: api.server.meetings.filter((m) => m.projectId === "p_isyatirim")
+          .map((m) => ({ ...m, notes: m.id === "m_2" ? "Sunucudaki not" : m.notes, actions: [] })),
+      }),
+    });
+    const { result } = await setup(api);
+    const mine = result.current.state.meetings.filter((m) => m.projectId === "p_isyatirim");
+    expect(mine.map((m) => m.id).sort()).toEqual(seed.meetings.filter((m) => m.projectId === "p_isyatirim").map((m) => m.id).sort());
+    expect(mine.find((m) => m.id === "m_2")?.notes).toBe("Sunucudaki not");
+    expect(mine.find((m) => m.id === "m_2")).not.toHaveProperty("actions");
+  });
+
+  it("a meeting and its actions from the API response are not sent back through sync", async () => {
     const api = fakeApi();
     const { result } = await setup(api);
-    act(() => {
-      result.current.addMeeting(
-        { projectId: "p_garanti", type: "checkin", date: "2026-10-12", internalIds: ["u_deniz"], contactIds: [], notes: "", decisions: "", status: "held" },
-        [{ title: "Toplantıdan doğan aksiyon", ownerId: "u_deniz", ball: "csm", due: "2026-10-20", priority: "high", status: "open" }],
-      );
-    });
-    await waitFor(() => expect(api.callsTo("POST", /p_garanti\/steps\/sync$/)).toHaveLength(1));
-    const body = api.callsTo("POST", /p_garanti\/steps\/sync$/)[0].body as { actions: { title: string; source: string; meetingId: string | null }[] };
-    expect(body.actions).toEqual([expect.objectContaining({ title: "Toplantıdan doğan aksiyon", source: "meeting", meetingId: expect.any(String) })]);
+    const meeting = { id: "m_api", projectId: "p_garanti", type: "checkin" as const, date: "2026-10-12", internalIds: ["u_deniz"], contactIds: [], notes: "", decisions: "", isCustomerVisible: false, status: "held" as const };
+    const action = { ...api.server.actions.find((a) => a.projectId === "p_garanti" && !a.ruleKey)!, id: "a_api", source: "meeting" as const, meetingId: "m_api" };
+    act(() => { result.current.applyServerEffects({ phases: [], steps: [], actions: [action], meetings: [meeting] }); });
+    expect(result.current.state.meetings.find((m) => m.id === "m_api")).toEqual(meeting);
     await pause(BRIDGE_DEBOUNCE_MS + 100);
-    expect(api.callsTo("POST", /steps\/sync$/)).toHaveLength(1);
+    expect(api.callsTo("POST", /steps\/sync$/)).toEqual([]);
   });
 
   it("a project the API does not know stays local-only and is never synced", async () => {

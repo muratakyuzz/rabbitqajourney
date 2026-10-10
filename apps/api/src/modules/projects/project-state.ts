@@ -1,13 +1,15 @@
-import type { Action, Phase, ProjectCore, RuleEffects, Step } from "@rabbitqa/shared";
+import type { Action, Meeting, Phase, ProjectCore, RuleEffects, Step } from "@rabbitqa/shared";
 import { DEFAULT_THRESHOLDS } from "@rabbitqa/shared/domain/alerts";
 import { setActiveHolidays } from "@rabbitqa/shared/domain/business-days";
+import { applyStepCompletion } from "@rabbitqa/shared/domain/completion";
 import { advanceFlow, type MkAudit } from "@rabbitqa/shared/domain/flow";
 import { DEFAULT_PROJECT_INTEGRATIONS, SEED_INTEGRATIONS, STATE_VERSION } from "@rabbitqa/shared/domain/seed";
-import type { Holiday, Meeting, PhaseTpl, Project, RqState, User } from "@rabbitqa/shared/domain/types";
+import type { Holiday, PhaseTpl, Project, RqState, User } from "@rabbitqa/shared/domain/types";
 import type { Queryable } from "../../db";
 import { notFound, reasonRequired } from "../../http/errors";
 import {
-  actionToRow, insertRow, phaseToRow, rowToAction, rowToPhase, rowToProject, rowToStep, stepToRow, updateRow,
+  actionToRow, insertRow, meetingToRow, phaseToRow, rowToAction, rowToMeeting, rowToPhase, rowToProject, rowToStep, stepToRow,
+  updateRow, writeParticipants,
 } from "../../db/rows";
 
 // Domain service pattern (docs/PLAN.md M2): load the project into a partial RqState, run the shared rule
@@ -60,32 +62,33 @@ export async function loadProjectState(q: Queryable, projectId: string): Promise
   const actions = (await q.query("SELECT * FROM actions WHERE project_id = $1 ORDER BY created_at, id", [projectId])).rows.map(rowToAction);
   const meetingRows = (await q.query("SELECT * FROM meetings WHERE project_id = $1 ORDER BY date, id", [projectId])).rows;
   const parts = (await q.query<{ meeting_id: string; kind: string; participant_id: string }>(
-    "SELECT mp.meeting_id, mp.kind, mp.participant_id FROM meeting_participants mp JOIN meetings m ON m.id = mp.meeting_id WHERE m.project_id = $1",
+    `SELECT mp.meeting_id, mp.kind, mp.participant_id FROM meeting_participants mp JOIN meetings m ON m.id = mp.meeting_id
+     WHERE m.project_id = $1 ORDER BY mp.sort_order`,
     [projectId],
   )).rows;
-  const meetings = meetingRows.map((r): Meeting => ({
-    id: r.id as string, projectId: r.project_id as string, type: r.type as Meeting["type"],
-    date: (r.date as Date).toISOString().slice(0, 10), notes: r.notes as string, decisions: r.decisions as string,
-    isCustomerVisible: r.is_customer_visible as boolean, status: r.status as Meeting["status"],
-    internalIds: parts.filter((p) => p.meeting_id === r.id && p.kind === "user").map((p) => p.participant_id),
-    contactIds: parts.filter((p) => p.meeting_id === r.id && p.kind === "contact").map((p) => p.participant_id),
-    ...(r.team_id != null ? { teamId: r.team_id as string } : {}),
-    ...(r.training != null ? { training: r.training as Meeting["training"] } : {}),
-  }));
+  const meetings = meetingRows.map((r) => rowToMeeting(r, parts.filter((p) => p.meeting_id === r.id)));
   const state = partialState({ ...common, projects: [toDomainProject(project)], phases, steps, actions, meetings });
   return { state, project };
 }
 
-export type Effects = Omit<RuleEffects, "project">;
+export type Effects = Omit<RuleEffects, "project" | "meetings"> & { meetings: Meeting[] };
+
+/** A meeting's columns plus its participants: what decides whether a meeting changed. */
+const meetingRow = (m: Meeting) => ({ ...meetingToRow(m), internal_ids: m.internalIds, contact_ids: m.contactIds });
 
 /**
- * Writes the phases, steps and actions of `projectId` that are new or changed between `before` and `after`.
+ * Writes the phases, steps, meetings and actions of `projectId` that are new or changed between `before` and `after`.
  * Records are matched by id; "changed" means the persisted columns differ (rows compared, not objects).
  * Returns exactly the written records. Must run inside db.transaction.
  */
 export async function persistDiff(tx: Queryable, before: RqState, after: RqState, projectId: string): Promise<Effects> {
-  const out: Effects = { phases: [], steps: [], actions: [] };
-  const sync = async <T extends Phase | Step | Action>(table: string, prev: T[], next: T[], toRow: (x: T) => Record<string, unknown>, into: T[]) => {
+  const out: Effects = { phases: [], steps: [], actions: [], meetings: [] };
+  const sync = async <T extends Phase | Step | Action | Meeting>(
+    table: string, prev: T[], next: T[], toRow: (x: T) => Record<string, unknown>, into: T[],
+    write: { insert: (x: T) => Promise<void>; update: (x: T) => Promise<void> } = {
+      insert: (x) => insertRow(tx, table, toRow(x)), update: (x) => updateRow(tx, table, toRow(x)),
+    },
+  ) => {
     const own = (x: T) => x.projectId === projectId;
     const old = new Map(prev.filter(own).map((x) => [x.id, x]));
     const nextIds = new Set(next.filter(own).map((x) => x.id));
@@ -93,21 +96,25 @@ export async function persistDiff(tx: Queryable, before: RqState, after: RqState
     if (removed.length) throw new Error(`persistDiff: ${table} removed (${removed.join(", ")}); deletion is not supported`);
     for (const x of next.filter(own)) {
       const o = old.get(x.id);
-      if (!o) await insertRow(tx, table, toRow(x));
+      if (!o) await write.insert(x);
       else if (o === x || JSON.stringify(toRow(o)) === JSON.stringify(toRow(x))) continue;
-      else await updateRow(tx, table, toRow(x));
+      else await write.update(x);
       into.push(x);
     }
   };
   // phases before steps (FK)
   await sync("phases", before.phases, after.phases, phaseToRow, out.phases);
   await sync("steps", before.steps, after.steps, stepToRow, out.steps);
+  await sync("meetings", before.meetings, after.meetings, meetingRow, out.meetings, {
+    insert: async (m) => { await insertRow(tx, "meetings", meetingToRow(m)); await writeParticipants(tx, m); },
+    update: async (m) => { await updateRow(tx, "meetings", meetingToRow(m)); await writeParticipants(tx, m); },
+  });
   await sync("actions", before.actions, after.actions, actionToRow, out.actions);
   return out;
 }
 
 /** The reason given with a reason-required change is kept on the record (audit history is Faz 2). */
-export async function setLastReason(tx: Queryable, table: "phases" | "steps" | "actions", id: string, reason: string | undefined) {
+export async function setLastReason(tx: Queryable, table: "phases" | "steps" | "actions" | "meetings", id: string, reason: string | undefined) {
   if (reason) await tx.query(`UPDATE ${table} SET last_reason = $2 WHERE id = $1`, [id, reason]);
 }
 
@@ -116,19 +123,30 @@ export const requireReason = (reason: string | undefined) => {
   return reason.trim();
 };
 
+export interface ChangeOptions {
+  /**
+   * Meeting writes: complete / reopen the meeting-completion steps from the meetings (completion.ts, only "meeting")
+   * before the flow engine runs. Data steps stay with the client (docs/PLAN.md M2a).
+   */
+  meetingSteps?: boolean;
+}
+
 /**
  * Every project write: loads the project, applies `change`, runs the flow engine and writes the difference.
  * Must run inside db.transaction. Returns the written records (RuleEffects without the project).
  */
-export async function changeProject(tx: Queryable, projectId: string, change: (s: RqState) => RqState): Promise<Effects> {
+export async function changeProject(tx: Queryable, projectId: string, change: (s: RqState) => RqState, opts: ChangeOptions = {}): Promise<Effects> {
   const loaded = await loadProjectState(tx, projectId);
   if (!loaded) throw notFound("Proje bulunamadı.");
   const before = loaded.state;
-  const after = advanceFlow(change(before), projectId, noAudit, new Date());
+  const now = new Date();
+  let after = change(before);
+  if (opts.meetingSteps) after = applyStepCompletion(after, projectId, noAudit, now, { only: "meeting" });
+  after = advanceFlow(after, projectId, noAudit, now);
   return persistDiff(tx, before, after, projectId);
 }
 
-export async function projectIdOf(q: Queryable, table: "phases" | "steps" | "actions", id: string, missing: string): Promise<string> {
+export async function projectIdOf(q: Queryable, table: "phases" | "steps" | "actions" | "meetings", id: string, missing: string): Promise<string> {
   const row = (await q.query<{ project_id: string }>(`SELECT project_id FROM ${table} WHERE id = $1`, [id])).rows[0];
   if (!row) throw notFound(missing);
   return row.project_id;

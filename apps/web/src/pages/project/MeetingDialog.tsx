@@ -13,9 +13,12 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Pill } from "@/components/rq/Badges";
 import { personName, useRq } from "@/lib/rabbitqa/store";
 import { selectableUsers } from "@/lib/rabbitqa/perm";
+import { useServerAction } from "@/lib/rabbitqa/use-server-action";
+import { createMeeting, patchMeeting } from "@/lib/api/meetings";
 import { ballForOwner } from "@rabbitqa/shared/domain/ball";
+import { meetingHeldError, stepsCompletedByMeeting } from "@rabbitqa/shared/domain/meetings";
 import { ACTION_STATUS_LABEL, BALL_LABEL, MEETING_STATUS_LABEL, MEETING_TYPE_LABEL, PRIORITY_LABEL, fmtDate, todayISO } from "@rabbitqa/shared/domain/labels";
-import type { ActionStatus, Ball, MeetingStatus, MeetingType, Priority, Project } from "@rabbitqa/shared/domain/types";
+import type { ActionStatus, Ball, Meeting, MeetingStatus, MeetingType, Priority, Project } from "@rabbitqa/shared/domain/types";
 
 export const NONE = "__none";
 
@@ -73,7 +76,9 @@ export function ActionFields({ d, setD, projectId, showStatus }: { d: ActionDraf
 export function MeetingDialog({ project, onClose, defaultType = "checkin", defaultStatus, defaultTeamId, onSaved }: {
   project: Project; onClose: () => void; defaultType?: MeetingType; defaultStatus?: MeetingStatus; defaultTeamId?: string | null; onSaved?: (meetingId: string) => void;
 }) {
-  const { state, addMeeting, addDocument } = useRq();
+  const { state, addDocument } = useRq();
+  const { busy, run } = useServerAction();
+  const [error, setError] = useState<string | null>(null);
   const [type, setType] = useState<MeetingType>(defaultType);
   const [visible, setVisible] = useState(false);
   const [docs, setDocs] = useState<string[]>([]);
@@ -95,6 +100,34 @@ export function MeetingDialog({ project, onClose, defaultType = "checkin", defau
   const onDateChange = (v: string) => {
     setDate(v);
     if (!statusTouched) setStatus(v > todayISO() ? "planned" : "held");
+  };
+  const meeting: Omit<Meeting, "id" | "projectId"> = {
+    type, date, status, internalIds, contactIds, notes, decisions, isCustomerVisible: visible,
+    teamId: type === "adaptation" ? teamId : null,
+    ...(type === "training" ? { training: { trainerId, modules: trainingModules, recordingUrl } } : {}),
+  };
+  // "Kaydedince tamamlanır": what the save would complete, from the shared rules (no copy of them here)
+  const completes = stepsCompletedByMeeting(state, { ...meeting, id: "m_preview", projectId: project.id });
+
+  const save = async () => {
+    setError(null);
+    if (actions.some((a) => !a.title.trim())) return setError("Aksiyon başlıkları boş olamaz.");
+    const heldErr = meetingHeldError(meeting, todayISO());
+    if (heldErr) return setError(heldErr.message);
+    let mid: string | null = null;
+    // the meeting and its actions go in one request: all or nothing on the server
+    const err = await run(async () => {
+      const res = await createMeeting(project.id, { ...meeting, actions });
+      mid = res.meeting.id;
+      return res;
+    });
+    if (err || !mid) return setError(err);
+    const savedId: string = mid;
+    // documents stay in the mockup store; they are linked to the server's meeting id
+    docs.forEach((name) => addDocument({ projectId: project.id, type: "other", name, linkType: "meeting", linkId: savedId }));
+    toast.success(status === "held" ? "Toplantı kaydedildi" : "Toplantı planlandı");
+    onSaved?.(savedId);
+    onClose();
   };
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -182,20 +215,40 @@ export function MeetingDialog({ project, onClose, defaultType = "checkin", defau
             ))}
           </div>
         </div>
+        {completes.length > 0 && (
+          <p className="text-sm text-muted-foreground">Kaydedince tamamlanır: <span className="font-medium text-foreground">{completes.map((x) => x.title).join(", ")}</span></p>
+        )}
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Vazgeç</Button>
-          <Button onClick={() => {
-            if (actions.some((a) => !a.title.trim())) return toast.error("Aksiyon başlıkları boş olamaz");
-            const mid = addMeeting({
-              projectId: project.id, type, date, internalIds, contactIds, notes, decisions, isCustomerVisible: visible, status,
-              teamId: type === "adaptation" ? teamId : null,
-              ...(type === "training" ? { training: { trainerId, modules: trainingModules, recordingUrl } } : {}),
-            }, actions);
-            docs.forEach((name) => addDocument({ projectId: project.id, type: "other", name, linkType: "meeting", linkId: mid }));
-            toast.success(status === "held" ? "Toplantı kaydedildi" : "Toplantı planlandı");
-            onSaved?.(mid);
-            onClose();
-          }}>Kaydet</Button>
+          <Button disabled={busy} onClick={() => void save()}>{busy ? "Kaydediliyor…" : "Kaydet"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Cancelling a planned meeting needs a reason (API #19); the API error stays in the dialog. */
+export function MeetingCancelDialog({ meeting, onClose }: { meeting: Meeting; onClose: () => void }) {
+  const { busy, run } = useServerAction();
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    const err = await run(() => patchMeeting(meeting.id, { status: "cancelled", reason: reason.trim() }));
+    if (err) return setError(err);
+    toast.success("Toplantı iptal edildi");
+    onClose();
+  };
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Toplantıyı iptal et</DialogTitle></DialogHeader>
+        <p className="text-sm text-muted-foreground">{MEETING_TYPE_LABEL[meeting.type]} · {fmtDate(meeting.date)}</p>
+        <div className="grid gap-2"><Label htmlFor="meeting-cancel-reason">Gerekçe</Label><Textarea id="meeting-cancel-reason" value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Vazgeç</Button>
+          <Button disabled={busy || !reason.trim()} onClick={() => void save()}>{busy ? "Kaydediliyor…" : "İptal et"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

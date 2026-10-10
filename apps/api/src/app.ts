@@ -5,6 +5,7 @@ import { errorHandler, notFound } from "./http/errors";
 import { templateRouter } from "./modules/template/template.routes";
 import { projectsRouter } from "./modules/projects/projects.routes";
 import { actionsRouter } from "./modules/actions/actions.routes";
+import { meetingsRouter } from "./modules/meetings/meetings.routes";
 
 export interface AppDeps {
   db: Db;
@@ -25,6 +26,7 @@ export function createApp({ db, bootId, startedAt }: AppDeps) {
   api.use("/config/template", templateRouter(db));
   api.use(projectsRouter(db));
   api.use(actionsRouter(db));
+  api.use(meetingsRouter(db));
 
   app.use("/api", api);
   app.use("/api", () => {

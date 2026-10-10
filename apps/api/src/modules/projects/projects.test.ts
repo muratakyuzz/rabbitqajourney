@@ -157,7 +157,7 @@ describe("PATCH /api/steps/:id", () => {
     const res = await request(app).patch("/api/steps/st_garanti_18").send({ ball });
     expect(effects(res).steps[0]).toMatchObject({ ball, ballSince: NOW.toISOString() });
     const same = await request(app).patch("/api/steps/st_garanti_18").send({ ball });
-    expect(effects(same)).toEqual({ phases: [], steps: [], actions: [] });
+    expect(effects(same)).toEqual({ phases: [], steps: [], actions: [], meetings: [] });
   });
 });
 

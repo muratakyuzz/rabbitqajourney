@@ -29,6 +29,7 @@ async function renderProject(projectId: string, api: ReturnType<typeof fakeApi>,
   );
   await waitFor(() => expect(api.callsTo("GET", new RegExp(`^/projects/${projectId}/phases$`))).toHaveLength(1));
   await waitFor(() => expect(api.callsTo("GET", new RegExp(`^/projects/${projectId}/actions$`))).toHaveLength(1));
+  await waitFor(() => expect(api.callsTo("GET", new RegExp(`^/projects/${projectId}/meetings$`))).toHaveLength(1));
 }
 
 beforeEach(() => {
@@ -241,5 +242,110 @@ describe("Aksiyonlar → API", () => {
     await waitFor(() => expect(within(dialog).getByRole("alert")).toHaveTextContent("Gerekçe zorunludur."));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(stored().actions.find((a) => a.id === "a_2")).toEqual(before);
+  });
+});
+
+describe("Toplantılar → API", () => {
+  const pick = async (dialog: HTMLElement, label: string, option: string) => {
+    fireEvent.click(within(within(dialog).getByText(label).parentElement!).getByRole("combobox"));
+    fireEvent.click(await screen.findByRole("option", { name: option }));
+  };
+  const openDialog = async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Toplantı kaydet" }));
+    return screen.findByRole("dialog");
+  };
+  const briefStatus = () => stored().steps.find((x) => x.projectId === "p_ornek" && x.key === "brief")?.status;
+  const settle = () => new Promise((r) => setTimeout(r, 400)); // longer than the bridge debounce
+
+  it("MeetingDialog: the meeting and its action go in one POST → both are in the store and the tab, no sync", async () => {
+    const api = fakeApi();
+    await renderProject("p_garanti", api, "meetings");
+    const dialog = await openDialog();
+    fireEvent.change(within(dialog).getByText("Notlar").parentElement!.querySelector("textarea")!, { target: { value: "API toplantısı" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Aksiyon" }));
+    fireEvent.change(within(dialog).getByText("Başlık").parentElement!.querySelector("input")!, { target: { value: "Toplantıdan doğan aksiyon" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Kaydet" }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Toplantı kaydedildi"));
+    const posts = api.callsTo("POST", /^\/projects\/p_garanti\/meetings$/);
+    expect(posts).toHaveLength(1);
+    expect(posts[0].body).toMatchObject({
+      type: "checkin", status: "held", internalIds: ["u_deniz"], notes: "API toplantısı", isCustomerVisible: false,
+      actions: [expect.objectContaining({ title: "Toplantıdan doğan aksiyon", ownerId: "u_deniz", ball: "csm", isCustomerVisible: true })],
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const meeting = stored().meetings.find((m) => m.notes === "API toplantısı")!;
+    expect(meeting.id).toBe(api.server.meetings.find((m) => m.notes === "API toplantısı")!.id);
+    expect(stored().actions.find((a) => a.title === "Toplantıdan doğan aksiyon")).toMatchObject({ source: "meeting", meetingId: meeting.id });
+    expect(screen.getByText("API toplantısı")).toBeInTheDocument();
+    expect(screen.getByText(/Toplantıdan doğan aksiyon/)).toBeInTheDocument();
+    await settle();
+    expect(api.callsTo("POST", /steps\/sync$/)).toEqual([]);
+  });
+
+  it("MeetingDialog: Yapıldı without an internal participant → message in the dialog, no request", async () => {
+    const api = fakeApi();
+    await renderProject("p_garanti", api, "meetings");
+    const dialog = await openDialog();
+    fireEvent.click(within(within(dialog).getByText("Deniz Uzun").closest("label")!).getByRole("checkbox"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Kaydet" }));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Yapıldı toplantıda en az bir iç katılımcı olmalı.");
+    expect(api.callsTo("POST", /meetings$/)).toEqual([]);
+  });
+
+  it("MeetingDialog: API error → message in the dialog, dialog stays open, nothing in the store", async () => {
+    const api = fakeApi({ "POST /projects/p_garanti/meetings": () => apiError(400, "VALIDATION", "Aksiyon başlığı boş olamaz.") });
+    await renderProject("p_garanti", api, "meetings");
+    const before = stored().meetings.length;
+    const dialog = await openDialog();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Kaydet" }));
+    await waitFor(() => expect(within(dialog).getByRole("alert")).toHaveTextContent("Aksiyon başlığı boş olamaz."));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(stored().meetings).toHaveLength(before);
+  });
+
+  it("\"Kaydedince tamamlanır\" previews the step the save completes; a planned meeting completes none", async () => {
+    const api = fakeApi();
+    await renderProject("p_ornek", api, "meetings");
+    const dialog = await openDialog();
+    expect(within(dialog).queryByText(/Kaydedince tamamlanır/)).toBeNull(); // CS check-in
+    await pick(dialog, "Tür", "Satış devri");
+    expect(within(dialog).getByText(/Kaydedince tamamlanır/)).toHaveTextContent("Kaydedince tamamlanır: Satış devri toplantısı");
+    await pick(dialog, "Durum", "Planlandı");
+    expect(within(dialog).queryByText(/Kaydedince tamamlanır/)).toBeNull();
+  });
+
+  it("Yapıldı olarak işaretle → PATCH status held → the meeting and its completed step come from the server", async () => {
+    const api = fakeApi();
+    await renderProject("p_ornek", api, "meetings");
+    expect(briefStatus()).toBe("locked");
+    fireEvent.click(screen.getByRole("button", { name: "Yapıldı olarak işaretle" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Toplantı Yapıldı olarak işaretlendi"));
+    expect(api.callsTo("PATCH", /^\/meetings\/m_brief_ornek$/)[0].body).toEqual({ status: "held" });
+    expect(stored().meetings.find((m) => m.id === "m_brief_ornek")?.status).toBe("held");
+    expect(briefStatus()).toBe("done");
+    expect(screen.queryByRole("button", { name: "Yapıldı olarak işaretle" })).toBeNull();
+  });
+
+  it("Yapıldı olarak işaretle: API error → toast, the meeting stays planned", async () => {
+    const api = fakeApi({ "PATCH /meetings/m_brief_ornek": () => apiError(400, "VALIDATION", "İleri tarihli toplantı Yapıldı olamaz; durumu Planlandı seçin.") });
+    await renderProject("p_ornek", api, "meetings");
+    fireEvent.click(screen.getByRole("button", { name: "Yapıldı olarak işaretle" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("İleri tarihli toplantı Yapıldı olamaz; durumu Planlandı seçin."));
+    expect(stored().meetings.find((m) => m.id === "m_brief_ornek")?.status).toBe("planned");
+  });
+
+  it("İptal et asks for a reason and sends it with the PATCH", async () => {
+    const api = fakeApi();
+    await renderProject("p_ornek", api, "meetings");
+    fireEvent.click(screen.getByRole("button", { name: "İptal et" }));
+    const dialog = await screen.findByRole("dialog");
+    const confirm = within(dialog).getByRole("button", { name: "İptal et" });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText("Gerekçe"), { target: { value: "Müşteri erteledi" } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Toplantı iptal edildi"));
+    expect(api.callsTo("PATCH", /^\/meetings\/m_brief_ornek$/)[0].body).toEqual({ status: "cancelled", reason: "Müşteri erteledi" });
+    expect(stored().meetings.find((m) => m.id === "m_brief_ornek")?.status).toBe("cancelled");
   });
 });

@@ -156,13 +156,47 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
   - `npm run check` yeşil: lint 0 hata / 27 uyarı; test sayıları api 85, web 259, shared 279, guard 3.
 
 ## M4 — Toplantılar
-- [ ] `GET /api/projects/:projectId/meetings`, `POST /api/projects/:projectId/meetings` (#8), `PATCH /api/meetings/:id` (#19; iptalde gerekçe)
-- [ ] Toplantı + kararlar + doğan aksiyonlar tek transaction'da (INV-28)
-- [ ] Toplantıyla tamamlanan adımlar ve `applyMeetingHeldRules` (Go/No-Go, DevOps devri → top DevOps'ta); "Yapıldı" için tarih ≤ bugün ve en az bir iç katılımcı
-- [ ] Toplantılar sekmesi, detay paneli ve `MeetingDialog` API'ye bağlanır ("Kaydedince tamamlanır: …" önizlemesi `packages/shared` ile)
-- [ ] Testler: transaction (aksiyon hatasında toplantı da yazılmaz), adım tamamlama, iptal gerekçesi
+- [x] `GET /api/projects/:projectId/meetings`, `POST /api/projects/:projectId/meetings` (#8), `PATCH /api/meetings/:id` (#19; iptalde gerekçe)
+- [x] Toplantı + kararlar + doğan aksiyonlar tek transaction'da (INV-28)
+- [x] Toplantıyla tamamlanan adımlar ve `applyMeetingHeldRules` (Go/No-Go, DevOps devri → top DevOps'ta); "Yapıldı" için tarih ≤ bugün ve en az bir iç katılımcı
+- [x] Toplantılar sekmesi, detay paneli ve `MeetingDialog` API'ye bağlanır ("Kaydedince tamamlanır: …" önizlemesi `packages/shared` ile)
+- [x] Testler: transaction (aksiyon hatasında toplantı da yazılmaz), adım tamamlama, iptal gerekçesi
 - **Kabul:** toplantı kaydı → ilgili adım Aşamalar'da tamamlanır, doğan aksiyonlar Aksiyonlar'da görünür
-- **Notlar:**
+- **Notlar:** 2026-10-10, tag `m4`.
+  - **API:**
+    - Yeni modül: `apps/api/src/modules/meetings/` (`listMeetings`, `createMeeting`, `updateMeeting`). Yazmalar `changeProject(…, { meetingSteps: true })` üzerinden.
+    - `persistDiff` toplantıları da yazar. Katılımcılar toplantıyla birlikte değişmiş sayılır ve yeniden yazılır.
+    - `RuleEffects`'e `meetings` eklendi (şemada opsiyonel, API her yanıtta gönderir). `POST` 201 döner, yanıtta yeni toplantı ayrıca `meeting` alanında.
+    - Liste: tarih azalan; her toplantı kendi aksiyonlarıyla (`actions`) gelir. Sözleşmedeki `total` ve filtreler yok.
+    - `meeting_participants`'a `sort_order` eklendi (katılımcı sırası korunur). Kişi id'leri FK'sız. `last_reason` toplantıda da saklanır.
+    - Aynı katılımcı iki kez gelirse tekilleştirilir.
+    - Shared:
+      - Şemalar: `MeetingSchema`, `MeetingCreateSchema`, `MeetingPatchSchema`, `MeetingListSchema`, `MeetingCreatedSchema`. `domain/types`'taki `Meeting` bu şemadan türetiliyor.
+      - `domain/meetings.ts`: `meetingHeldError`, `stepsCompletedByMeeting`.
+      - `applyStepCompletion`'a `{ only: "data" | "meeting" }` seçeneği eklendi. Varsayılan ikisini de işler; web'in davranışı değişmedi.
+  - **Web:**
+    - `lib/api/meetings.ts` (`getMeetings`, `createMeeting`, `patchMeeting`). Ayrıca `lib/rabbitqa/use-meeting-patch.ts` (busy + hata toast'ı).
+    - Toplantılar köprüye girmez; `mergeEffects` toplantıları id ile yerleştirir.
+    - Hidrasyon: proje başına `GET phases` + `GET actions` + `GET meetings` paralel çağrılır, sunucu kazanır. Hata sonrası yeniden yükleme toplantıları da kapsar.
+    - API'ye bağlanan yerler:
+      - `MeetingDialog`: tek `POST`; doğan aksiyonlar bu istekle gider. Hata ve yerel doğrulama diyalogda gösterilir. Ekler (`addDocument`) store'da kalır ve sunucunun toplantı id'siyle bağlanır.
+      - Toplantılar sekmesi: "Yapıldı olarak işaretle" ve yeni "İptal et" (gerekçe diyaloğu, `MeetingCancelDialog`).
+      - Go-Live → Go/No-Go "Toplantıyı kaydet".
+      - Toplantı kartındaki "Müşteriye görünür" anahtarı (`ContinuityTab` → `MeetingExtras`).
+      - `TrainingWorkspace` ve `MeetingStepSection` "Yapıldı olarak işaretle".
+    - Bu dosyalarda başka toplantı yazan yer yok. `AdaptationWorkspace` ve `HandoverWorkspace` yalnız `MeetingDialog`'u açıyor; `MeetingDetailDialog` salt okunur.
+    - Store'daki `addMeeting`/`updateMeeting` çağıranları:
+      - Önce: `addMeeting` ← `MeetingDialog`, Go/No-Go; `updateMeeting` ← Toplantılar sekmesi, `TrainingWorkspace`, `MeetingStepSection`, `MeetingExtras`.
+      - Şimdi çağıran kalmadı; ikisi de kaldırıldı (store testleri API testlerine taşındı). Store `applyMeetingHeldRules` çalıştırmıyor (INV-20).
+  - **Tarayıcıda denendi** (Deniz Uzun):
+    - Örnek Sigorta: ileri tarihli planlı Satış devri → "Yapıldı olarak işaretle" → `400` ve toast. Sonra gerekçeyle iptal edildi.
+    - Örnek Sigorta: Kick-off "Yapıldı" + bir aksiyon. Diyalogda "Kaydedince tamamlanır: Kick-off toplantısı" göründü. Tek `POST` gitti; sunucuda `kickoff` done, aksiyon `source: meeting`, `meetingId` sunucunun id'si. Yenileme → aksiyon Aksiyonlar sekmesinde, `steps/sync` gitmedi.
+    - Garanti, 04 paneli: session planlandı → `POST` + bir `steps/sync` (`training_plan` veri adımı istemcide, beklenen). "Yapıldı" → `training_plan` ve `training_done` sunucuda done.
+    - Garanti Go-Live: Go/No-Go → `gonogo` Tamamlandı.
+    - "Müşteriye görünür" anahtarı → `PATCH`, sync yok.
+    - API restart → toplantılar seed'e döndü.
+    - Konsolda yalnız bilerek tetiklenen `400` var.
+  - `npm run check` yeşil: lint 0 hata / 27 uyarı; test sayıları api 110, web 259, shared 284, guard 3. API testleri `TZ=UTC` ve `TZ=Europe/Istanbul` ile de geçiyor.
 
 ## M5 — Kapanış
 - [ ] Playwright: tek ana akış e2e (yeni proje → adım tamamla → toplantı kaydet + aksiyon → aksiyonu tamamla → aşamayı onayla)
@@ -231,3 +265,18 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
   - 400 durumları: başka projenin id'si, bir kural aksiyonunun id'si, yabancı `projectId`, aynı id'nin iki kez gelmesi.
   - Köprü yolunda #7'nin gerekçe kuralları uygulanmaz (adımlardaki gibi; ekran API'ye geçince köprü kalkar).
 - 2026-10-10 (M3): Elle tamamlanan ya da iptal edilen "Aşama onayı bekliyor" aksiyonu, aşama hâlâ onaya hazırsa akış motoru tarafından hemen yeniden açılır. Bu, mockup ve API_CONTRACT #7 ile aynı davranış; aşama "Aşamayı tamamla" ile kapanır.
+- 2026-10-10 (M4): Brief'te olup kodda bulunmayanlar:
+  - "Yapıldı" doğrulaması (tarih ≤ bugün, en az bir iç katılımcı) ne `MeetingDialog`'da ne store'da vardı. **Yeni:** shared `meetingHeldError`. API bunu `POST`'ta (`held` ise) ve `PATCH`'te uygular; `PATCH`'te yalnız durum, tarih ya da iç katılımcılar değişince bakılır, böylece eski kayıtlar düzenlenebilir kalır. Hata `400` (`field: date | internalIds`). `MeetingDialog` aynı fonksiyonla önceden kontrol eder. "UX §2.6" adlı bir belge repoda yok.
+  - "Kaydedince tamamlanır: <adım>" önizlemesi yoktu; yalnız adım satırında "… toplantısı kaydedilince tamamlanır" ipucu vardı. **Yeni:** shared `stepsCompletedByMeeting` (held kuralları + adım tamamlama simülasyonu), `MeetingDialog`'da gösterilir.
+  - Planlı toplantıyı iptal eden bir arayüz yoktu. **Yeni:** Toplantılar sekmesinde "İptal et" + gerekçe diyaloğu.
+  - Brief'teki "Yapıldı olarak kaydet" düğmesinin kodundaki adı "Yapıldı olarak işaretle"; ad değişmedi.
+  - Yapılmış toplantının tür/tarih değişikliği için de arayüz yok. Kural API'de uygulanır (gerekçe zorunlu), arayüz eklenmedi.
+- 2026-10-10 (M4): `PATCH /meetings/:id` store'un kurallarıyla çalışır:
+  - Durum yalnız `planned`'dan değişir, aksi `409`.
+  - `cancelled`'a geçiş gerekçe ister.
+  - `held` toplantının tür veya tarih değişikliği gerekçe ister.
+  - Diğer alanlar (`isCustomerVisible`, notlar, katılımcılar …) gerekçesizdir.
+  - `applyMeetingHeldRules` yalnız `planned → held` geçişinde ve `held` ile oluşturmada çalışır. Toplantı adımları ise her toplantı yazmasından sonra çalışır (`only: "meeting"`), bu yüzden tür değişikliği ya da iptal koşulu bozarsa adım geri açılır (`gonogo` ve DevOps topu geri alınmaz, API_CONTRACT #19).
+- 2026-10-10 (M4): Varsayılanlar store'daki gibi: toplantı `isCustomerVisible: false`, doğan aksiyonlar `true`. Aksiyon başlığı kırpılır; boş kalırsa `400` (`actions.N.title`) döner ve hiçbir şey yazılmaz.
+- 2026-10-10 (M4): Brief INV-28'i "tek transaction" için kullanıyor, `db/index.ts` de öyle. `docs/INVARIANTS.md`'de INV-28 aşama yeniden açma kuralı. Tek transaction kuralı tutuluyor; numara karışıklığı düzeltilmedi.
+- 2026-10-10 (M4): Eğitim veri adımları (`training_plan`, `training_done`) sunucuda hesaplanmaz (M2a kararı). Toplantı yazıldıktan sonra istemci bunları tamamlar ve köprüden yazar; eğitim planlayınca bir `steps/sync` gitmesi bu yüzden beklenen davranış.

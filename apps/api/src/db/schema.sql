@@ -109,7 +109,8 @@ CREATE TABLE meetings (
 CREATE TABLE meeting_participants (
   meeting_id text NOT NULL REFERENCES meetings(id),
   kind text NOT NULL CHECK (kind IN ('user', 'contact')),
-  participant_id text NOT NULL,
+  participant_id text NOT NULL, -- user id (kind user, FK-less like other person ids) or contact id
+  sort_order integer NOT NULL DEFAULT 0,
   PRIMARY KEY (meeting_id, kind, participant_id)
 );
 
@@ -123,7 +124,7 @@ CREATE TABLE actions (
   priority text NOT NULL CHECK (priority IN ({{Priority}})),
   status text NOT NULL CHECK (status IN ({{ActionStatus}})),
   source text NOT NULL CHECK (source IN ({{ActionSource}})),
-  meeting_id text, -- no FK: meetings come to the API in M4; the bridge may carry actions of store-only meetings
+  meeting_id text, -- no FK: the bridge (steps/sync) still upserts actions as the client sends them
   rule_key text,
   insight_id text,
   is_customer_visible boolean NOT NULL DEFAULT false,

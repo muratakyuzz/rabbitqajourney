@@ -11,6 +11,7 @@ import { Pill } from "@/components/rq/Badges";
 import { useAuth } from "@/lib/auth-context";
 import { canManageProject } from "@/lib/rabbitqa/perm";
 import { personName, useRq } from "@/lib/rabbitqa/store";
+import { useMeetingPatch } from "@/lib/rabbitqa/use-meeting-patch";
 import { RISK_STATUS_LABEL, TICKET_STATUS_LABEL, TICKET_TYPE_LABEL, fmtDate } from "@rabbitqa/shared/domain/labels";
 import type { Meeting, Project, TicketType } from "@rabbitqa/shared/domain/types";
 
@@ -87,7 +88,8 @@ export function ContinuityTab({ project, renderCheckinDialog }: { project: Proje
 
 /* ── Toplantı ekleri ve bağlı kararlar ──────────────────── */
 export function MeetingExtras({ meeting, canEdit }: { meeting: Meeting; canEdit: boolean }) {
-  const { state, addDocument, updateMeeting } = useRq();
+  const { state, addDocument } = useRq();
+  const { busy, patch } = useMeetingPatch();
   const [name, setName] = useState("");
   const docs = state.documents.filter((d) => d.linkType === "meeting" && d.linkId === meeting.id);
   const decisions = state.risks.filter((r) => r.kind === "decision" && r.meetingId === meeting.id);
@@ -110,7 +112,7 @@ export function MeetingExtras({ meeting, canEdit }: { meeting: Meeting; canEdit:
             addDocument({ projectId: meeting.projectId, type: "other", name: name.trim(), linkType: "meeting", linkId: meeting.id });
             setName(""); toast.success("Ek eklendi");
           }}>Ek ekle</Button>
-          <label className="ml-auto flex items-center gap-2 text-xs"><Switch checked={meeting.isCustomerVisible} onCheckedChange={(c) => updateMeeting(meeting.id, { isCustomerVisible: c })} />Müşteriye görünür</label>
+          <label className="ml-auto flex items-center gap-2 text-xs"><Switch checked={meeting.isCustomerVisible} disabled={busy} onCheckedChange={(c) => void patch(meeting.id, { isCustomerVisible: c })} />Müşteriye görünür</label>
         </div>
       )}
     </div>

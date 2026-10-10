@@ -1,18 +1,19 @@
 import { useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Pill } from "@/components/rq/Badges";
 import { personName, useRq } from "@/lib/rabbitqa/store";
+import { useMeetingPatch } from "@/lib/rabbitqa/use-meeting-patch";
 import { fmtDate } from "@rabbitqa/shared/domain/labels";
 import { MeetingDialog } from "../MeetingDialog";
 import type { WorkspaceProps } from "./index";
 
 /** 04 Eğitim paneli: Eğitim toplantıları listesi (data-field="training:sessions" / "training:pending"). */
 export function TrainingWorkspace({ project, readOnly }: WorkspaceProps) {
-  const { state, updateMeeting } = useRq();
+  const { state } = useRq();
+  const { busy, patch } = useMeetingPatch();
   const [open, setOpen] = useState(false);
   const sessions = state.meetings
     .filter((m) => m.projectId === project.id && m.type === "training")
@@ -40,10 +41,7 @@ export function TrainingWorkspace({ project, readOnly }: WorkspaceProps) {
                   <span className="text-xs text-muted-foreground">Eğitmen: {personName(state, m.training?.trainerId ?? null)}</span>
                   <span className="text-xs text-muted-foreground">Katılımcı: {m.internalIds.length + m.contactIds.length}</span>
                   {m.status === "planned" && !readOnly && (
-                    <Button size="sm" variant="outline" className="ml-auto" onClick={() => {
-                      const err = updateMeeting(m.id, { status: "held" });
-                      if (err) toast.error(err);
-                    }}>Yapıldı olarak işaretle</Button>
+                    <Button size="sm" variant="outline" className="ml-auto" disabled={busy} onClick={() => void patch(m.id, { status: "held" })}>Yapıldı olarak işaretle</Button>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-1">{(m.training?.modules ?? []).map((mod) => <Pill key={mod} tone="muted">{mod}</Pill>)}</div>

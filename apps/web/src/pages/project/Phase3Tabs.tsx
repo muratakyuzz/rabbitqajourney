@@ -15,6 +15,8 @@ import { Switch } from "@/components/ui/switch";
 import { VisibleIcon } from "@/components/rq/VisibleIcon";
 import { useAuth } from "@/lib/auth-context";
 import { personName, useAlertViews, useRq } from "@/lib/rabbitqa/store";
+import { useServerAction } from "@/lib/rabbitqa/use-server-action";
+import { createMeeting } from "@/lib/api/meetings";
 import { AlertActionDialog } from "@/components/rq/AlertActionDialog";
 import type { AlertView } from "@rabbitqa/shared/domain/alerts";
 import { canHandleAlert, canManageProject, canManageTickets, selectableUsers } from "@/lib/rabbitqa/perm";
@@ -447,9 +449,18 @@ function RiskDialog({ project, risk, onClose, onCreate }: { project: Project; ri
 
 /* ── Go-Live ────────────────────────────────────────────── */
 export function GoLiveTab({ project }: { project: Project }) {
-  const { state, approveGoLive, addMeeting } = useRq();
+  const { state, approveGoLive } = useRq();
   const { user } = useAuth();
   const manage = canManageProject(user, project);
+  const { busy: savingGoNoGo, run } = useServerAction();
+  const saveGoNoGo = async () => {
+    const err = await run(() => createMeeting(project.id, {
+      type: "go_no_go", date: todayISO(), status: "held", internalIds: project.csmId ? [project.csmId] : [], contactIds: [],
+      notes: "Go/No-Go toplantısı (hızlı kayıt)", decisions: "", actions: [],
+    }));
+    if (err) toast.error(err);
+    else toast.success("Go/No-Go toplantısı kaydedildi — detayları Toplantılar sekmesinden düzenleyebilirsiniz");
+  };
   const [reason, setReason] = useState("");
   const [contactId, setContactId] = useState("");
   const [approvedAt, setApprovedAt] = useState(todayISO());
@@ -480,10 +491,7 @@ export function GoLiveTab({ project }: { project: Project }) {
                 </div>
                 <Pill tone={done ? "success" : "muted"}>{done ? "Tamamlandı" : "Bekliyor"}</Pill>
                 {key === "gonogo" && !done && manage && (
-                  <Button size="sm" variant="outline" onClick={() => {
-                    addMeeting({ projectId: project.id, type: "go_no_go", date: todayISO(), internalIds: project.csmId ? [project.csmId] : [], contactIds: [], notes: "Go/No-Go toplantısı (hızlı kayıt)", decisions: "", status: "held" }, []);
-                    toast.success("Go/No-Go toplantısı kaydedildi — detayları Toplantılar sekmesinden düzenleyebilirsiniz");
-                  }}>Toplantıyı kaydet</Button>
+                  <Button size="sm" variant="outline" disabled={savingGoNoGo} onClick={() => void saveGoNoGo()}>{savingGoNoGo ? "Kaydediliyor…" : "Toplantıyı kaydet"}</Button>
                 )}
               </div>
             );

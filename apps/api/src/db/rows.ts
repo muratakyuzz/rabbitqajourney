@@ -1,4 +1,4 @@
-import type { Action, Phase, ProjectCore, Step } from "@rabbitqa/shared";
+import type { Action, Meeting, Phase, ProjectCore, Step } from "@rabbitqa/shared";
 import type { Queryable } from "./index";
 
 // Domain object ↔ table row. One mapping per entity, used by the seed loader and by persistDiff.
@@ -70,6 +70,28 @@ export const rowToAction = (r: Row): Action => {
   if (insightId !== undefined) a.insightId = insightId;
   return a;
 };
+
+export const meetingToRow = (m: Meeting): Row => ({
+  id: m.id, project_id: m.projectId, type: m.type, date: m.date, notes: m.notes, decisions: m.decisions,
+  is_customer_visible: m.isCustomerVisible, status: m.status, team_id: m.teamId ?? null, training: m.training ?? null,
+});
+/** `parts`: the meeting_participants rows of this meeting. */
+export const rowToMeeting = (r: Row, parts: { kind: string; participant_id: string }[]): Meeting => ({
+  id: r.id as string, projectId: r.project_id as string, type: r.type as Meeting["type"], date: date(r.date)!,
+  notes: r.notes as string, decisions: r.decisions as string, isCustomerVisible: r.is_customer_visible as boolean,
+  status: r.status as Meeting["status"],
+  internalIds: parts.filter((p) => p.kind === "user").map((p) => p.participant_id),
+  contactIds: parts.filter((p) => p.kind === "contact").map((p) => p.participant_id),
+  ...(r.team_id != null ? { teamId: r.team_id as string } : {}),
+  ...(r.training != null ? { training: r.training as Meeting["training"] } : {}),
+});
+
+/** Replaces a meeting's participants (internal users first, then contacts, in the given order). */
+export async function writeParticipants(q: Queryable, m: Meeting) {
+  await q.query("DELETE FROM meeting_participants WHERE meeting_id = $1", [m.id]);
+  for (const [i, id] of m.internalIds.entries()) await insertRow(q, "meeting_participants", { meeting_id: m.id, kind: "user", participant_id: id, sort_order: i });
+  for (const [i, id] of m.contactIds.entries()) await insertRow(q, "meeting_participants", { meeting_id: m.id, kind: "contact", participant_id: id, sort_order: i });
+}
 
 const param = (v: unknown) => (v !== null && typeof v === "object" ? JSON.stringify(v) : v ?? null);
 

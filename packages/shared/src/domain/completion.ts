@@ -158,15 +158,21 @@ export function stepConditionResult(state: RqState, step: Step): ConditionResult
   return cond.check(state, step.projectId);
 }
 
+export interface StepCompletionOptions {
+  /** Only steps of this completion kind (the API runs "meeting" only; data steps are completed by the client). Default: both. */
+  only?: "data" | "meeting";
+}
+
 /** Bir turda: projectId'nin completion != manual adımlarını koşullarına göre tamamlar / geri açar. Değişiklik yoksa aynı referansı döner. */
-export function applyStepCompletion(state: RqState, projectId: string, mk: MkAudit, now: Date = new Date()): RqState {
+export function applyStepCompletion(state: RqState, projectId: string, mk: MkAudit, now: Date = new Date(), opts: StepCompletionOptions = {}): RqState {
   const today = localISO(now);
   const hol = holidayDates(state.holidays);
   const phases = new Map(state.phases.filter((p) => p.projectId === projectId).map((p) => [p.id, p]));
   const audit: AuditEntry[] = [];
   const stepUpd = new Map<string, Step>();
 
-  state.steps.filter((s) => s.projectId === projectId && (s.completion === "data" || s.completion === "meeting")).forEach((step) => {
+  const kinds = opts.only ? [opts.only] : ["data", "meeting"];
+  state.steps.filter((s) => s.projectId === projectId && kinds.includes(s.completion)).forEach((step) => {
     if (step.status === "out_of_scope") return;
     const phase = phases.get(step.phaseId);
     if (phase && phase.status === "out_of_scope") return;

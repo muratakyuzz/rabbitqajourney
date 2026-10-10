@@ -107,129 +107,6 @@ describe("setNoCommitments / addCommitment (AC11, AC-NEG1)", () => {
   });
 });
 
-describe("addMeeting / updateMeeting (AC12, AC-NEG2)", () => {
-  it("held brief meeting completes the Satış devri toplantısı step even while locked", () => {
-    const { result } = setup();
-    const pid = "p_ornek";
-    const step0 = result.current.state.steps.find((s) => s.projectId === pid && s.key === "brief")!;
-    expect(step0.status).toBe("locked");
-    act(() => {
-      result.current.addMeeting({ projectId: pid, type: "brief", date: "2026-10-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "held" }, []);
-    });
-    const step = result.current.state.steps.find((s) => s.projectId === pid && s.key === "brief")!;
-    expect(step.status).toBe("done");
-  });
-
-  it("planned brief meeting does not complete the step", () => {
-    const { result } = setup();
-    const pid = "p_ornek";
-    act(() => {
-      result.current.addMeeting({ projectId: pid, type: "brief", date: "2026-12-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "planned" }, []);
-    });
-    const step = result.current.state.steps.find((s) => s.projectId === pid && s.key === "brief")!;
-    expect(step.status).not.toBe("done");
-  });
-
-  it("updateMeeting planned -> held completes the step", () => {
-    const { result } = setup();
-    const pid = "p_ornek";
-    let meetingId = "";
-    act(() => {
-      meetingId = result.current.addMeeting({ projectId: pid, type: "brief", date: "2026-12-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "planned" }, []);
-    });
-    act(() => { result.current.updateMeeting(meetingId, { status: "held" }); });
-    const step = result.current.state.steps.find((s) => s.projectId === pid && s.key === "brief")!;
-    expect(step.status).toBe("done");
-  });
-
-  it("rejects status change on a held meeting", () => {
-    const { result } = setup();
-    const pid = "p_ornek";
-    let meetingId = "";
-    act(() => {
-      meetingId = result.current.addMeeting({ projectId: pid, type: "brief", date: "2026-10-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "held" }, []);
-    });
-    let err: string | null = null;
-    act(() => { err = result.current.updateMeeting(meetingId, { status: "cancelled" }, "gerekçe"); });
-    expect(err).toBe("Yalnızca Planlandı toplantının durumu değiştirilebilir");
-  });
-
-  // AC-NEG5 / RUL-07 (m09a): held toplantıda tür veya tarih değişikliği gerekçesiz reddedilir.
-  it("rejects a held meeting's date change without a reason, accepts it with one (RUL-07 m09a, AC-NEG5)", () => {
-    const { result } = setup();
-    const pid = "p_ornek";
-    let meetingId = "";
-    act(() => {
-      meetingId = result.current.addMeeting({ projectId: pid, type: "brief", date: "2026-10-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "held" }, []);
-    });
-    let err: string | null = null;
-    act(() => { err = result.current.updateMeeting(meetingId, { date: "2026-10-02" }); });
-    expect(err).toBe("Yapılmış toplantının tür/tarih değişikliğinde gerekçe zorunlu");
-    expect(result.current.state.meetings.find((m) => m.id === meetingId)!.date).toBe("2026-10-01");
-
-    act(() => { err = result.current.updateMeeting(meetingId, { date: "2026-10-02" }, "müşteri talebiyle tarih güncellendi"); });
-    expect(err).toBeNull();
-    const after = result.current.state.meetings.find((m) => m.id === meetingId)!;
-    expect(after.date).toBe("2026-10-02");
-    const audit = result.current.state.audit.find((a) => a.entity === "meeting" && a.entityId === meetingId && a.field === "date");
-    expect(audit?.reason).toBe("müşteri talebiyle tarih güncellendi");
-  });
-
-  it("rejects a held meeting's type change without a reason (RUL-07 m09a)", () => {
-    const { result } = setup();
-    const pid = "p_ornek";
-    let meetingId = "";
-    act(() => {
-      meetingId = result.current.addMeeting({ projectId: pid, type: "brief", date: "2026-10-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "held" }, []);
-    });
-    let err: string | null = null;
-    act(() => { err = result.current.updateMeeting(meetingId, { type: "kickoff" }); });
-    expect(err).toBe("Yapılmış toplantının tür/tarih değişikliğinde gerekçe zorunlu");
-    expect(result.current.state.meetings.find((m) => m.id === meetingId)!.type).toBe("brief");
-  });
-
-  it("rejects planned -> cancelled without reason", () => {
-    const { result } = setup();
-    const pid = "p_ornek";
-    let meetingId = "";
-    act(() => {
-      meetingId = result.current.addMeeting({ projectId: pid, type: "brief", date: "2026-12-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "planned" }, []);
-    });
-    let err: string | null = null;
-    act(() => { err = result.current.updateMeeting(meetingId, { status: "cancelled" }); });
-    expect(err).toBe("İptal için gerekçe zorunlu");
-  });
-
-  it("cancelled meeting does not complete the step (AC12, REV-03)", () => {
-    const { result } = setup();
-    const pid = "p_ornek";
-    let meetingId = "";
-    act(() => {
-      meetingId = result.current.addMeeting({ projectId: pid, type: "brief", date: "2026-12-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "planned" }, []);
-    });
-    act(() => { result.current.updateMeeting(meetingId, { status: "cancelled" }, "müşteri iptal etti"); });
-    const step = result.current.state.steps.find((s) => s.projectId === pid && s.key === "brief")!;
-    expect(step.status).not.toBe("done");
-  });
-
-  it("planned devops_handover does not move the ball; held moves ball to devops and completes the step (AC13, REV-03)", () => {
-    const { result } = setup();
-    const pid = "p_isyatirim";
-    const before = result.current.state.steps.find((s) => s.projectId === pid && s.key === "devops_handover")!;
-    const beforeBall = before.ball;
-    let meetingId = "";
-    act(() => {
-      meetingId = result.current.addMeeting({ projectId: pid, type: "devops_handover", date: "2026-12-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "planned" }, []);
-    });
-    const afterPlanned = result.current.state.steps.find((s) => s.projectId === pid && s.key === "devops_handover")!;
-    expect(afterPlanned.ball).toBe(beforeBall);
-    act(() => { result.current.updateMeeting(meetingId, { status: "held" }); });
-    const afterHeld = result.current.state.steps.find((s) => s.projectId === pid && s.key === "devops_handover")!;
-    expect(afterHeld.ball).toBe("devops");
-    expect(afterHeld.status).toBe("done");
-  });
-});
-
 describe("updateStep — out_of_scope reopens via settle (AC10, REV-03)", () => {
   it("out_of_scope -> pending is accepted; settle marks it done once the condition is met", () => {
     const { result } = setup();
@@ -609,18 +486,15 @@ describe("flowMessages — Tamamlandı toast (AC10)", () => {
     expect(toast.success).toHaveBeenCalledWith("Tamamlandı: Satışçı ve lisans modelinin girilmesi");
   });
 
-  it("a held brief meeting with a rule action keeps its toast across the follow-up setState (does not get overwritten)", () => {
+  it("a held brief meeting from the API (server effects) toasts the completed step once", () => {
     const { result } = setup();
     const pid = "p_ornek";
-    act(() => {
-      result.current.addMeeting(
-        { projectId: pid, type: "brief", date: "2026-10-01", internalIds: [], contactIds: [], notes: "", decisions: "", status: "held" },
-        [{ title: "Takip aksiyonu", ownerId: null, ball: "csm", due: null, priority: "medium", status: "open" }],
-      );
-    });
+    const brief = result.current.state.steps.find((s) => s.projectId === pid && s.key === "brief")!;
+    const meeting = { id: "m_api", projectId: pid, type: "brief" as const, date: "2026-10-01", internalIds: ["u_deniz"], contactIds: [], notes: "", decisions: "", isCustomerVisible: false, status: "held" as const };
+    act(() => { result.current.applyServerEffects({ phases: [], steps: [{ ...brief, status: "done" }], actions: [], meetings: [meeting] }); });
+    expect(result.current.state.meetings.find((m) => m.id === "m_api")).toEqual(meeting);
     const calls = (toast.success as unknown as { mock: { calls: unknown[][] } }).mock.calls.map((c) => c[0]);
-    const matches = calls.filter((m) => m === "Tamamlandı: Satış devri toplantısı");
-    expect(matches.length).toBe(1);
+    expect(calls.filter((m) => m === "Tamamlandı: Satış devri toplantısı")).toHaveLength(1);
   });
 });
 

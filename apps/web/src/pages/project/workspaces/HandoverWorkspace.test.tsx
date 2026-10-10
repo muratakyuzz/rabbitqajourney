@@ -1,11 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within, fireEvent } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { RqProvider } from "@/lib/rabbitqa/store";
 import ProjectDetail from "@/pages/ProjectDetail";
 import type { AuthUser } from "@/lib/auth-api";
+import { fakeApi } from "@/test/fake-api";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -27,6 +28,8 @@ function renderProject(initialPath = "/app/projects/p_ornek?tab=phases") {
     </MemoryRouter>,
   );
 }
+
+afterEach(() => vi.unstubAllGlobals());
 
 beforeEach(() => {
   localStorage.clear();
@@ -65,7 +68,9 @@ describe("AC2 — clicking a missing step highlights its field", () => {
 
 describe("AC3 — meeting step opens prefilled form and completes on save", () => {
   it("opens MeetingDialog with defaultType brief and completes the step on save", async () => {
+    const api = fakeApi();
     renderProject();
+    await waitFor(() => expect(api.callsTo("GET", /^\/projects\/p_ornek\/meetings$/)).toHaveLength(1));
     fireEvent.click(screen.getByText("Satış devri toplantısı"));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("Toplantı kaydet")).toBeTruthy();
@@ -74,7 +79,8 @@ describe("AC3 — meeting step opens prefilled form and completes on save", () =
     expect(within(denizLabel).getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
     const saveBtn = within(dialog).getByRole("button", { name: "Kaydet" });
     fireEvent.click(saveBtn);
-    expect(toast.success).toHaveBeenCalledWith("Toplantı kaydedildi");
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Toplantı kaydedildi"));
+    expect(api.callsTo("POST", /^\/projects\/p_ornek\/meetings$/)[0].body).toMatchObject({ type: "brief", status: "held", internalIds: ["u_deniz"], actions: [] });
     await vi.waitFor(() => {
       expect(screen.queryByRole("dialog")).toBeNull();
     });

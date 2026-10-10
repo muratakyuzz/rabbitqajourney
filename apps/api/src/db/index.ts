@@ -4,7 +4,7 @@ import { newDb, type IMemoryDb } from "pg-mem";
 import * as shared from "@rabbitqa/shared";
 import { createSeed } from "@rabbitqa/shared/domain/seed";
 import type { RqState } from "@rabbitqa/shared/domain/types";
-import { actionToRow, insertRow, phaseToRow, projectToRow, stepToRow } from "./rows";
+import { actionToRow, insertRow, meetingToRow, phaseToRow, projectToRow, stepToRow, writeParticipants } from "./rows";
 
 // Faz 1: pg-mem only (docs/PLAN.md). Schema + seed are rebuilt on every boot; a restart resets all data.
 
@@ -64,12 +64,8 @@ export async function loadSeed(db: Queryable, s: RqState) {
   for (const ph of s.phases) await insertRow(db, "phases", phaseToRow(ph));
   for (const st of s.steps) await insertRow(db, "steps", stepToRow(st));
   for (const m of s.meetings) {
-    await insertRow(db, "meetings", {
-      id: m.id, project_id: m.projectId, type: m.type, date: m.date, notes: m.notes, decisions: m.decisions,
-      is_customer_visible: m.isCustomerVisible, status: m.status, team_id: m.teamId ?? null, training: m.training ?? null,
-    });
-    for (const id of m.internalIds) await insertRow(db, "meeting_participants", { meeting_id: m.id, kind: "user", participant_id: id });
-    for (const id of m.contactIds) await insertRow(db, "meeting_participants", { meeting_id: m.id, kind: "contact", participant_id: id });
+    await insertRow(db, "meetings", meetingToRow(m));
+    await writeParticipants(db, m);
   }
   for (const a of s.actions) await insertRow(db, "actions", actionToRow(a));
 }

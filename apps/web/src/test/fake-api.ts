@@ -1,8 +1,26 @@
 import { vi } from "vitest";
-import { createSeed } from "@rabbitqa/shared/domain/seed";
+import type { MeetingCreate, MeetingPatch } from "@rabbitqa/shared";
+import { ballForOwner } from "@rabbitqa/shared/domain/ball";
+import { applyStepCompletion } from "@rabbitqa/shared/domain/completion";
+import { advanceFlow, type MkAudit } from "@rabbitqa/shared/domain/flow";
+import { applyMeetingHeldRules } from "@rabbitqa/shared/domain/rules";
+import { createSeed, uid } from "@rabbitqa/shared/domain/seed";
+import type { Action, Meeting, RqState } from "@rabbitqa/shared/domain/types";
 
 // In-memory stand-in for apps/api in web tests: serves the seed like a fresh API boot.
 // `handlers` override routes by "METHOD /path" regex (path without the /api prefix).
+// Meeting writes run the same shared rules as the API (no validation; tests of errors use handlers).
+
+const noAudit: MkAudit = (e) => ({ ...e, id: "", at: "", userId: "" });
+
+/** Applies a meeting write to the fake server state like apps/api changeProject; returns the changed steps. */
+function meetingWrite(server: RqState, projectId: string, change: (s: RqState) => RqState) {
+  const before = new Map(server.steps.map((x) => [x.id, JSON.stringify(x)]));
+  let next = applyStepCompletion(change(server), projectId, noAudit, new Date(), { only: "meeting" });
+  next = advanceFlow(next, projectId, noAudit, new Date());
+  Object.assign(server, { meetings: next.meetings, actions: next.actions, steps: next.steps, phases: next.phases });
+  return next.steps.filter((x) => before.get(x.id) !== JSON.stringify(x));
+}
 
 export interface Call { method: string; path: string; body: unknown }
 type Handler = (call: Call) => Response | Promise<Response>;
@@ -35,6 +53,39 @@ export function fakeApi(handlers: Record<string, Handler> = {}) {
       const pid = m[1];
       if (!server.projects.some((p) => p.id === pid)) return apiError(404, "NOT_FOUND", "Proje bulunamadı.");
       return json(200, { items: server.actions.filter((a) => a.projectId === pid) });
+    }
+    m = key.match(/^GET \/projects\/([^/]+)\/meetings$/);
+    if (m) {
+      const pid = m[1];
+      if (!server.projects.some((p) => p.id === pid)) return apiError(404, "NOT_FOUND", "Proje bulunamadı.");
+      const items = server.meetings.filter((x) => x.projectId === pid).sort((a, b) => b.date.localeCompare(a.date))
+        .map((x) => ({ ...x, actions: server.actions.filter((a) => a.meetingId === x.id) }));
+      return json(200, { items });
+    }
+    m = key.match(/^POST \/projects\/([^/]+)\/meetings$/);
+    if (m) {
+      const pid = m[1];
+      const { actions: drafts = [], isCustomerVisible, teamId, ...b } = call.body as MeetingCreate;
+      const meeting: Meeting = { ...b, id: uid("m"), projectId: pid, isCustomerVisible: isCustomerVisible ?? false, ...(teamId != null ? { teamId } : {}) };
+      const actions = drafts.map((a): Action => ({
+        ...a, id: uid("a"), projectId: pid, ball: ballForOwner(a.ownerId, server.users, a.ball), source: "meeting", meetingId: meeting.id,
+        createdAt: new Date().toISOString(), isCustomerVisible: a.isCustomerVisible ?? true,
+      }));
+      const steps = meetingWrite(server, pid, (s) => applyMeetingHeldRules({ ...s, meetings: [...s.meetings, meeting], actions: [...s.actions, ...actions] }, meeting, noAudit));
+      return json(201, { phases: [], steps, actions, meetings: [meeting], meeting });
+    }
+    m = key.match(/^PATCH \/meetings\/([^/]+)$/);
+    if (m) {
+      const old = server.meetings.find((x) => x.id === m![1]);
+      if (!old) return apiError(404, "NOT_FOUND", "Toplantı bulunamadı.");
+      const { reason: _r, ...patch } = call.body as MeetingPatch;
+      const next: Meeting = { ...old, ...patch } as Meeting;
+      const held = old.status === "planned" && next.status === "held";
+      const steps = meetingWrite(server, old.projectId, (s) => {
+        const changed = { ...s, meetings: s.meetings.map((x) => (x.id === old.id ? next : x)) };
+        return held ? applyMeetingHeldRules(changed, next, noAudit) : changed;
+      });
+      return json(200, { phases: [], steps, actions: [], meetings: [next] });
     }
     m = key.match(/^POST \/projects\/([^/]+)\/steps\/sync$/);
     if (m) {

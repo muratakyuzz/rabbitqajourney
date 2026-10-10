@@ -4,6 +4,7 @@ import {
   MeetingTypeSchema, PhaseStatusSchema, PrioritySchema, StepCompletionSchema, StepStatusSchema,
 } from "../enums";
 import { IdSchema, IsoDateSchema, IsoDateTimeSchema } from "./common";
+import { MeetingSchema } from "./meeting";
 
 // Projects, phases, steps and the actions the flow engine opens (docs/PLAN.md M2).
 // Phase/Step/Action in domain/types are these types.
@@ -139,14 +140,28 @@ export const StepsSyncSchema = z.object({
 }).refine((b) => b.steps.length + b.actions.length > 0, { message: "Gönderilecek adım veya aksiyon yok.", path: ["steps"] });
 export type StepsSync = z.infer<typeof StepsSyncSchema>;
 
-/** Response of every phase/step write: only the records that changed (including rule/flow effects). */
+/**
+ * Response of every project write: only the records that changed (including rule/flow effects).
+ * `meetings` is sent by every API write since M4; optional so a response without it still parses.
+ */
 export const RuleEffectsSchema = z.object({
   project: ProjectCoreSchema.optional(),
   phases: z.array(PhaseSchema),
   steps: z.array(StepSchema),
   actions: z.array(ActionSchema),
+  meetings: z.array(MeetingSchema).optional(),
 });
 export type RuleEffects = z.infer<typeof RuleEffectsSchema>;
+
+/** GET /api/projects/:projectId/meetings: newest first, each with the actions it gave rise to. */
+export const MeetingDetailSchema = MeetingSchema.extend({ actions: z.array(ActionSchema) });
+export type MeetingDetail = z.infer<typeof MeetingDetailSchema>;
+export const MeetingListSchema = z.object({ items: z.array(MeetingDetailSchema) });
+export type MeetingList = z.infer<typeof MeetingListSchema>;
+
+/** POST /api/projects/:projectId/meetings (#8): the new meeting plus everything written with it. */
+export const MeetingCreatedSchema = RuleEffectsSchema.extend({ meeting: MeetingSchema });
+export type MeetingCreated = z.infer<typeof MeetingCreatedSchema>;
 
 /** GET /api/projects/:projectId/phases. */
 export const PhasesWithStepsSchema = z.object({

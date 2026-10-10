@@ -121,23 +121,6 @@ export interface Project {
 
 
 
-export interface MeetingTraining { trainerId: string | null; modules: string[]; recordingUrl: string }
-
-export interface Meeting {
-  id: string;
-  projectId: string;
-  type: MeetingType;
-  date: string;
-  internalIds: string[];
-  contactIds: string[];
-  notes: string;
-  decisions: string;
-  isCustomerVisible: boolean;
-  status: MeetingStatus;
-  teamId?: string | null;
-  training?: MeetingTraining;
-}
-
 export interface Contact {
   id: string;
   projectId: string;
@@ -271,6 +254,8 @@ import type { PhaseTpl } from "../schemas/template";
 export type { PhaseTpl, StepTpl } from "../schemas/template";
 import type { Action, Phase, Step } from "../schemas/project";
 export type { Action, Phase, Step } from "../schemas/project";
+import type { Meeting } from "../schemas/meeting";
+export type { Meeting, MeetingTraining } from "../schemas/meeting";
 
 export interface RqState {
   version: number;

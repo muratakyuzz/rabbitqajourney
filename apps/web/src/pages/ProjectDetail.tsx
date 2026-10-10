@@ -21,7 +21,8 @@ import { CredentialsSection, DocumentsTab } from "./project/Phase2Tabs";
 import { GoLiveTab, ProjectAlertsPanel, RisksTab, TicketsTab } from "./project/Phase3Tabs";
 import { ContinuityTab, MeetingExtras } from "./project/ContinuityTab";
 import { DiscoveryTab } from "./project/DiscoveryContent";
-import { ActionFields, type ActionDraft, EnumSelect, MeetingDetailDialog, MeetingDialog, NONE, PersonSelect } from "./project/MeetingDialog";
+import { ActionFields, type ActionDraft, EnumSelect, MeetingCancelDialog, MeetingDetailDialog, MeetingDialog, NONE, PersonSelect } from "./project/MeetingDialog";
+import { useMeetingPatch } from "@/lib/rabbitqa/use-meeting-patch";
 import { stepClickTarget, workspaceAvailable } from "./project/workspaces";
 import { PhaseWorkspaceSheet } from "./project/workspaces/PhaseWorkspaceSheet";
 import { VisibleIcon } from "@/components/rq/VisibleIcon";
@@ -49,7 +50,7 @@ import {
   PHASE_STATUS_LABEL, PRIORITY_LABEL, STEP_STATUS_LABEL, INSTALL_LABEL, LLM_LABEL, SOURCE_LABEL, fmtDate, fmtDateTime, todayISO,
 } from "@rabbitqa/shared/domain/labels";
 import type {
-  Action, ActionStatus, Ball, ContactRole, Dependency, Health, MeetingStatus, MeetingType, Phase, PhaseStatus, Priority, Project, Step, StepStatus,
+  Action, ActionStatus, Ball, ContactRole, Dependency, Health, Meeting, MeetingStatus, MeetingType, Phase, PhaseStatus, Priority, Project, Step, StepStatus,
 } from "@rabbitqa/shared/domain/types";
 
 function AiSourceBadge({ action }: { action: Action }) {
@@ -735,9 +736,11 @@ function ActionDialog({ project, action, onClose }: { project: Project; action: 
 
 /* ── Meetings ───────────────────────────────────────────── */
 function MeetingsTab({ project }: { project: Project }) {
-  const { state, updateMeeting } = useRq();
+  const { state } = useRq();
   const { user } = useAuth();
+  const { busy, patch } = useMeetingPatch();
   const [open, setOpen] = useState(false);
+  const [cancelling, setCancelling] = useState<Meeting | null>(null);
   const [fType, setFType] = useState("all");
   const [fStatus, setFStatus] = useState("all");
   const meetings = state.meetings
@@ -778,10 +781,10 @@ function MeetingsTab({ project }: { project: Project }) {
                   İç: {m.internalIds.map((i) => personName(state, i)).join(", ") || "—"} · Müşteri: {m.contactIds.map((i) => personName(state, i)).join(", ") || "—"}
                 </span>
                 {m.status === "planned" && manage && (
-                  <Button size="sm" variant="outline" onClick={() => {
-                    const err = updateMeeting(m.id, { status: "held" });
-                    if (err) toast.error(err); else toast.success("Toplantı Yapıldı olarak işaretlendi");
-                  }}>Yapıldı olarak işaretle</Button>
+                  <>
+                    <Button size="sm" variant="outline" disabled={busy} onClick={() => void patch(m.id, { status: "held" }, "Toplantı Yapıldı olarak işaretlendi")}>Yapıldı olarak işaretle</Button>
+                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => setCancelling(m)}>İptal et</Button>
+                  </>
                 )}
               </div>
               {m.type === "training" && m.training && (
@@ -804,6 +807,7 @@ function MeetingsTab({ project }: { project: Project }) {
         );
       })}
       {open && <MeetingDialog project={project} onClose={() => setOpen(false)} />}
+      {cancelling && <MeetingCancelDialog meeting={cancelling} onClose={() => setCancelling(null)} />}
     </div>
   );
 }

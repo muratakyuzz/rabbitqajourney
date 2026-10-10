@@ -238,5 +238,6 @@ async function withSentRecords(tx: Queryable, projectId: string, effects: Effect
     phases: effects.phases,
     steps: add([...effects.steps], state.steps.filter((x) => stepIds.has(x.id))),
     actions: add([...effects.actions], actions.map((a) => (isRuleAction(a) ? rules.get(a.ruleKey) : state.actions.find((x) => x.id === a.id)))),
+    meetings: effects.meetings,
   };
 }

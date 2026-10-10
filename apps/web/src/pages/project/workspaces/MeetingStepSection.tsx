@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Pill, StepStatusBadge } from "@/components/rq/Badges";
 import { personName, useRq } from "@/lib/rabbitqa/store";
+import { useMeetingPatch } from "@/lib/rabbitqa/use-meeting-patch";
 import { latestHeldMeeting } from "@rabbitqa/shared/domain/completion";
 import { fmtDate } from "@rabbitqa/shared/domain/labels";
 import type { MeetingType, Project } from "@rabbitqa/shared/domain/types";
@@ -12,7 +12,8 @@ import { MeetingDialog, MeetingDetailDialog } from "../MeetingDialog";
 export function MeetingStepSection({ project, stepKey, type, title, readOnly, teamId }: {
   project: Project; stepKey: string; type: MeetingType; title: string; readOnly: boolean; teamId?: string | null;
 }) {
-  const { state, updateMeeting } = useRq();
+  const { state } = useRq();
+  const { busy, patch } = useMeetingPatch();
   const [meetingFormOpen, setMeetingFormOpen] = useState(false);
   const [meetingDetailId, setMeetingDetailId] = useState<string | null>(null);
 
@@ -38,10 +39,7 @@ export function MeetingStepSection({ project, stepKey, type, title, readOnly, te
           <Pill tone="info">Planlandı · {fmtDate(planned.date)}</Pill>
           {!readOnly && (
             <div>
-              <Button size="sm" variant="outline" onClick={() => {
-                const err = updateMeeting(planned.id, { status: "held" });
-                if (err) toast.error(err);
-              }}>Yapıldı olarak işaretle</Button>
+              <Button size="sm" variant="outline" disabled={busy} onClick={() => void patch(planned.id, { status: "held" })}>Yapıldı olarak işaretle</Button>
             </div>
           )}
         </div>

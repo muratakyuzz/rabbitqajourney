@@ -16,12 +16,13 @@ import type {
 import { todayISO } from "@rabbitqa/shared/domain/labels";
 import { buildReportSnapshot, defaultNextWeek } from "@rabbitqa/shared/domain/reports";
 import { weekStartOf } from "@rabbitqa/shared/domain/alerts";
-import { applyInstallType, applyLlmChoice, applyMeetingHeldRules, ensureReviewAction, installChoiceError, setStepByKey } from "@rabbitqa/shared/domain/rules";
+import { applyInstallType, applyLlmChoice, ensureReviewAction, installChoiceError, setStepByKey } from "@rabbitqa/shared/domain/rules";
 import type { RuleEffects, TemplateVersion } from "@rabbitqa/shared";
 import { fetchTemplate } from "@/lib/api/template";
 import { ApiError, apiErrorMessage } from "@/lib/api";
 import { getPhases, patchPhase, syncProject } from "@/lib/api/projects";
 import { getActions } from "@/lib/api/actions";
+import { getMeetings } from "@/lib/api/meetings";
 import { diffProject, emptyView, mergeEffects, projectsIn, recordActions, recordSteps, replaceProjectData, type ServerView, canon } from "./server-sync";
 
 /** Debounce of the client-rule bridge (docs/PLAN.md M2b). */
@@ -57,7 +58,6 @@ interface Ctx {
   updateStep: (id: string, patch: Partial<Step>, reason?: string) => string | null;
   /** Mockup callers only (AI action_update approval); the Actions tab writes through the API (docs/PLAN.md M3). */
   updateAction: (id: string, patch: Partial<Action>, reason?: string) => void;
-  addMeeting: (m: Omit<Meeting, "id" | "isCustomerVisible"> & { isCustomerVisible?: boolean }, actions: (Omit<Action, "id" | "createdAt" | "meetingId" | "projectId" | "source" | "isCustomerVisible"> & { isCustomerVisible?: boolean })[]) => string;
   addContact: (c: Omit<Contact, "id">) => void;
   updateContact: (id: string, patch: Partial<Contact>) => void;
   addCommitment: (c: Omit<Commitment, "id">) => void;
@@ -68,7 +68,6 @@ interface Ctx {
   setInstallChoice: (projectId: string, patch: Partial<Pick<Project, "installType" | "llmChoice">>, reason?: string) => { error: string | null; summary: string | null };
   addKpi: (k: Omit<Kpi, "id" | "measurements" | "isCustomerVisible"> & { isCustomerVisible?: boolean }) => void;
   updateKpi: (id: string, patch: Partial<Kpi>) => void;
-  updateMeeting: (id: string, patch: Partial<Meeting>, reason?: string) => string | null;
   addMeasurement: (kpiId: string, m: { date: string; value: number }) => void;
   setAdaptationCheck: (projectId: string, teamId: string | null, item: AdaptationItem, value: boolean) => string | null;
   addCredential: (c: Omit<Credential, "id">) => void;
@@ -175,16 +174,17 @@ export function RqProvider({ children }: { children: ReactNode }) {
     setState((s) => mergeEffects(s, e));
   }, [setState]);
 
-  /** Loads a project's phases, steps and actions from the API (server wins) and starts bridging it. */
+  /** Loads a project's phases, steps, actions and meetings from the API (server wins) and starts bridging it. */
   const hydrate = useCallback(async (pid: string): Promise<"ok" | "missing" | "offline"> => {
     try {
-      const [plan, actions] = await Promise.all([getPhases(pid), getActions(pid)]);
+      const [plan, actions, meetingList] = await Promise.all([getPhases(pid), getActions(pid), getMeetings(pid)]);
+      const meetings = meetingList.map(({ actions: _a, ...m }) => m);
       const view = emptyView();
       recordSteps(view, plan.steps);
       recordActions(view, actions);
       views.current.set(pid, view);
       lastSent.current.delete(pid);
-      setState((s) => replaceProjectData(s, pid, { ...plan, actions }));
+      setState((s) => replaceProjectData(s, pid, { ...plan, actions, meetings }));
       return "ok";
     } catch (e) {
       views.current.delete(pid);
@@ -199,7 +199,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
 
   const hydrateAll = useCallback(async (ids: string[]) => {
     const results = await Promise.all(ids.map(hydrate));
-    if (results.includes("offline")) console.warn("API'ye ulaşılamadı; aşama/adım/aksiyon köprüsü kapalı, mockup verisiyle devam ediliyor.");
+    if (results.includes("offline")) console.warn("API'ye ulaşılamadı; aşama/adım/aksiyon/toplantı köprüsü kapalı, mockup verisiyle devam ediliyor.");
   }, [hydrate]);
 
   useEffect(() => {
@@ -352,34 +352,6 @@ export function RqProvider({ children }: { children: ReactNode }) {
       return null;
     },
     updateAction: (id, p, reason) => patch<Action>("actions", id, p, reason),
-    addMeeting: (m, actions) => {
-      const meeting: Meeting = { ...m, isCustomerVisible: m.isCustomerVisible ?? false, id: uid("m") };
-      add<Meeting>("meetings", meeting, `Toplantı kaydedildi`);
-      setState((s) => applyMeetingHeldRules(s, meeting, mkAudit));
-      actions.forEach((a) =>
-        add<Action>("actions", { ...a, isCustomerVisible: a.isCustomerVisible ?? true, id: uid("a"), projectId: m.projectId, source: "meeting", meetingId: meeting.id, createdAt: new Date().toISOString() }),
-      );
-      return meeting.id;
-    },
-    updateMeeting: (id, p, reason) => {
-      const old = state.meetings.find((m) => m.id === id);
-      if (!old) return "Toplantı bulunamadı";
-      if (p.status && p.status !== old.status) {
-        if (old.status !== "planned") return "Yalnızca Planlandı toplantının durumu değiştirilebilir";
-        if (p.status === "cancelled" && !reason?.trim()) return "İptal için gerekçe zorunlu";
-      }
-      if (old.status === "held" && ((p.type && p.type !== old.type) || (p.date && p.date !== old.date)) && !reason?.trim()) {
-        return "Yapılmış toplantının tür/tarih değişikliğinde gerekçe zorunlu";
-      }
-      patch<Meeting>("meetings", id, p, reason);
-      if (p.status === "held") {
-        setState((s) => {
-          const m = s.meetings.find((x) => x.id === id);
-          return m ? applyMeetingHeldRules(s, m, mkAudit) : s;
-        });
-      }
-      return null;
-    },
     addContact: (c) => add<Contact>("contacts", { ...c, id: uid("c") }),
     updateContact: (id, p) => patch<Contact>("contacts", id, p),
     addCommitment: (c) => {
