@@ -565,7 +565,9 @@ function PhaseDialog({ phase, onClose }: { phase: Phase; onClose: () => void }) 
   delete statusOptions.locked;
   delete statusOptions.late;
   delete statusOptions.at_risk;
-  const needsReason = status !== initialStatus || (planEnd || null) !== phase.planEnd || (planStart || null) !== phase.planStart;
+  // status, plan and actual dates need a reason — same as the API (INV-06)
+  const needsReason = status !== initialStatus || (planEnd || null) !== phase.planEnd || (planStart || null) !== phase.planStart
+    || (actualStart || null) !== phase.actualStart;
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>

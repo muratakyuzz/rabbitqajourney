@@ -74,6 +74,32 @@ describe("Aşamalar ve adımlar → API", () => {
     });
   });
 
+  it("phase dialog: changing the actual start asks for a reason, then PATCH carries both (review O3)", async () => {
+    const api = fakeApi({
+      "PATCH /phases/([^/]+)": (c) => {
+        const ph = api.server.phases.find((p) => p.id === c.path.split("/")[2])!;
+        const { reason: _r, ...body } = c.body as Record<string, unknown>;
+        return json(200, { phases: [{ ...ph, ...body }], steps: [], actions: [] });
+      },
+    });
+    await renderProject("p_garanti", api);
+    fireEvent.click(screen.getAllByRole("button", { name: "Aşamayı düzenle" })[0]);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByText("Gerekçe (zorunlu)")).toBeNull();
+
+    const actualStart = within(dialog).getByText("Gerçekleşen başlangıç").parentElement!.querySelector("input")!;
+    fireEvent.change(actualStart, { target: { value: "2026-09-01" } });
+    expect(within(dialog).getByText("Gerekçe (zorunlu)")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Kaydet" }));
+    expect(toast.error).toHaveBeenCalledWith("Gerekçe zorunlu");
+    expect(api.callsTo("PATCH", /^\/phases\//)).toEqual([]);
+
+    fireEvent.change(within(dialog).getByText("Gerekçe (zorunlu)").parentElement!.querySelector("textarea")!, { target: { value: "Fiili başlangıç düzeltildi" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Kaydet" }));
+    await waitFor(() => expect(api.callsTo("PATCH", /^\/phases\//)).toHaveLength(1));
+    expect(api.callsTo("PATCH", /^\/phases\//)[0].body).toMatchObject({ actualStart: "2026-09-01", reason: "Fiili başlangıç düzeltildi" });
+  });
+
   it("step dialog: API error is shown and the dialog stays open", async () => {
     const api = fakeApi({ "PATCH /steps/st_garanti_18": () => apiError(409, "CONFLICT", "Adımın sırası gelmedi") });
     await renderProject("p_garanti", api);

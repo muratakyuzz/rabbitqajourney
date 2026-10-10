@@ -202,6 +202,41 @@ describe("PATCH /api/phases/:id", () => {
     expect(ph).toMatchObject({ planEnd: "2026-10-30", baselineEnd: before.baselineEnd });
   });
 
+  it("planStart, actualStart and actualEnd changes need a reason (review O3)", async () => {
+    const before = (await phasesOf("p_akbank")).phases.find((p) => p.id === "ph_akbank_03")!;
+    for (const body of [{ planStart: "2026-10-01" }, { actualStart: "2026-09-01" }, { actualEnd: "2026-10-30" }, { actualStart: null }]) {
+      const res = await request(app).patch("/api/phases/ph_akbank_03").send(body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(errorOf(res)).toMatchObject({ code: "REASON_REQUIRED", field: "reason" });
+    }
+    expect((await phasesOf("p_akbank")).phases.find((p) => p.id === "ph_akbank_03")).toEqual(before);
+
+    const ok = await request(app).patch("/api/phases/ph_akbank_03").send({ actualStart: "2026-09-01", reason: "Fiili başlangıç düzeltildi" });
+    expect(ok.status).toBe(200);
+    expect(effects(ok).phases[0].actualStart).toBe("2026-09-01");
+    // an unchanged date is not a change: no reason needed
+    expect((await request(app).patch("/api/phases/ph_akbank_03").send({ actualStart: "2026-09-01" })).status).toBe(200);
+  });
+
+  it("a status change without a reason → 400 and nothing changes (review O3)", async () => {
+    const before = (await phasesOf("p_akbank")).phases.find((p) => p.id === "ph_akbank_03")!;
+    for (const reason of [undefined, "", "   "]) {
+      const res = await request(app).patch("/api/phases/ph_akbank_03").send({ status: "out_of_scope", reason });
+      expect(res.status).toBe(400);
+      expect(errorOf(res).code).toBe("REASON_REQUIRED");
+    }
+    expect((await phasesOf("p_akbank")).phases.find((p) => p.id === "ph_akbank_03")?.status).toBe(before.status);
+  });
+
+  it("the reason is stored as last_reason (review O3)", async () => {
+    const lastReason = async () => (await db.query<{ last_reason: string | null }>("SELECT last_reason FROM phases WHERE id = 'ph_akbank_03'")).rows[0].last_reason;
+    expect(await lastReason()).toBeNull();
+    await request(app).patch("/api/phases/ph_akbank_03").send({ planEnd: "2026-10-30", reason: "  Keşif uzadı  " }).expect(200);
+    expect(await lastReason()).toBe("Keşif uzadı");
+    await request(app).patch("/api/phases/ph_akbank_03").send({ status: "out_of_scope", reason: "Keşif yapılmayacak" }).expect(200);
+    expect(await lastReason()).toBe("Keşif yapılmayacak");
+  });
+
   it("409 for locked phases and for statuses that are not set by hand", async () => {
     expect((await request(app).patch("/api/phases/ph_akbank_04").send({ status: "in_progress", reason: "x" })).status).toBe(409);
     for (const status of ["late", "at_risk", "locked", "done"]) {

@@ -78,8 +78,9 @@ export async function updatePhase(db: Db, id: string, { reason, ...patch }: Phas
         if (patch.status === "late" || patch.status === "at_risk") throw conflict("\"Gecikti\" ve \"Risk altında\" uyarılardan otomatik belirlenir");
         if (patch.status === "done") throw conflict("Aşamayı tamamlamak için \"Aşamayı tamamla\" kullanılır");
       }
-      const datesChanged = (patch.planStart !== undefined && patch.planStart !== ph.planStart)
-        || (patch.planEnd !== undefined && patch.planEnd !== ph.planEnd);
+      // plan and actual dates both need a reason (INV-06, API_CONTRACT #3)
+      const datesChanged = (["planStart", "planEnd", "actualStart", "actualEnd"] as const)
+        .some((k) => patch[k] !== undefined && patch[k] !== ph[k]);
       if (statusChanged || datesChanged) requireReason(reason);
 
       const next: Phase = { ...ph };
