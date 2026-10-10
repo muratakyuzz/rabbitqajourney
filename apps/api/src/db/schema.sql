@@ -123,7 +123,7 @@ CREATE TABLE actions (
   priority text NOT NULL CHECK (priority IN ({{Priority}})),
   status text NOT NULL CHECK (status IN ({{ActionStatus}})),
   source text NOT NULL CHECK (source IN ({{ActionSource}})),
-  meeting_id text REFERENCES meetings(id),
+  meeting_id text, -- no FK: meetings come to the API in M4; the bridge may carry actions of store-only meetings
   rule_key text,
   insight_id text,
   is_customer_visible boolean NOT NULL DEFAULT false,

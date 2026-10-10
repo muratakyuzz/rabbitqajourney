@@ -22,3 +22,6 @@ export function currentRuleActions(actions: Action[], projectId: string): Map<st
   }
   return new Map([...groups].map(([k, list]) => [k, currentRuleAction(list)!]));
 }
+
+/** Default customer visibility of a new action: phase approvals are internal (spec: müşteriye görünür kayıtlar). */
+export const defaultCustomerVisible = (ruleKey?: string) => !(ruleKey ?? "").startsWith("phase_approval:");

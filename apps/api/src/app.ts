@@ -4,6 +4,7 @@ import type { Db } from "./db";
 import { errorHandler, notFound } from "./http/errors";
 import { templateRouter } from "./modules/template/template.routes";
 import { projectsRouter } from "./modules/projects/projects.routes";
+import { actionsRouter } from "./modules/actions/actions.routes";
 
 export interface AppDeps {
   db: Db;
@@ -23,6 +24,7 @@ export function createApp({ db, bootId, startedAt }: AppDeps) {
   });
   api.use("/config/template", templateRouter(db));
   api.use(projectsRouter(db));
+  api.use(actionsRouter(db));
 
   app.use("/api", api);
   app.use("/api", () => {

@@ -1,10 +1,11 @@
 import type { Action, Phase, ProjectCore, RuleEffects, Step } from "@rabbitqa/shared";
 import { DEFAULT_THRESHOLDS } from "@rabbitqa/shared/domain/alerts";
 import { setActiveHolidays } from "@rabbitqa/shared/domain/business-days";
-import type { MkAudit } from "@rabbitqa/shared/domain/flow";
+import { advanceFlow, type MkAudit } from "@rabbitqa/shared/domain/flow";
 import { DEFAULT_PROJECT_INTEGRATIONS, SEED_INTEGRATIONS, STATE_VERSION } from "@rabbitqa/shared/domain/seed";
 import type { Holiday, Meeting, PhaseTpl, Project, RqState, User } from "@rabbitqa/shared/domain/types";
 import type { Queryable } from "../../db";
+import { notFound, reasonRequired } from "../../http/errors";
 import {
   actionToRow, insertRow, phaseToRow, rowToAction, rowToPhase, rowToProject, rowToStep, stepToRow, updateRow,
 } from "../../db/rows";
@@ -75,7 +76,7 @@ export async function loadProjectState(q: Queryable, projectId: string): Promise
   return { state, project };
 }
 
-type Effects = Omit<RuleEffects, "project">;
+export type Effects = Omit<RuleEffects, "project">;
 
 /**
  * Writes the phases, steps and actions of `projectId` that are new or changed between `before` and `after`.
@@ -106,6 +107,31 @@ export async function persistDiff(tx: Queryable, before: RqState, after: RqState
 }
 
 /** The reason given with a reason-required change is kept on the record (audit history is Faz 2). */
-export async function setLastReason(tx: Queryable, table: "phases" | "steps", id: string, reason: string | undefined) {
+export async function setLastReason(tx: Queryable, table: "phases" | "steps" | "actions", id: string, reason: string | undefined) {
   if (reason) await tx.query(`UPDATE ${table} SET last_reason = $2 WHERE id = $1`, [id, reason]);
 }
+
+export const requireReason = (reason: string | undefined) => {
+  if (!reason?.trim()) throw reasonRequired();
+  return reason.trim();
+};
+
+/**
+ * Every project write: loads the project, applies `change`, runs the flow engine and writes the difference.
+ * Must run inside db.transaction. Returns the written records (RuleEffects without the project).
+ */
+export async function changeProject(tx: Queryable, projectId: string, change: (s: RqState) => RqState): Promise<Effects> {
+  const loaded = await loadProjectState(tx, projectId);
+  if (!loaded) throw notFound("Proje bulunamadı.");
+  const before = loaded.state;
+  const after = advanceFlow(change(before), projectId, noAudit, new Date());
+  return persistDiff(tx, before, after, projectId);
+}
+
+export async function projectIdOf(q: Queryable, table: "phases" | "steps" | "actions", id: string, missing: string): Promise<string> {
+  const row = (await q.query<{ project_id: string }>(`SELECT project_id FROM ${table} WHERE id = $1`, [id])).rows[0];
+  if (!row) throw notFound(missing);
+  return row.project_id;
+}
+
+export const replace = <T extends { id: string }>(list: T[], next: T) => list.map((x) => (x.id === next.id ? next : x));

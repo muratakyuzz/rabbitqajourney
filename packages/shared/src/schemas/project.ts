@@ -66,6 +66,10 @@ export const ActionSchema = z.object({
 });
 export type Action = z.infer<typeof ActionSchema>;
 
+/** GET /api/projects/:projectId/actions — ordered by due date (no due date last), then creation. */
+export const ActionListSchema = z.object({ items: z.array(ActionSchema) });
+export type ActionList = z.infer<typeof ActionListSchema>;
+
 /** The project fields the API owns. Health, handover, discovery, integrations … stay in the web store (Faz 1). */
 export const ProjectCoreSchema = z.object({
   id: IdSchema,
@@ -125,8 +129,9 @@ export const StepPatchSchema = z.object({
 export type StepPatch = z.infer<typeof StepPatchSchema>;
 
 /**
- * POST /api/projects/:projectId/steps/sync — bridge for changes computed by client-side rules (origin client-rule).
- * `actions`: rule actions only (source "rule" + ruleKey); the server matches them by projectId + ruleKey.
+ * POST /api/projects/:projectId/steps/sync — bridge for changes made by mockup screens (client-side rules,
+ * meeting dialog, AI approvals). `actions`: any source. Rule actions (source "rule" + ruleKey) are matched by
+ * projectId + ruleKey, all others are upserted by id (a client-made id is accepted).
  */
 export const StepsSyncSchema = z.object({
   steps: z.array(StepSchema).default([]),

@@ -277,12 +277,49 @@ describe("POST /api/projects/:projectId/steps/sync (client-rule bridge)", () => 
       expect(await byRuleKey("rule_review:st_perakende_16")).toEqual([{ id: serverId, title: "Gözden geçir (istemci)", status: "open" }]);
     });
 
-    it("400 for a non-rule action and for an empty body", async () => {
-      const manual = await request(app).post("/api/projects/p_garanti/steps/sync").send({ actions: [ruleAction({ source: "manual" })] });
-      expect(manual.status).toBe(400);
-      expect(errorOf(manual).field).toBe("actions.0.ruleKey");
-      expect((await request(app).post("/api/projects/p_garanti/steps/sync").send({ actions: [ruleAction({ ruleKey: undefined })] })).status).toBe(400);
+    it("400 for an empty body", async () => {
       expect((await request(app).post("/api/projects/p_garanti/steps/sync").send({})).status).toBe(400);
+    });
+  });
+
+  describe("other actions (meeting dialog, AI approval) — upsert by id", () => {
+    const meetingAction = (over: Partial<Action> = {}): Action => ({
+      id: "a_client_m1", projectId: "p_garanti", title: "Toplantıdan doğan aksiyon", ownerId: "u_deniz", ball: "csm",
+      due: "2026-10-20", priority: "high", status: "open", source: "meeting", meetingId: "m_store_only", createdAt: NOW.toISOString(),
+      isCustomerVisible: true, ...over,
+    });
+    const actionsOf = async (projectId: string) =>
+      (await request(app).get(`/api/projects/${projectId}/actions`)).body.items as Action[];
+
+    it("a client-made id is inserted as sent (meetingId without FK), then updated by the same id", async () => {
+      const first = await request(app).post("/api/projects/p_garanti/steps/sync").send({ actions: [meetingAction()] });
+      expect(first.status).toBe(200);
+      expect(effects(first).actions).toEqual([meetingAction()]);
+      expect((await actionsOf("p_garanti")).find((a) => a.id === "a_client_m1")).toEqual(meetingAction());
+
+      const second = await request(app).post("/api/projects/p_garanti/steps/sync").send({ actions: [meetingAction({ status: "done", title: "Bitti" })] });
+      expect(effects(second).actions).toEqual([meetingAction({ status: "done", title: "Bitti" })]);
+      expect((await actionsOf("p_garanti")).filter((a) => a.id === "a_client_m1")).toHaveLength(1);
+    });
+
+    it("an unchanged action is still echoed back", async () => {
+      const seeded = (await actionsOf("p_isyatirim")).find((a) => a.id === "a_2")!;
+      const res = await request(app).post("/api/projects/p_isyatirim/steps/sync").send({ actions: [seeded] });
+      expect(effects(res).actions).toEqual([seeded]);
+    });
+
+    it("400 for an id of another project, a rule action's id, a foreign projectId and a duplicate", async () => {
+      const foreign = await request(app).post("/api/projects/p_garanti/steps/sync").send({ actions: [meetingAction({ id: "a_2" })] });
+      expect(foreign.status).toBe(400);
+      expect(errorOf(foreign).field).toBe("actions.0.id");
+      expect((await actionsOf("p_isyatirim")).find((a) => a.id === "a_2")?.projectId).toBe("p_isyatirim");
+
+      const rule = (await db.query<{ id: string; project_id: string }>("SELECT id, project_id FROM actions WHERE rule_key IS NOT NULL ORDER BY id")).rows[0];
+      const asManual = await request(app).post(`/api/projects/${rule.project_id}/steps/sync`)
+        .send({ actions: [meetingAction({ id: rule.id, projectId: rule.project_id })] });
+      expect(asManual.status).toBe(400);
+      expect((await request(app).post("/api/projects/p_garanti/steps/sync").send({ actions: [meetingAction({ projectId: "p_akbank" })] })).status).toBe(400);
+      expect((await request(app).post("/api/projects/p_garanti/steps/sync").send({ actions: [meetingAction(), meetingAction()] })).status).toBe(400);
     });
   });
 
