@@ -123,7 +123,7 @@ export function MeetingDialog({ project, onClose, defaultType = "checkin", defau
       const res = await createMeeting(project.id, { ...meeting, actions });
       mid = res.meeting.id;
       return res;
-    });
+    }, { flush: project.id });
     if (err || !mid) return setError(err);
     const savedId: string = mid;
     // documents stay in the mockup store; they are linked to the server's meeting id
@@ -237,7 +237,7 @@ export function MeetingCancelDialog({ meeting, onClose }: { meeting: Meeting; on
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const save = async () => {
-    const err = await run(() => patchMeeting(meeting.id, { status: "cancelled", reason: reason.trim() }));
+    const err = await run(() => patchMeeting(meeting.id, { status: "cancelled", reason: reason.trim() }), { flush: meeting.projectId });
     if (err) return setError(err);
     toast.success("Toplantı iptal edildi");
     onClose();

@@ -457,7 +457,7 @@ export function GoLiveTab({ project }: { project: Project }) {
     const err = await run(() => createMeeting(project.id, {
       type: "go_no_go", date: todayISO(), status: "held", internalIds: project.csmId ? [project.csmId] : [], contactIds: [],
       notes: "Go/No-Go toplantısı (hızlı kayıt)", decisions: "", actions: [],
-    }));
+    }), { flush: project.id });
     if (err) toast.error(err);
     else toast.success("Go/No-Go toplantısı kaydedildi — detayları Toplantılar sekmesinden düzenleyebilirsiniz");
   };

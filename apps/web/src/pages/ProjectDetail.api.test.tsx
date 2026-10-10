@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useEffect } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { RqProvider } from "@/lib/rabbitqa/store";
+import { BRIDGE_DEBOUNCE_MS, RqProvider, useRq } from "@/lib/rabbitqa/store";
+import { BRIDGE_NOT_SENT } from "@/lib/rabbitqa/use-server-action";
 import ProjectDetail from "@/pages/ProjectDetail";
-import { STATE_KEY } from "@rabbitqa/shared/domain/seed";
+import { STATE_KEY, createSeed } from "@rabbitqa/shared/domain/seed";
 import type { RqState } from "@rabbitqa/shared/domain/types";
 import { apiError, fakeApi, json } from "@/test/fake-api";
 
@@ -16,12 +18,21 @@ vi.mock("@/lib/auth-context", () => ({
 
 const NOW = "2026-10-12T09:00:00.000Z";
 const stored = () => JSON.parse(localStorage.getItem(STATE_KEY)!) as RqState;
+/** The store, for changes made by mockup screens that are not under test here. */
+let rq: ReturnType<typeof useRq>;
+const setRq = (v: ReturnType<typeof useRq>) => { rq = v; };
+function StoreProbe() {
+  const store = useRq();
+  useEffect(() => setRq(store), [store]);
+  return null;
+}
 
 async function renderProject(projectId: string, api: ReturnType<typeof fakeApi>, tab = "phases") {
   render(
     <MemoryRouter initialEntries={[`/app/projects/${projectId}?tab=${tab}`]}>
       <TooltipProvider>
         <RqProvider>
+          <StoreProbe />
           <Routes><Route path="/app/projects/:id" element={<ProjectDetail />} /></Routes>
         </RqProvider>
       </TooltipProvider>
@@ -133,6 +144,55 @@ describe("Aşamalar ve adımlar → API", () => {
     await waitFor(() => expect(api.callsTo("POST", /^\/phases\/ph_isyatirim_07\/complete$/)).toHaveLength(1));
     await waitFor(() => expect(screen.getByText(/Onaylayan: Örnek Administrator/)).toBeInTheDocument());
     expect(stored().phases.find((p) => p.id === "ph_isyatirim_08")?.status).toBe("in_progress");
+  });
+
+  describe("phase approval sends the bridge first", () => {
+    // p_lojistik 01: the only open required step is reqdoc, a data step done by a req_doc document.
+    const P = "p_lojistik";
+    const PH = createSeed().phases.find((p) => p.projectId === P && p.code === "01")!.id;
+    /** POST /phases/:id/complete with the API's check: 409 while a required step is open on the server. */
+    const completeLikeApi = (api: () => ReturnType<typeof fakeApi>) => () => {
+      const server = api().server;
+      const open = server.steps.filter((st) => st.phaseId === PH && st.required && st.status !== "done" && st.status !== "out_of_scope");
+      if (open.length) return apiError(409, "CONFLICT", `${open.length} zorunlu adım tamamlanmadı`);
+      const phase = server.phases.find((p) => p.id === PH)!;
+      return json(200, { phases: [{ ...phase, status: "done", approvedBy: "u_admin", approvedAt: NOW, actualEnd: NOW.slice(0, 10) }], steps: [], actions: [], meetings: [] });
+    };
+    const writes = (api: ReturnType<typeof fakeApi>) =>
+      api.calls.filter((c) => c.method !== "GET" && (c.path.includes(P) || c.path.includes(PH))).map((c) => `${c.method} ${c.path}`);
+    const completeDataStep = () =>
+      act(() => { rq.addDocument({ projectId: P, type: "req_doc", name: "Gereksinimler.pdf", linkType: "project", linkId: null }); });
+
+    it("data step done, then Aşamayı tamamla at once: steps/sync goes first, then complete, no 409", async () => {
+      const api: ReturnType<typeof fakeApi> = fakeApi({ [`POST /phases/${PH}/complete`]: completeLikeApi(() => api) });
+      await renderProject(P, api);
+      completeDataStep();
+      expect(writes(api)).toEqual([]); // still waiting for the debounce
+      fireEvent.click(screen.getByRole("button", { name: "Aşamayı tamamla" }));
+
+      await waitFor(() => expect(writes(api)).toEqual([`POST /projects/${P}/steps/sync`, `POST /phases/${PH}/complete`]));
+      const reqdocSent = () => api.callsTo("POST", /steps\/sync$/)
+        .flatMap((c) => (c.body as { steps: { status: string; key?: string }[] }).steps)
+        .filter((st) => st.key === "reqdoc");
+      expect(reqdocSent().map((st) => st.status)).toEqual(["done"]);
+      await waitFor(() => expect(screen.getByText(/Onaylayan: Örnek Administrator/)).toBeInTheDocument());
+      expect(toast.error).not.toHaveBeenCalled();
+      await new Promise((r) => setTimeout(r, BRIDGE_DEBOUNCE_MS + 100));
+      expect(reqdocSent()).toHaveLength(1); // the debounced send was replaced by the immediate one
+    });
+
+    it("the bridge send is rejected → complete is not called, the error toast says why", async () => {
+      const api: ReturnType<typeof fakeApi> = fakeApi({
+        [`POST /projects/${P}/steps/sync`]: () => apiError(400, "VALIDATION", "Geçersiz adım."),
+        [`POST /phases/${PH}/complete`]: completeLikeApi(() => api),
+      });
+      await renderProject(P, api);
+      completeDataStep();
+      fireEvent.click(screen.getByRole("button", { name: "Aşamayı tamamla" }));
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(`Aşama tamamlanamaz: ${BRIDGE_NOT_SENT}`));
+      expect(api.callsTo("POST", /\/complete$/)).toEqual([]);
+    });
   });
 });
 

@@ -42,7 +42,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export type TemplateMeta = Omit<TemplateVersion, "phases">;
 
 /** Outcome of one bridge send for a project. */
-type FlushResult = "sent" | "nothing" | "failed" | "unbridged";
+export type FlushResult = "sent" | "nothing" | "failed" | "unbridged";
 
 function load(): RqState {
   try {
@@ -122,6 +122,8 @@ interface Ctx {
   applyTemplateVersion: (tv: TemplateVersion) => void;
   /** Puts an API response (RuleEffects) into the store and the bridge's server view; does not trigger a sync of its own. */
   applyServerEffects: (e: RuleEffects) => void;
+  /** Sends the project's pending bridge diff now (no debounce) and waits; for API calls whose server checks read step status. */
+  flushBridge: (projectId: string) => Promise<FlushResult>;
 }
 
 const RqContext = createContext<Ctx | null>(null);
@@ -945,6 +947,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
     templateVersion,
     applyTemplateVersion,
     applyServerEffects,
+    flushBridge: flushNow,
     };
     return api;
   }, [state, userId, patch, add, mkAudit, templateVersion, applyTemplateVersion, applyServerEffects, hydrate, hydrateAll, nextCommit, flushNow]);

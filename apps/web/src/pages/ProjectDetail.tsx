@@ -347,7 +347,7 @@ function PhasesTab({ project, initialWorkspace }: { project: Project; initialWor
                     {manage && <Button size="sm" variant="outline" onClick={() => setEditPhase(ph)}><Pencil className="h-3.5 w-3.5 mr-1" />Aşamayı düzenle</Button>}
                     {manage && ph.status !== "done" && !locked && (
                       <Button size="sm" disabled={busy} onClick={async () => {
-                        const err = await run(() => completePhaseApi(ph.id));
+                        const err = await run(() => completePhaseApi(ph.id), { flush: project.id });
                         if (err) toast.error(`Aşama tamamlanamaz: ${err}`);
                       }}><CheckCircle2 className="h-3.5 w-3.5 mr-1" />{busy ? "Kaydediliyor…" : "Aşamayı tamamla"}</Button>
                     )}
@@ -540,7 +540,7 @@ export function StepDialog({ step, project, onClose }: { step: Step; project: Pr
             if (!locked) { p.due = due || null; p.status = status; }
             if (flow) { p.dependency = dependency; if (locked) p.durationDays = durationDays; }
             if (reason.trim()) p.reason = reason.trim();
-            const err = await run(() => patchStep(step.id, p));
+            const err = await run(() => patchStep(step.id, p), { flush: project.id });
             if (err) return toast.error(err);
             toast.success("Adım güncellendi");
             onClose();
