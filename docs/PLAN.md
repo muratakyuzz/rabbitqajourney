@@ -25,11 +25,11 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 | Audit | **Yok (Faz 2).** Gerekçe zorunlulukları API'de doğrulanır ve kaydın üzerinde saklanır (`reason` / `last_reason`), geçmiş tablosu yazılmaz |
 | İş kuralları | `flow.ts`, `rules.ts`, `completion.ts`, `business-days.ts` → `packages/shared` (taşınır, kopyalanmaz); API ve web aynı kodu kullanır |
 | Uyarılar | İstemcide, store'dan hesaplanmaya devam eder (değişiklik yok) |
-| Yerel geliştirme | `npm run dev` API (3001) + web birlikte; Vite `/api` → 3001 proxy |
+| Yerel geliştirme | `npm run dev` API (`127.0.0.1:3001`, `API_HOST`/`API_PORT` ile değişir) + web (`localhost:8080`) birlikte; Vite `/api` → API proxy. Giriş olmadığı için ikisi de yalnız bu makineden erişilir |
 
 ### Store köprüsü (mockup ile API'nin birlikte çalışması)
 - **API'ye ait dilimler:** `template`, `phases`, `steps`, `actions`, `meetings`. Diğer dilimler store'da kalır.
-- **Hidrasyon:** uygulama açılınca (ve proje açılınca) bu dilimler API'den okunup store'a yazılır. Bu modüllerdeki her değişiklik önce API'ye gider, dönen kayıt (+ `RuleEffects`) store'a uygulanır.
+- **Hidrasyon:** uygulama açılınca, "Demo verisini sıfırla"da ve köprü hatasından sonra (4xx'te o proje; yüklenemeyen ya da duraklatılan proje bir sonraki başarılı API yanıtında) bu dilimler API'den okunup store'a yazılır. Proje açılınca ayrıca okunmaz. Bu modüllerdeki her değişiklik önce API'ye gider, dönen kayıt (+ `RuleEffects`) store'a uygulanır.
 - **Yeni proje:** proje oluşturma diyaloğu `POST /api/projects` çağırır (şablondan kopyalama sunucuda). Proje kaydının diğer alanları (sağlık, satış devri, keşif…) store'da kalır.
 - **Mockup ekranlardan gelen adım değişiklikleri** (veriyle tamamlanan adımlar, kurulum tipi/LLM kuralları, takım ekleme vb.) store'da hesaplanır ve `POST /api/projects/:projectId/steps/sync` ile (origin client-rule) sunucuya yazılır. Bu yol kilit kontrolünü atlar (INV-25). (M2a kararı; ilk taslakta `PATCH /api/steps/:id` + `origin` alanıydı.) İlgili ekran API'ye geçince köprü kalkar.
 - **Restart tespiti:** `GET /api/health` bir `bootId` döner. Kayıtlı `bootId` farklıysa store seed'e sıfırlanır (localStorage temizlenir), böylece iki taraf aynı seed'den başlar.
@@ -41,7 +41,7 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 - [x] `.claude/` sadeleşir: guard yalnızca `.env*` ve gizli anahtar dosyalarını korur; rol ve commit denetimi kalkar; `plan/gate/phase-close/fix` komutları ve ajanlar silinir; `build` = "PLAN.md'deki sıradaki maddeyi uygula"
 - [x] `CLAUDE.md` / `AGENTS.md`: rol, gate, branch, yazma yetkisi bölümleri kaldırılır; bu dosyadaki çalışma kuralları yazılır
 - [x] Kök `npm run check`; `docs/PHASES.md` başına "yerine docs/PLAN.md geçti" notu; BACKLOG'da GATE-01..03 "süreç değişti" ile kapanır
-- [ ] `ci.yml`: parity ve check-migrations job'ları kaldırılır (Murat elle — gerekli değişiklik M0 kapanışında iletildi)
+- [x] `ci.yml`: parity ve check-migrations job'ları kaldırılır (Murat elle, `44dd6ca`)
 - [x] `apps/api`: Express 5, `/api` router, zod doğrulama + hata middleware'i, `GET /api/health` (`bootId`)
 - [x] `apps/api/src/db`: pg-mem, `schema.sql` (bu kapsamın tabloları: users, projects, template_versions, phases, steps, actions, meetings, meeting_participants), açılışta şema + seed
 - [x] `seed.ts` → `packages/shared`; web import'ları güncellenir; seed API'ye yüklenir
@@ -56,7 +56,7 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
   - Seed ile birlikte iş kuralları da shared'a taşındı (M2'nin ilk maddesi).
   - pg-mem `ROLLBACK` desteklemiyor; yerine snapshot tabanlı `db.transaction` (bkz. Kararlar).
   - Yeni paketler: express, pg-mem, tsx, supertest (+ tipler).
-  - Açık: `ci.yml` (Murat elle).
+  - `ci.yml` Murat tarafından `44dd6ca`'da yapıldı.
 
 ## M1 — Ayarlar → Aşama şablonu
 - [x] `GET /api/config/template` (aktif sürüm), `PUT /api/config/template` → yeni sürüm (#39a); sistem adımı silinemez (`409`), yalnızca yeni projeler etkilenir
@@ -77,7 +77,7 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 - [x] `POST /api/projects` (#1): şablondan kopyalama (INV-10), kurulum tipi/LLM koşullu adımlar, iş günü termini, plan tahmini — M2a. Kurulum tipi/LLM koşullu adımlar açılışta yok (proje `installType: null` ile açılır; kurallar istemcide, sync ile gelir)
 - [x] `GET /api/projects/:projectId/phases` — M2a. Yanıt `{ phases, steps }`; türetilmiş durum ve `ConditionResult` istemcide kalır (Kararlar)
 - [x] `PATCH /api/phases/:id` (#3; plan bitişi gerekçeli), `POST /api/phases/:id/complete` (#4; aşama onayı, sonraki aşama açılır, onaylayan + tarih) — M2a
-- [x] `PATCH /api/steps/:id` (#5): durum (gerekçeli), termin (gerekçeli), sorumlu/top; kilitli adıma elle değişiklik `409`; köprü `POST /api/projects/:projectId/steps/sync` — M2a
+- [x] `PATCH /api/steps/:id` (#5): durum (gerekçeli), termin (gerekçeli), sorumlu/top; kilitli adıma elle **durum** değişikliği `409` (termin/sahip/süre serbest, bkz. Kararlar 2026-10-11 D2); köprü `POST /api/projects/:projectId/steps/sync` — M2a
 - [x] Store köprüsü: phases/steps hidrasyonu, yeni proje diyaloğu → API, mockup kurallarının adım değişikliklerini API'ye yazması — M2b
 - [x] Testler: kopyalama, sıralı açılış, kilit, aşama onayı, gerekçe zorunluluğu, iş günü (tatil dahil) — API M2a, web köprüsü M2b
 - **Kabul:** yeni proje → Aşamalar sekmesi API'den gelir; adım tamamla, termin değiştir, aşamayı onayla → sayfa yenilenince durur; uyarılar ve diğer sekmeler bozulmaz
@@ -289,3 +289,7 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 - 2026-10-11 (inceleme O3): `PATCH /phases/:id` `actualStart`/`actualEnd` değişikliğinde de gerekçe ister (INV-06, API_CONTRACT #3); aynı değer değişiklik sayılmaz. `PhaseDialog` "Gerçekleşen başlangıç" değişince gerekçe alanını gösterir.
 - 2026-10-11 (inceleme D3): Aksiyon `cancelled` durumunda oluşturulamaz (`400`, `status` / toplantıda `actions.N.status`); iptal gerekçe istediği için önce oluşturulup sonra gerekçeyle iptal edilir. Yeni aksiyon diyaloğu "İptal"i sunmaz. Kontrol şemada değil serviste: AI `action_update` önerisi aynı şemadan `status` alıyor ve iptal önerebilmeli.
 - 2026-10-11 (inceleme D1): Hidrasyon sürerken o projeye gelen API yanıtları (`applyServerEffects`) biriktirilir ve GET sonuçları yerleştikten sonra sırayla yeniden uygulanır; böylece eski okunmuş veri yeni yazmayı ezmez. **Bilinen kısıt:** hidrasyon sürerken mockup ekranlarında yapılan yerel adım/aksiyon değişiklikleri sunucu verisiyle değiştirilir (sunucu kazanır). Pencere yerelde milisaniyeler; Faz 2'de ekranlar API'ye geçince kalkar.
+- 2026-10-11 (inceleme D2): Kilitli adımda termin (ve sahip/süre) değişikliği bilerek serbest bırakıldı: ileri planlama için kilitli adımlara termin girilebilmeli. API_CONTRACT #5'teki "kilitli adımda `due` → `409`" (RR-F017) ve "`durationDays` yalnız kilitliyken" kuralları Faz 1'de uygulanmıyor; gerekçe kuralı (termin değişikliği gerekçeli) geçerli.
+- 2026-10-11 (inceleme D6): Oturum ortasında API restart'ı (dev'de `tsx watch` her API dosyası kaydında) istemcide fark edilmiyor; `bootId` yalnız açılışta kontrol edilir. Sayfa yenilenince store seed'e döner ve tutarlılık geri gelir. Düzeltilmedi: yalnız geliştirmede görülür, Faz 2'de kalıcı PostgreSQL ile restart veri sıfırlamaz.
+- 2026-10-11 (inceleme D8): `.github/workflows/ci.yml:34`'teki "parity job'una output olarak aktarılır" yorumu parity job'u kalktığı için eskidi; değişiklik Murat'a önerildi (workflow'lara elle dokunulur).
+- 2026-10-11 (inceleme Y2): API varsayılan olarak yalnız `127.0.0.1`'i dinler (`API_HOST`), Vite dev/preview `localhost`. Faz 1'de kimlik doğrulama olmadığından yerel ağa açmak bilinçli bir karar olmalı (`API_HOST=0.0.0.0`).
