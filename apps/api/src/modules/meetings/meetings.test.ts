@@ -122,6 +122,14 @@ describe("POST /api/projects/:projectId/meetings (#8)", () => {
       expect(await counts()).toEqual(before);
     });
 
+    it("an action created as cancelled → 400 (actions.N.status), nothing written (review D3)", async () => {
+      const before = await counts();
+      const res = await post(draft({ actions: [{ title: "X", ownerId: null, ball: "csm", due: null, priority: "medium", status: "cancelled" }] }));
+      expect(res.status).toBe(400);
+      expect(errorOf(res).field).toBe("actions.0.status");
+      expect(await counts()).toEqual(before);
+    });
+
     it("a schema-invalid action (bad due date) → 400, nothing written", async () => {
       const before = await counts();
       const res = await post(draft({ actions: [{ title: "X", ownerId: null, ball: "csm", due: "20.10.2026", priority: "medium", status: "open" }] }));

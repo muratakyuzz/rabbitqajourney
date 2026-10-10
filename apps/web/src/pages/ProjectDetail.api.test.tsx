@@ -173,6 +173,16 @@ describe("Aksiyonlar → API", () => {
     expect(screen.getByText(a2)).toBeInTheDocument();
   });
 
+  it("new action: the status list has no İptal (an action is not created as cancelled, review D3)", async () => {
+    const api = fakeApi();
+    await renderProject(P, api, "actions");
+    fireEvent.click(screen.getByRole("button", { name: "Aksiyon ekle" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(within(dialog).getByText("Durum").parentElement!).getByRole("combobox"));
+    const options = (await screen.findAllByRole("option")).map((o) => o.textContent);
+    expect(options).toEqual(["Açık", "Devam ediyor", "Tamamlandı"]);
+  });
+
   it("new action: POST with the owner-derived ball → the server's record is in the store and the list", async () => {
     const api = fakeApi({
       [`POST /projects/${P}/actions`]: (c) => json(201, {

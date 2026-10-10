@@ -723,7 +723,7 @@ function ActionDialog({ project, action, onClose }: { project: Project; action: 
         {action?.insightId && (() => { const ins = state.insights.find((i) => i.id === action.insightId); return ins ? (
           <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs"><Sparkles className="inline h-3 w-3 mr-1 text-primary" />Kaynak mesaj ({ins.source === "teams" ? "Teams" : "E-posta"} · {ins.sourceRef.from}): “{ins.sourceRef.excerpt}”</p>
         ) : null; })()}
-        <ActionFields d={d} setD={setD} projectId={project.id} showStatus />
+        <ActionFields d={d} setD={setD} projectId={project.id} showStatus creating={!action} />
         {needsReason && <div className="grid gap-2"><Label>Gerekçe (termin değişikliği ve iptalde zorunlu)</Label><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></div>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <DialogFooter>

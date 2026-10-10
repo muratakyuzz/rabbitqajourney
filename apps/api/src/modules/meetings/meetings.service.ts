@@ -10,6 +10,7 @@ import { badRequest, conflict, notFound } from "../../http/errors";
 import {
   type Effects, changeProject, loadProjectState, noAudit, projectIdOf, replace, requireReason, setLastReason,
 } from "../projects/project-state";
+import { checkNewActionStatus } from "../actions/actions.service";
 
 // #8, #19 and the meeting list (docs/PLAN.md M4). Writes go through changeProject with meetingSteps, so the
 // meeting, its actions, the held-meeting rules and the meeting-completion steps land in one transaction.
@@ -37,6 +38,7 @@ export async function listMeetings(db: Db, projectId: string): Promise<MeetingLi
 
 // ---- #8 POST /projects/:projectId/meetings ----
 export async function createMeeting(db: Db, projectId: string, input: MeetingCreate): Promise<MeetingCreated> {
+  input.actions.forEach((a, i) => checkNewActionStatus(a, `actions.${i}.status`));
   return db.transaction(async (tx) => {
     let meeting: Meeting | null = null;
     const effects = await changeProject(tx, projectId, (s) => {

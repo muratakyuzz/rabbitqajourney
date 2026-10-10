@@ -3,7 +3,7 @@ import { ballForOwner } from "@rabbitqa/shared/domain/ball";
 import { defaultCustomerVisible } from "@rabbitqa/shared/domain/rule-actions";
 import { uid } from "@rabbitqa/shared/domain/seed";
 import type { Db } from "../../db";
-import { notFound } from "../../http/errors";
+import { badRequest, notFound } from "../../http/errors";
 import { type Effects, changeProject, loadProjectState, projectIdOf, replace, requireReason, setLastReason } from "../projects/project-state";
 
 // #6, #7 and the action list (docs/PLAN.md M3). Writes go through changeProject like phases and steps, so the
@@ -19,8 +19,14 @@ export async function listActions(db: Db, projectId: string): Promise<ActionList
   return { items: [...loaded.state.actions].sort(byDue) };
 }
 
+/** Cancelling needs a reason (#7), so an action is not created as cancelled (review D3). */
+export function checkNewActionStatus(a: ActionCreate, field = "status") {
+  if (a.status === "cancelled") throw badRequest("Aksiyon İptal durumunda oluşturulamaz.", field);
+}
+
 // ---- #6 POST /projects/:projectId/actions ----
 export async function createAction(db: Db, projectId: string, input: ActionCreate): Promise<Effects> {
+  checkNewActionStatus(input);
   return db.transaction((tx) => changeProject(tx, projectId, (s) => {
     const action: Action = {
       id: uid("a"), projectId, title: input.title, ownerId: input.ownerId, ball: ballForOwner(input.ownerId, s.users, input.ball),

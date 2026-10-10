@@ -92,6 +92,15 @@ describe("POST /api/projects/:projectId/actions (#6)", () => {
     expect((await request(app).post("/api/projects/p_yok/actions").send(draft())).status).toBe(404);
   });
 
+  it("an action is not created as cancelled (cancelling needs a reason) → 400 status (review D3)", async () => {
+    const before = await list("p_garanti");
+    const res = await request(app).post("/api/projects/p_garanti/actions").send(draft({ status: "cancelled" }));
+    expect(res.status).toBe(400);
+    expect(errorOf(res)).toEqual({ code: "VALIDATION", message: "Aksiyon İptal durumunda oluşturulamaz.", field: "status" });
+    expect(await list("p_garanti")).toEqual(before);
+    for (const status of ["open", "in_progress", "done"] as const) expect((await create({ status })).status).toBe(status);
+  });
+
   it("a whitespace-only title → 400 with field title, nothing written (review O1)", async () => {
     const before = await list("p_garanti");
     const res = await request(app).post("/api/projects/p_garanti/actions").send(draft({ title: "   " }));

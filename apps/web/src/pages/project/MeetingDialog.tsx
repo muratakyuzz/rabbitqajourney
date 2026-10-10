@@ -52,8 +52,10 @@ export function EnumSelect<T extends string>({ value, onChange, labels, disabled
 export type ActionDraft = { title: string; ownerId: string | null; ball: Ball; due: string | null; priority: Priority; status: ActionStatus; isCustomerVisible: boolean };
 
 /** The ball follows the owner (shared ballForOwner, same as the API); it is chosen by hand only without an owner. */
-export function ActionFields({ d, setD, projectId, showStatus }: { d: ActionDraft; setD: (d: ActionDraft) => void; projectId: string; showStatus?: boolean }) {
+/** `creating`: a new action cannot start as cancelled (cancelling needs a reason, API #6/#7). */
+export function ActionFields({ d, setD, projectId, showStatus, creating }: { d: ActionDraft; setD: (d: ActionDraft) => void; projectId: string; showStatus?: boolean; creating?: boolean }) {
   const { state } = useRq();
+  const statusLabels = creating ? (({ cancelled: _c, ...rest }) => rest)(ACTION_STATUS_LABEL) as Record<ActionStatus, string> : ACTION_STATUS_LABEL;
   return (
     <div className="grid gap-3">
       <div className="grid gap-2"><Label>Başlık</Label><Input value={d.title} onChange={(e) => setD({ ...d, title: e.target.value })} /></div>
@@ -66,7 +68,7 @@ export function ActionFields({ d, setD, projectId, showStatus }: { d: ActionDraf
         </div>
         <div className="grid gap-2"><Label>Termin</Label><Input type="date" value={d.due ?? ""} onChange={(e) => setD({ ...d, due: e.target.value || null })} /></div>
         <div className="grid gap-2"><Label>Öncelik</Label><EnumSelect value={d.priority} onChange={(v) => setD({ ...d, priority: v })} labels={PRIORITY_LABEL} /></div>
-        {showStatus && <div className="grid gap-2"><Label>Durum</Label><EnumSelect value={d.status} onChange={(v) => setD({ ...d, status: v })} labels={ACTION_STATUS_LABEL} /></div>}
+        {showStatus && <div className="grid gap-2"><Label>Durum</Label><EnumSelect value={d.status} onChange={(v) => setD({ ...d, status: v })} labels={statusLabels} /></div>}
       </div>
       <label className="flex items-center gap-3 text-sm"><Switch checked={d.isCustomerVisible} onCheckedChange={(c) => setD({ ...d, isCustomerVisible: c })} />Müşteriye görünür</label>
     </div>
