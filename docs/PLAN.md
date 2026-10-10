@@ -59,12 +59,18 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
   - Açık: `ci.yml` (Murat elle).
 
 ## M1 — Ayarlar → Aşama şablonu
-- [ ] `GET /api/config/template` (aktif sürüm), `PUT /api/config/template` → yeni sürüm (#39a); sistem adımı silinemez (`409`), yalnızca yeni projeler etkilenir
-- [ ] Gerekirse salt-okunur yardımcılar: `GET /api/users`, `GET /api/config/modules` (seed'den)
-- [ ] Ayarlar → Aşama şablonu sekmesi API'den okur/yazar; plan önizlemesi `packages/shared` ile istemcide
-- [ ] Testler: sürüm artışı, sistem adımı koruması, doğrulama hataları
+- [x] `GET /api/config/template` (aktif sürüm), `PUT /api/config/template` → yeni sürüm (#39a); sistem adımı silinemez (`409`), yalnızca yeni projeler etkilenir
+- [x] Gerekirse salt-okunur yardımcılar: `GET /api/users`, `GET /api/config/modules` (seed'den) — gerekmedi, eklenmedi
+- [x] Ayarlar → Aşama şablonu sekmesi API'den okur/yazar; plan önizlemesi `packages/shared` ile istemcide
+- [x] Testler: sürüm artışı, sistem adımı koruması, doğrulama hataları
 - **Kabul:** şablon değişir → API restart'a kadar kalır → yeni proje yeni sürümle açılır (M2'de doğrulanır)
-- **Notlar:**
+- **Notlar:** 2026-10-10, tag `m1`.
+  - `npm run check` yeşil: lint 0 hata / 27 uyarı; test sayıları api 40, web 232, shared 276.
+  - API: `GET`/`PUT /api/config/template` (`apps/api/src/modules/template/`). Kurallar `template.rules.ts`'te saf fonksiyon; yazma `db.transaction` içinde. `createdBy` = seed'deki ilk aktif admin (`core/current-user.ts`).
+  - Şemalar `packages/shared/src/schemas/template.ts`. `domain/types`'taki `StepTpl`/`PhaseTpl` artık bu şemalardan türetiliyor.
+  - Web: `TemplateEditor` → `pages/admin/TemplateEditor.tsx`. Şablon açılışta `RqProvider`'da API'den alınıp `state.template`'e yazılıyor; sürüm bilgisi (`templateVersion`) yalnızca bellekte, localStorage'a yazılmıyor. `setConfig("template")` kaldırıldı; başka çağıran yoktu.
+  - Tarayıcıda denendi: 06'ya adım ekle → yukarı taşı → sil → kaydet ("Şablon kaydedildi · sürüm 2"). Yerel şablon silinip sayfa yenilenince sürüm 2 ve değişiklik API'den geldi. API restart → sürüm 1. Konsolda hata yok.
+  - Bilinen: şablon değişikliği artık Ayarlar → Değişiklikler listesine düşmüyor (audit Faz 2).
 
 ## M2 — Proje açılışı + Aşamalar ve adımlar
 - [x] İş kuralları `packages/shared`'a taşınır (`flow`, `rules`, `completion`, `business-days`); web testleri yeşil kalır — M0'da yapıldı (bkz. Kararlar)
@@ -117,3 +123,7 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 - 2026-10-10 (M0): Tablo id'leri `text` (seed id'leri okunur metin; uuid değil). Enum CHECK'leri `schema.sql`'de `{{Ad}}` yer tutucusundan `AdSchema` değerleriyle üretilir (tek kaynak). Kişi id'leri (aksiyon sahibi, toplantı katılımcısı) FK'siz.
 - 2026-10-10 (M0): pg-mem `ROLLBACK`'i yok sayıyor. `db.transaction` yazmaları sıraya dizer, başta `backup()` alır, hatada `restore()` eder. Bu yüzden **her yazma `db.transaction` içinden** yapılır. Sıralama Faz 1'de proje kilidinin (INV-08) yerini de tutar.
 - 2026-10-10 (M0): API TS'i `tsx` ile çalışır (`tsx watch`); derleme adımı yok.
+- 2026-10-10 (M1): Sistem adımı = `key`'i olan ya da `completion`'ı manual olmayan adım (seed'de manual olmayan her adımın `key`'i var). Kimlik `key` ile kurulur: aynı aşamada kalmalı, `completion`/`meetingType` değişmez. Yeni eklenen adım sistem adımı olamaz (`409`).
+- 2026-10-10 (M1): Doğrulama sırası: şema (`400`) → `baseVersion` (`409`, `field: "baseVersion"`) → yapı (`400`) → sistem adımı (`409`). İstemci "Yenile"yi yalnızca `field: "baseVersion"` olan `409`'da gösterir.
+- 2026-10-10 (M1): API'de zod varsayılan mesajları Türkçe (`z.locales.tr()`); `400` mesajı ilk hatanın mesajı, `field` ilk hatanın yolu (ör. `phases.6.steps.0.durationDays`).
+- 2026-10-10 (M1): API'ye ulaşılamazsa editör yerel şablonu gösterir, "Şablonu kaydet" kapalıdır (yerel kayıt yolu yok).
