@@ -1,5 +1,7 @@
 # Geliştirme Fazları
 
+> **2026-10-10: Bu dosyanın yerine `docs/PLAN.md` geçti.** Aşağısı tarihsel kayıttır (F0-04a'ya kadar); süreç (plan/gate/rol/branch) ve faz sırası artık geçerli değildir.
+
 **İlke:** Önce FE tam mockup olarak tamamlanır ve dondurulur; BE, dondurulmuş mockup'ın sözleşmesine (`docs/API_CONTRACT.md`) göre yazılır ve ekranlar modül modül gerçek API'ye bağlanır.
 Durum tespiti: `docs/AUDIT.md` v3 (2026-10-03, main @ 4bfa4cb). Lovable ile mockup geliştirmesi bitti; tüm geliştirme uygulama oturumu ile, bu dokümandaki döngüyle yapılır.
 

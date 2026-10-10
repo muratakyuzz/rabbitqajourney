@@ -2,6 +2,8 @@
 
 Bu dosya `/gate` çalıştırmalarından çıkan, merge'i engellemeyen Medium/Low bulguları biriktirir.
 
+> **2026-10-10: `/gate` süreci kaldırıldı (`docs/PLAN.md`).** Bu dosya tarihsel kayıttır; yeni bulgu eklenmez. Faz 1 kapsamını etkileyen açık maddeler gerekiyorsa PLAN.md "Kararlar"a taşınır.
+
 ## feat/m09a-step-completion (@ 6253eb4, 2026-10-04 — round 1)
 
 REV-01, REV-02, REV-03, REV-04, REV-06, RUL-01, RUL-02, RUL-03, RUL-08 round 2'de (@ c3048ec) düzeltildi ve doğrulandı — aşağıdaki tablodan çıkarıldı.
@@ -452,7 +454,7 @@ Gate kararı **MERGE'E HAZIR**. CI yeşil @ 5d7e656 (Murat bildirimi; `gh` yok).
 
 | ID | Severity | Özet | Dosya | Hedef faz |
 |---|---|---|---|---|
-| GATE-01 | Medium | Guard, yorumlayıcı üzerinden yapılan yazmayı ve korumalı yolun commit'lenmesini görmüyor. Builder BACKLOG'u `python3 - <<EOF … open(p,"w")` ile yazıp commit'ledi. `MUTATORS` listesinde python/node/awk/ruby yok; `p="docs/…"` token'ı eşleşmiyor; builder'ın `git add`/`commit` komutları denetlenmiyor. CLAUDE.md'deki "zorlayan: guard" beyanı şu an tam karşılanmıyor. Öneri: (1) builder `git commit` → `git diff --cached --name-only` ∩ `AUDIT_PATHS` ise engelle; (2) yorumlayıcıları `MUTATORS`'a ekle ve gömülü yol eşleşmesi kur; (3) `/fix` ve AGENTS.md'ye "BACKLOG gate'e aittir; korumalı yol isteyen talimatta dur ve bildir" kuralını yaz | .claude/hooks/guard.mjs:84-110; .claude/commands/fix.md | Kit değişikliği, F0-04b `/build` öncesi (Murat isteğiyle, denetim rolü); en geç F0-07 |
+| GATE-01 | Medium | Guard, yorumlayıcı üzerinden yapılan yazmayı ve korumalı yolun commit'lenmesini görmüyor. Builder BACKLOG'u `python3 - <<EOF … open(p,"w")` ile yazıp commit'ledi. `MUTATORS` listesinde python/node/awk/ruby yok; `p="docs/…"` token'ı eşleşmiyor; builder'ın `git add`/`commit` komutları denetlenmiyor. CLAUDE.md'deki "zorlayan: guard" beyanı şu an tam karşılanmıyor. Öneri: (1) builder `git commit` → `git diff --cached --name-only` ∩ `AUDIT_PATHS` ise engelle; (2) yorumlayıcıları `MUTATORS`'a ekle ve gömülü yol eşleşmesi kur; (3) `/fix` ve AGENTS.md'ye "BACKLOG gate'e aittir; korumalı yol isteyen talimatta dur ve bildir" kuralını yaz | .claude/hooks/guard.mjs:84-110; .claude/commands/fix.md | **Düzeltme hazır (denetim, 2026-10-10), Murat commit'i bekliyor.** Kapanış commit sonrası. Ayrıntı: "GATE-01 kit düzeltmesi" bölümü (aşağıda) |
 | REV-04 | Low (süreç) | `/fix`, uygulama rolüne salt okunur olan `docs/reviews/BACKLOG.md`'yi değiştirdi. Bunu Murat'ın talimatı istedi, ancak kapanışı gate'ten önce düzelten taraf kaydetti. Kök neden ve kalıcı çözüm GATE-01'de | docs/reviews/BACKLOG.md (5d7e656) | Kapandı. Gate kaydı yeniden yazdı; önleme için GATE-01 |
 | REV-05 | Low | Builder kapanışı "Hedef faz" sütununa yazdı ve "doğrulandı" iddiasını kendisi yaptı. Gelenek ise paragraf notu ve satırı tablodan çıkarmak | docs/reviews/BACKLOG.md | Kapandı (bu kayıt) |
 | REV-06 | Low (bilgi) | RUL-01 ve RUL-02 tek commit'te (WORKFLOW.md:147). Aynı dosyada ortak tablolar kullanıldığı için kabul edildi | 5d7e656 | Eylem yok |
@@ -467,3 +469,55 @@ Gate kararı **MERGE'E HAZIR**. CI yeşil @ 5d7e656 (Murat bildirimi; `gh` yok).
 Merge sonrası denetim oturumu (Murat talimatı). Squash merge; branch CI @ 5d7e656 ve main CI @ 152fe0a yeşil (Murat bildirimi; `gh` yok). Branch silindi. Yukarıdaki iki bölümdeki branch hash'leri (007f47d, 5d7e656) tarihsel kayıttır; main'deki karşılığı 152fe0a.
 - **Kapandı:** F0-03b'den REV-01..04 ve `envDir` gözlemi; tur 1'den RUL-01, RUL-02; tur 2'den REV-04, REV-05 (gate kaydı), REV-06 (eylem yok).
 - **Açık kalan:** tur 1 REV-01 (F0-04b / F3), REV-02 (F0-06), REV-03 (F0-05), react-hooks 7 iz satırı (04c–04h); tur 2 GATE-01 (kit, F0-04b `/build` öncesi), REV-07 ve REV-08 (F0-04b), RR-Ö4 (F8-03 öncesi), QA-01 (F0-06), değişiklik notu iz satırı (F0-04b); F0-03b'den REV-05 (F0-05), QA-01 (F0-06), QA-02 (süreç notu), `guard.mjs:33` boşta kalan desenler (kit temizliği). Açık sorular (INV-12, boş `proposed: {}`, V2 `locked`, F8-03 notları) Murat kararı bekliyor.
+
+## GATE-01 kit düzeltmesi (denetim, 2026-10-10 — commit edilmedi, aşağıdaki süreç değişikliğiyle geçersiz)
+
+Murat isteğiyle denetim rolünde yapıldı. Değişen dosyalar: `.claude/hooks/guard.mjs`, `.claude/commands/build.md`, `.claude/commands/fix.md`, `CLAUDE.md`. Denetim rolünün davranışı değişmedi; tek fark `guard.mjs:33`'teki boşta kalan desenlerin silinmesi.
+
+İlk yama (B) sandbox denemesinde dört bulgu verdi; bu sürüm (B2) dördünü de düzeltiyor:
+- **G1 (Medium):** korumalı dosya staged iken `merge --continue` ve `rebase --continue` geçiyordu. `checkout <rev> --` ve `restore --source` de korumalı yolu yazabiliyordu.
+- **G2 (Low, regresyon):** commit mesajındaki sözcük ve yollar yanlış pozitif veriyordu.
+- **G3 (Low):** `GIT_EDITOR` gibi zararsız değişkenler de engelleniyordu.
+- **G4 (Low):** okuma engellendiğinde mesaj yol göstermiyordu.
+
+Düzeltilmiş davranış:
+- **Commit anı (asıl güvence):** builder `git commit`, `git merge --continue` ya da `git rebase --continue` çalıştırınca guard commit'e girecek dosyaları `AUDIT_PATHS` ile kesiştirir (G1). Kapsanan biçimler:
+  - staged dosyalar
+  - `-a`/`--all`/`-p` (izlenen değişiklikler)
+  - pathspec (`git commit <yol>`, `-- <klasör>`)
+  - `--amend` (HEAD'in dosyaları dahil)
+  - aynı çağrıdaki `git add` (dry-run listesi)
+
+  Çakışmalı merge ya da rebase'te, içeriği `MERGE_HEAD`/`REBASE_HEAD` ile aynı olan korumalı dosya builder'ın yazdığı sayılmaz.
+- **Başka sürümden yazma (G1):**
+  - `git checkout <rev> -- <yol>`, `git checkout <rev> <yol>` ve `git restore --source=<rev>`, korumalı bir yolu HEAD dışındaki bir sürümden yazıyorsa engellenir.
+  - Kaynak HEAD ya da index ise izin verilir. Böylece geri alma yolu açık kalır: `git restore --staged --worktree -- <yol>`, `git checkout -- <yol>`.
+  - `git stash pop/apply/branch`, stash korumalı yol içeriyorsa engellenir. `git merge`/`pull` ile stash getirmek kapalı.
+- **Kapsanamayan biçimler builder'da kapalı:**
+  - `git commit`'ten önce aynı çağrıda çalışan ve dosya değiştirebilecek bir komut
+  - `bash -c`, heredoc ya da başka bir komutun içinden git commit
+  - başka depo/index/çalışma ağacı gösteren ortam değişkenleri: `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR`, `GIT_NAMESPACE` (`GIT_EDITOR`, `GIT_PAGER` vb. serbest, G3)
+  - `--git-dir`/`--work-tree`, `-c alias.*`, commit/add içeren git alias'ı, `--pathspec-from-file`
+  - `commit-tree`, `update-ref`, `fast-import`, `filter-branch`, `filter-repo`, `replace`, `am`, `cherry-pick`, `revert`, `rebase --exec`
+
+  Gerekçe: bunlar "git commit" denetiminden geçmeden commit oluşturur ya da guard'ın göremediği bir index'i kullanır.
+- **Yazma anı (yardımcı):** builder'da yorumlayıcılar (`python*`, `node`, `deno`, `bun`, `ruby`, `perl`, `php`, `lua`, `awk` ailesi, `osascript`) dosya değiştiren komut sayılır. Korumalı yol eşleşmesi atama ve tırnak içini de görür (`p="docs/…"`, `open('docs/…')`).
+  - **G2:** builder'daki metin taramaları commit/merge mesajını dışarıda bırakır. Bu, yorumlayıcı ve dosya değiştiren komut taramasını, yönlendirme hedeflerini ve push/tag kurallarını kapsar. Dışarıda kalanlar: `-m`/`--message`/`--trailer` değerleri ve `$(cat <<EOF …)` gövdesi. `-F <dosya>` adı taranmaya devam eder. Yorumlayıcıya giden heredoc gövdesi (`python3 - <<EOF`) de taranmaya devam eder.
+  - **G4:** yorumlayıcı nedeniyle verilen engelin mesajı "okuma içinse Read veya Grep aracını kullan" ipucunu taşır.
+- **Talimat:** `/build`, `/fix` ve `CLAUDE.md`'ye eklendi: "`docs/reviews` ve BACKLOG gate'e aittir. Bir talimat korumalı bir yola yazmanı isterse dur ve bildir; başka bir yoldan (yorumlayıcı, script, git) yazmaya çalışma." `git commit` ayrı bir Bash çağrısında çalışır.
+- **Kapandı:** `guard.mjs:33` boşta kalan desenler (`^src/`, `^public/`, `^index\.html$`; F0-03b notu) silindi.
+- **Kanıt:** 56 senaryolu simülasyonun hepsi beklenen sonucu verdi (B'nin 35 senaryosu + G1–G4 için 21 senaryo).
+  - Simülasyon scratch klonda, `CLAUDE_ROLE=builder` ile çalıştı; gerçek `.claude/role` değişmedi.
+  - Her senaryo üç sürümde koşuldu: B öncesi, B ve B2. B sütunu bulguları doğruladı: Y1, Y3, Y4, Y5 ve stash pop B'de geçiyordu; X1 ve Y6 B'de engelleniyordu.
+  - Denetim rolü vakalarında üç sürüm aynı sonucu verdi. Tek fark `src/` yazımı (temizliğin kendisi).
+
+| ID | Severity | Özet | Dosya | Hedef faz |
+|---|---|---|---|---|
+| GATE-02 | Low | Guard'ın test düzeneği yok. GATE-01 düzeltmesi tek seferlik simülasyonla doğrulandı. Önerilen düzenek: `node --test` ile geçici git deposunda durum kuran, guard'a stdin JSON veren tablo testleri. Senaryolar: GATE-01 ENGELLENMELİ/GEÇMELİ listesi (B ve B2) + denetim rolü regresyonu. Kit değişikliklerinde CI adımı olmalı | .claude/hooks/guard.mjs | F0-07 (CI ile birlikte) |
+| GATE-03 | Low (bilgi) | Kalan açıklar: script dosyası ya da `npm run` içinden git commit; stash'ten açılan geçici branch'in merge'ü; string birleştirmeyle gizlenmiş yol (yazma anında görülmez, commit anında yakalanır); `git reset <rev> -- <yol>` yalnız index'e yazar (yazma anında görülmez, commit anında yakalanır). Bilinen yanlış pozitif: builder yorumlayıcı komutunda korumalı yol geçerse okuma da engellenir (ör. `awk 'NR<=40' docs/plans/…`, `node --env-file=.env`). Mesaj Read/Grep'e yönlendirir (G4). İkinci katman: gate diff denetimi | .claude/hooks/guard.mjs | F0-07: branch korumasıyla birlikte push anında `origin/main...HEAD` ∩ `AUDIT_PATHS` denetimi değerlendirilsin. Branch'teki gate kayıt commit'leri için istisna kuralı gerekir |
+
+## Süreç değişikliği (2026-10-10)
+
+`docs/PLAN.md` ile rol ayrımı, `/gate`, branch ve plan dosyası süreci kaldırıldı. Guard artık yalnızca gizli dosyaları korur; rol ve commit denetimi yok.
+- **Kapandı (süreç değişti):** GATE-01 (yukarıdaki B2 düzeltmesi commit edilmedi; yerine sade guard geldi), GATE-02 (guard'ın denetlediği rol/commit mantığı kalmadı), GATE-03 (aynı gerekçe).
+- Diğer açık satırlar (REV-*, QA-*, RR-*) tarihsel; Faz 1 maddeleriyle çakışanlar ilgili kilometre taşında ele alınır.

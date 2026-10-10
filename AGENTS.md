@@ -1,7 +1,7 @@
 # AGENTS.md — RabbitQA Onboarding Tracker
 
-Bu dosya bu repoda çalışan **tüm AI kodlama ajanları** (Claude Code'un uygulama ve denetim oturumları, alt ajanlar) için bağlayıcı kurallardır.
-Her görevden önce bu dosyayı, `docs/INVARIANTS.md` ve `docs/RBAC.md`'yi oku.
+Bu dosya bu repoda çalışan **tüm AI kodlama ajanları** için bağlayıcı kurallardır.
+Her görevden önce bu dosyayı ve `docs/PLAN.md`'yi oku. Faz planı ve çalışma kuralları için **`docs/PLAN.md` geçerlidir** (`docs/PHASES.md` ve `docs/WORKFLOW.md` tarihsel).
 
 ---
 
@@ -13,16 +13,16 @@ Arayüz dili **Türkçe**. Kod, tablo, değişken ve commit mesajları **İngili
 Hiyerarşi: **Müşteri → Onboarding projesi → Aşama → Adım → Aksiyon**
 Roller: `csm`, `devops`, `care`, `manager`, `admin` (enum değerleri mockup'takiyle aynıdır; değiştirilmez)
 
-**Yaklaşım:** FE mock veriyle tam mockup olarak tamamlandı (Lovable, bitti) ve M-09 + M-06 ile dondurulur. BE dondurulmuş mockup'ın sözleşmesine (`docs/API_CONTRACT.md`) göre yazılır; ekranlar modül modül `mock` → `http` adaptörüne geçirilir. Mevcut durum: `docs/AUDIT.md`.
+**Yaklaşım:** FE mock veriyle tam mockup olarak tamamlandı. BE mockup'ın sözleşmesine (`docs/API_CONTRACT.md`) göre yazılır; ekranlar ekran ekran API'ye bağlanır (Faz 1 kapsamı ve store köprüsü: `docs/PLAN.md`). Mevcut durum: `docs/AUDIT.md`.
 
-### Demo kuralları (Faz M — M-09 ve mockup koduna dokunan her iş, F0-04 sonuna kadar)
-- Backend, veritabanı, Supabase yok. Tüm veri `src/lib/rabbitqa/` store'unda (`RqProvider`/`useRq`) ve seed'de.
+### Mockup kuralları (henüz API'ye bağlanmamış ekranlar)
+- Bu ekranların verisi `apps/web/src/lib/rabbitqa/` store'unda (`RqProvider`/`useRq`) ve seed'de.
 - Her veri değişikliği store fonksiyonundan geçer ve audit yazar; bileşende state doğrudan değişmez.
 - Gerekçe zorunlu: kurulum tipi/LLM değişikliği, tarih ve durum değişikliği, uyarı kapatma/erteleme.
 - Enum değerleri değiştirilmez/yeniden adlandırılmaz; yalnızca yeni değer eklenir. Model değişirse state sürümü +1 ve store KEY aynı sürüme.
 - Akış yalnızca `flow.ts` (`advanceFlow`, `isOpenStep`); adım tamamlama yalnızca `completion.ts` (M-09a); uyarılar yalnızca `alerts.ts`; iş günü yalnızca `business-days.ts`; rapor snapshot'ı yalnızca `reports.ts`.
 - Yetki yalnızca `perm.ts`; bileşende rol karşılaştırması yok (Overview'daki role göre içerik hariç).
-- Yeni npm paketi yok (F0-03 hariç: yalnızca ADR-0006 K4 izin listesi; F0-04: yalnızca ADR-0007 K2 izin listesi). Arayüz Türkçe, tarih `gg.aa.yyyy`, mevcut AppShell/tema/shadcn.
+- Yeni npm paketi eklemeden önce sor (`docs/PLAN.md` teknik kararlarındakiler hariç). Arayüz Türkçe, tarih `gg.aa.yyyy`, mevcut AppShell/tema/shadcn.
 - Kilitli ("Sırası gelmedi") adım iş sayılmaz.
 
 ### Mockup yapısı (main @ 4bfa4cb)
@@ -57,7 +57,7 @@ apps/api/src/
   core/audit/                audit yazıcı (tek giriş noktası)
   core/crypto/               AES-256-GCM
   core/rules/                otomatik kural motoru
-  db/                        pool (pgmem|pg), transaction yardımcısı, migration runner, seed
+  db/                        pg-mem, schema.sql, seed yükleme, transaction yardımcısı (Faz 1; pg + migration runner Faz 2)
 apps/worker/src/             Teams/e-posta okuma, e-posta eşleştirme, AI analizi (ADR-0003); proje verisini DEĞİŞTİRMEZ (INV-21)
   sources/                   ChatSource, MailSource adaptörleri (mock | graph | imap)
   analyzer/                  AiAnalyzer (mock | llm)
@@ -70,37 +70,28 @@ docs/                        PRODUCT_SPEC, AUDIT, API_CONTRACT, INVARIANTS, RBAC
 ```
 
 ## 4. Değişmez kurallar
-Tam liste ve doğrulama yöntemleri: **`docs/INVARIANTS.md`**. Yetki matrisi: **`docs/RBAC.md`**. İhlal = gate reddi.
-En sık unutulanlar:
-- Her yazma işlemi `core/audit` üzerinden ve aynı transaction içinde audit kaydı üretir.
-- Her endpoint `authorize()` çağırır; yetki yalnızca UI'da gizlemekle sağlanmaz.
-- Migration'lar pg-mem **ve** PostgreSQL'de çalışmak zorunda; trigger/PL/pgSQL/RLS yok.
-- Repository'de motor kontrolü (`if (isPgMem)`) yok.
-- Doğrulama şemaları, enum'lar ve iş günü hesabı `packages/shared`'dan gelir; kopyası yazılmaz (INV-19).
-- Bir modül API'ye bağlanınca o modülün kural kodu web'den kaldırılır (INV-20).
+Tam liste: **`docs/INVARIANTS.md`**. Yetki matrisi: **`docs/RBAC.md`**.
+**Faz 1 istisnası (`docs/PLAN.md`):** `authorize()`, RBAC ve audit (geçmiş tablosu) Faz 2'ye kadar yok; gerekçe zorunlulukları API'de doğrulanır ve kaydın üzerinde saklanır. Veritabanı pg-mem (bellekte, açılışta şema + seed); migration runner ve parity yok.
+Faz 1'de de geçerli olanlar:
+- Doğrulama şemaları, enum'lar, seed ve iş kuralları (`flow`, `rules`, `completion`, `business-days`) `packages/shared`'dan gelir; kopyası yazılmaz (INV-19).
+- Bir modül API'ye bağlanınca o modülün kural kodu web'de kopya olarak kalmaz (INV-20).
+- Repository'de motor kontrolü (`if (isPgMem)`) yok; trigger/PL/pgSQL/RLS yok.
+- Çok tablolu yazmalar tek transaction'da.
 
-## 5. Çalışma akışı (detay: `docs/WORKFLOW.md`)
-1. Her görevin planı vardır: `docs/plans/<FAZ>-<NO>-<slug>.md` (planner üretir, Murat onaylar).
-2. **Yalnızca plandaki kapsam** uygulanır. Kapsam dışı fikirler değişiklik notunda (`docs/changes/<branch>.md`) "Öneriler" altına yazılır.
-3. Branch: `feat/<faz>-<no>-<slug>`, `fix/…`, `chore/…`. `main`'e doğrudan push yok. Uzak depo: yalnızca GitHub.
-4. Conventional Commits (`feat:`, `fix:`, `test:`, `chore:`, `docs:`).
-5. Push etmeden önce: `npm run lint && npm run typecheck && npm test && npm run build`. E2E etkileniyorsa `npm run e2e`.
-6. Değişiklik notu (`docs/changes/_TEMPLATE.md`) eksiksiz doldurulur. **PR açılmaz:** branch push edilir, `/gate` branch'i inceler, main'e squash merge'ü Murat terminalden yapar.
-7. Merge koşulları: CI yeşil (**parity job dahil**) + `reviewer` ve `qa-verifier` APPROVE (+ tetiklenirse `rules-reviewer`).
+## 5. Çalışma akışı (`docs/PLAN.md` → "Çalışma kuralları")
+1. Doğrudan `main`. Branch, plan dosyası, gate, rol ayrımı yok. Sıradaki iş `docs/PLAN.md`'deki ilk işaretlenmemiş madde (`/build`).
+2. Kapsam yalnızca o madde. Karar gerekirse `docs/PLAN.md` → "Kararlar" listesine bir satır; ayrı plan dosyası, ADR, BACKLOG turu yok.
+3. Conventional Commits (`feat:`, `fix:`, `test:`, `chore:`, `docs:`).
+4. Commit'ten önce `npm run check` (lint + typecheck + test) yeşil. CI (`app` + `secrets`) kırmızıysa önce o düzeltilir.
+5. Kilometre taşı bitince PLAN.md kutuları işaretlenir ve `git tag mN`.
 
 ## 6. Tamamlanma tanımı
-- [ ] Plandaki tüm kabul kriterleri karşılandı, her biri bir testle eşlendi
-- [ ] Yeni/değişen iş kuralı için unit + entegrasyon testi (negatif senaryo dahil)
-- [ ] Lint, typecheck, test, build yeşil; CI parity yeşil
-- [ ] Yeni tablo: ortak kolonlar + soft delete + audit kapsamında + `DATA_MODEL.md` güncel
-- [ ] Yeni endpoint: `authorize()` + RBAC testi (izinli + yasaklı rol)
+- [ ] Maddenin kabul kriterleri karşılandı; her davranış bir testle (negatif senaryo dahil) eşlendi
+- [ ] `npm run check` yeşil
 - [ ] UI metinleri Türkçe; yükleniyor/boş/hata durumları var
-- [ ] Gerekiyorsa ADR veya docs güncellendi
+- [ ] Gerekiyorsa `docs/PLAN.md` (Kararlar/Notlar) ve `docs/API_CONTRACT.md` güncellendi
 
 ## 7. Ajanlara not
-- Bu repoda tek araç Claude Code'dur, ama iki rolle çalışılır (`docs/WORKFLOW.md` → "İki rol"). Rol `.claude/role` dosyasından okunur; yalnızca Murat değiştirir:
-  - **Uygulama rolü** (`echo builder > .claude/role`): planı uygular, test yazar, değişiklik notunu yazar, branch'e commit/push eder (`/build`, `/fix`). Kendi işini onaylamaz, `/gate` çalıştırmaz, merge etmez.
-  - **Denetim rolü** (varsayılan, `rm .claude/role`): plan üretir ve inceler (`/plan`, `/gate`, `/phase-close`); uygulama koduna yazamaz (`guard.mjs`).
-- Yazan ve denetleyen aynı sohbet olamaz: `/gate` her zaman denetim rolünde, uygulama sohbetini görmemiş yeni bir sohbette (`/clear`) çalışır.
-- Emin olmadığın iş kuralında tahmin etme; değişiklik notunda "Açık sorular"a yaz, güvenli varsayımı belirt.
-- Gate bulgusunu düzeltirken bulgu ID'sini commit mesajına ekle: `fix: enforce reason on status change [REV-03]`.
+- Emin olmadığın iş kuralında tahmin etme; dur ve sor ya da güvenli varsayımı PLAN.md "Kararlar"a yaz.
+- `.env` ve gizli anahtar dosyalarına dokunma (`.claude/hooks/guard.mjs` engeller).
+- `.github/workflows/` değişikliğini öner; Murat uygular.

@@ -1,5 +1,7 @@
 # Geliştirme Akışı — Claude Code: uygulama oturumu + denetim oturumu
 
+> **2026-10-10: Bu akış kaldırıldı.** Geçerli çalışma kuralları `docs/PLAN.md` → "Çalışma kuralları" (doğrudan `main`, rol/gate/plan dosyası yok). Aşağısı tarihsel kayıttır.
+
 ## Kim ne yapar?
 | Kim | Yetki | Ne yapar | Ne yapmaz |
 |---|---|---|---|
