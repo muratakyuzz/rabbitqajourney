@@ -52,7 +52,7 @@ Faz M kapandı: `/phase-close M` round 3 → GO (2026-10-06, main @ dffa61f, `do
 | F0-03a | **Yükseltme (tek paket yapısında):** React 19, Vite 8 + plugin-react v6, Vitest 5 (+ `@vitest/*`), Tailwind 4, react-router 7, recharts 3, date-fns 4 + @date-fns/tz; `npm audit` (tam) 0. Plan: `docs/plans/F0-03a-stack-upgrades.md`, ADR-0006. **Kabul:** M-06 görsel referansına göre fark yok (L5b, ADR-0006 K5) | | ✅ |
 | F0-03b | **Monorepo taşıma:** `apps/web` (mevcut kod), `apps/api` (boş), `packages/shared`; npm workspaces. F0-03a merge'ünden sonra. Plan: `docs/plans/F0-03b-monorepo.md`. **Kabul:** saf taşıma (R100), CSS hash aynı, M-06 görsel referansına göre fark yok | | ✅ |
 | F0-04 | **FE veri erişim katmanı (çerçeve):** `packages/shared` zod şemaları (types.ts'ten), modül bazlı TanStack Query hook'ları, `DataSource` arayüzü; mevcut store → `mock` adaptörü; modül başına `VITE_DATA_<MODÜL>=mock\|http` anahtarı; ekranlar `useRq()` yerine hook'ları kullanır. 04a–04h olarak bölündü (ADR-0007 K1; çerçeve: `docs/plans/F0-04-fe-data-layer.md` §0). Her alt görev ayrı plan/branch/gate; 04c–04h'de L5b-A (ADR-0006 K5). **Kabul:** görsel referansa göre fark yok, tüm akışlar aynı | ● | |
-| F0-04a | **Zemin:** REV-01..03 belge düzeltmeleri (ilk, ayrı commit), REV-04 (shared `tsconfig`), `envDir` (repo kökü), eslint-plugin-react-hooks (ADR-0007 K2), 33 enum → `packages/shared`, `ActionCreate` / `RiskDecisionCreate` / `InsightProposal` şemaları (#44 izin listesi, INV-19). Plan: `docs/plans/F0-04-fe-data-layer.md` §1–§13. **Kabul:** web build çıktısı main ile bayt düzeyinde aynı (ADR-0007 K6) | ● | |
+| F0-04a | **Zemin:** REV-01..03 belge düzeltmeleri (ilk, ayrı commit), REV-04 (shared `tsconfig`), `envDir` (repo kökü), eslint-plugin-react-hooks (ADR-0007 K2), 33 enum → `packages/shared`, `ActionCreate` / `RiskDecisionCreate` / `InsightProposal` şemaları (#44 izin listesi, INV-19). Plan: `docs/plans/F0-04-fe-data-layer.md` §1–§13. **Kabul:** web build çıktısı main ile bayt düzeyinde aynı (ADR-0007 K6) | ● | ✅ |
 | F0-04b | **Varlık şemaları:** `types.ts` varlıkları → `packages/shared` (mekanik); `AiInsight` = `InsightProposal` + sunucu alanları; seed uygunluk testi | ● | |
 | F0-04c | **Veri katmanı çekirdeği + pilot:** `DataSource`, `DataError`, mod çözücü (`VITE_DATA_<MODÜL>`), mock köprüsü, sorgu anahtarları, QueryClient (ADR-0007 K7); pilot: kullanıcılar, satışçılar, modüller (`UsersAdmin`, `Admin`) → F2-01, F2-02 | ● | |
 | F0-04d | **Konfigürasyon:** şablon, keşif soruları, eşikler, tatiller, Değişiklikler, entegrasyon ayarları, eşleşmeyen e-postalar (`Admin`, `AlertsAdmin`, `IntegrationsAdmin`) → F2-03..05, F8-01, F8-05 | ● | |
@@ -80,6 +80,12 @@ Faz M kapandı: `/phase-close M` round 3 → GO (2026-10-06, main @ dffa61f, `do
 - **Kabul:** taşınan dosyaların hepsi R100; CSS ve JS bundle'larının adı ve sha256'sı F0-03a ile aynı; L5b-B `csm-overview` baseline ile uyumlu.
 - **Kapandı:** REV2-01..03 (F0-03a artıkları) bu görevde kapandı. REV-06 (kitteki yedek komutlar monorepo'ya uyarlandı: `npm run typecheck`, `npm ci`, `npm run dev` / `preview`; Murat onayı).
 - **Taşınanlar:** REV-04 → F0-04 (shared `tsconfig`), REV-05 → F0-05 (workspace bazında ESLint), `envDir` gözlemi → F0-04. REV-01..03 (belge düzeltmeleri) açık (`docs/reviews/BACKLOG.md`).
+
+**F0-04a kapanışı (2026-10-10, main @ 152fe0a, squash):** `/gate` 2 tur → MERGE'E HAZIR: tur 1 @ 007f47d, tur 2 @ 5d7e656 (`docs/reviews/chore_f0-04a-shared-foundation/SUMMARY.md`).
+- **CI:** branch @ 5d7e656 ve main @ 152fe0a yeşil (Murat bildirimi; `gh` yok). Branch silindi.
+- **Kabul (ADR-0007 K6):** web build çıktısı main ile bayt düzeyinde aynı; CSS ve JS bundle'larının adı ve sha256'sı tur 1 ve tur 2'de aynı (AC9).
+- **Kapandı:** F0-03b artıkları REV-01..03 (belge düzeltmeleri), REV-04 (shared `lib`/`types`) ve `envDir` gözlemi; tur 1 RUL-01 (#44 türler arası alan reddi) ve RUL-02 (RiskStatus çapraz testi) tur 2'de.
+- **Taşınanlar:** `docs/reviews/BACKLOG.md` → "F0-04a kapanış". GATE-01 (guard, kit) ayrı commit'te.
 
 ## F1 — Veri modeli, çekirdek & yetki
 | Kod | Görev | Kural |

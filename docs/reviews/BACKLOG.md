@@ -461,3 +461,9 @@ Gate kararı **MERGE'E HAZIR**. CI yeşil @ 5d7e656 (Murat bildirimi; `gh` yok).
 | RR-Ö4 | Low | Sunucunun atadığı alanlar (`source`, `ruleKey`, `insightId`, `meetingId`, `kind`) yalnızca create türlerinde açıkça reddediliyor. Update türlerinde bunları yalnızca `.strict()` koruyor | packages/shared/src/schemas/insight.test.ts:128-139 | F8-03 öncesi |
 | QA-01 | Low | Flaky: soğuk worktree'de `npm ci` sonrası ilk koşuda `HandoverWorkspace.test.tsx` (AC1) ve `HandoverWorkspace.toast-router.test.tsx` (QA-02) 5000 ms'de zaman aşımına uğradı. Sonraki 3 koşu temiz | apps/web/src/pages/project/workspaces/HandoverWorkspace{,.toast-router}.test.tsx | F0-06 (açık timeout ya da yavaşlık incelemesi) |
 | — | Low (iz) | Değişiklik notundaki RUL-01 mutasyon satırında M3'ün tipi yazılmamış. "→ 4" sayısı `z.string()` ile çıkıyor, `StepStatusSchema` ile 2 | docs/changes/chore_f0-04a-shared-foundation.md:166 | F0-04b değişiklik notu |
+
+## F0-04a kapanış (main @ 152fe0a, 2026-10-10)
+
+Merge sonrası denetim oturumu (Murat talimatı). Squash merge; branch CI @ 5d7e656 ve main CI @ 152fe0a yeşil (Murat bildirimi; `gh` yok). Branch silindi. Yukarıdaki iki bölümdeki branch hash'leri (007f47d, 5d7e656) tarihsel kayıttır; main'deki karşılığı 152fe0a.
+- **Kapandı:** F0-03b'den REV-01..04 ve `envDir` gözlemi; tur 1'den RUL-01, RUL-02; tur 2'den REV-04, REV-05 (gate kaydı), REV-06 (eylem yok).
+- **Açık kalan:** tur 1 REV-01 (F0-04b / F3), REV-02 (F0-06), REV-03 (F0-05), react-hooks 7 iz satırı (04c–04h); tur 2 GATE-01 (kit, F0-04b `/build` öncesi), REV-07 ve REV-08 (F0-04b), RR-Ö4 (F8-03 öncesi), QA-01 (F0-06), değişiklik notu iz satırı (F0-04b); F0-03b'den REV-05 (F0-05), QA-01 (F0-06), QA-02 (süreç notu), `guard.mjs:33` boşta kalan desenler (kit temizliği). Açık sorular (INV-12, boş `proposed: {}`, V2 `locked`, F8-03 notları) Murat kararı bekliyor.
