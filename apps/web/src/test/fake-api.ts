@@ -5,7 +5,7 @@ import { applyStepCompletion } from "@rabbitqa/shared/domain/completion";
 import { advanceFlow, type MkAudit } from "@rabbitqa/shared/domain/flow";
 import { applyMeetingHeldRules } from "@rabbitqa/shared/domain/rules";
 import { createSeed, uid } from "@rabbitqa/shared/domain/seed";
-import type { Action, Meeting, RqState } from "@rabbitqa/shared/domain/types";
+import type { Action, Meeting, RqState, Step } from "@rabbitqa/shared/domain/types";
 
 // In-memory stand-in for apps/api in web tests: serves the seed like a fresh API boot.
 // `handlers` override routes by "METHOD /path" regex (path without the /api prefix).
@@ -87,9 +87,25 @@ export function fakeApi(handlers: Record<string, Handler> = {}) {
       });
       return json(200, { phases: [], steps, actions: [], meetings: [next] });
     }
+    m = key.match(/^POST \/phases\/([^/]+)\/complete$/);
+    if (m) {
+      // like apps/api completePhase: no checks here (tests of errors use handlers), the flow engine runs after
+      const phase = server.phases.find((p) => p.id === m![1]);
+      if (!phase) return apiError(404, "NOT_FOUND", "Aşama bulunamadı.");
+      const before = new Map([...server.phases, ...server.steps, ...server.actions].map((x) => [x.id, JSON.stringify(x)]));
+      const done = { ...phase, status: "done" as const, approvedBy: "u_admin", approvedAt: new Date().toISOString(), actualEnd: new Date().toISOString().slice(0, 10) };
+      const next = advanceFlow({ ...server, phases: server.phases.map((p) => (p.id === done.id ? done : p)) }, phase.projectId, noAudit, new Date());
+      Object.assign(server, { phases: next.phases, steps: next.steps, actions: next.actions });
+      const changed = <T extends { id: string }>(xs: T[]) => xs.filter((x) => before.get(x.id) !== JSON.stringify(x));
+      return json(200, { phases: changed(next.phases), steps: changed(next.steps), actions: changed(next.actions), meetings: [] });
+    }
     m = key.match(/^POST \/projects\/([^/]+)\/steps\/sync$/);
     if (m) {
-      const b = call.body as { steps?: unknown[]; actions?: unknown[] };
+      // stored as sent (upsert by id) and echoed, like the API for records it accepts
+      const b = call.body as { steps?: Step[]; actions?: Action[] };
+      const upsert = <T extends { id: string }>(list: T[], items: T[]) =>
+        [...list.map((x) => items.find((i) => i.id === x.id) ?? x), ...items.filter((i) => !list.some((x) => x.id === i.id))];
+      Object.assign(server, { steps: upsert(server.steps, b.steps ?? []), actions: upsert(server.actions, b.actions ?? []) });
       return json(200, { phases: [], steps: b.steps ?? [], actions: b.actions ?? [] });
     }
     return apiError(404, "NOT_FOUND", "Uç bulunamadı.");

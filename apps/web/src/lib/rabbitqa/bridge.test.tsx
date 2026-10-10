@@ -164,6 +164,56 @@ describe("API bridge", () => {
     error.mockRestore();
   });
 
+  describe("Go-Live approval (review Y1)", () => {
+    /** p_garanti with 07 open on the server: Go/No-Go and the commitment check done, customer approval pending. */
+    function goLiveApi(complete?: () => Response) {
+      const api = fakeApi(complete ? { "POST /phases/[^/]+/complete": complete } : {});
+      const p07 = api.server.phases.find((p) => p.projectId === "p_garanti" && p.code === "07")!;
+      api.server.phases = api.server.phases.map((p) => (p.id === p07.id ? { ...p, status: "in_progress", activatedAt: "2026-10-01T09:00:00.000Z" } : p));
+      const status = { gonogo: "done", commit_check: "done", customer_approval: "pending" } as const;
+      api.server.steps = api.server.steps.map((st) => {
+        const k = st.phaseId === p07.id ? (st as { key?: keyof typeof status }).key : undefined;
+        return k && status[k] ? { ...st, status: status[k], activatedAt: "2026-10-01T09:00:00.000Z" } : st;
+      });
+      return { api, p07 };
+    }
+
+    /** Not inside act(): approveGoLive waits for the store commit, which act() would hold back until it returns. */
+    async function approve(rq: ReturnType<typeof useRq>) {
+      let out: Awaited<ReturnType<typeof rq.approveGoLive>> | undefined;
+      void rq.approveGoLive("p_garanti", "c_3", "2026-10-12", "Müşteri onayladı").then((r) => { out = r; });
+      await waitFor(() => expect(out).toBeDefined());
+      return out!;
+    }
+
+    it("07 is not closed locally: the bridge is sent at once, then POST /phases/:id/complete, then its effects are applied", async () => {
+      const { api, p07 } = goLiveApi();
+      const { result } = await setup(api);
+      const out = await approve(result.current);
+
+      expect(out).toEqual({ error: null, notice: null });
+      const writes = api.calls.filter((c) => c.method !== "GET");
+      expect(writes.map((c) => `${c.method} ${c.path}`)).toEqual(["POST /projects/p_garanti/steps/sync", `POST /phases/${p07.id}/complete`]);
+      const synced = (writes[0].body as { steps: { id: string; status: string }[] }).steps;
+      const approval = result.current.state.steps.find((st) => st.phaseId === p07.id && (st as { key?: string }).key === "customer_approval")!;
+      expect(synced.find((st) => st.id === approval.id)?.status).toBe("done");
+      expect(result.current.state.phases.find((p) => p.id === p07.id)).toMatchObject({ status: "done", approvedBy: "u_admin" });
+      expect(result.current.state.projects.find((p) => p.id === "p_garanti")?.goLiveApproval).toMatchObject({ contactId: "c_3", approvedAt: "2026-10-12" });
+      await pause(BRIDGE_DEBOUNCE_MS + 100);
+      expect(api.callsTo("POST", /steps\/sync$/)).toHaveLength(1); // the debounced send was replaced by the immediate one
+    });
+
+    it("complete answers 409 → the message comes back as a notice, 07 stays open, the approval is kept", async () => {
+      const { api, p07 } = goLiveApi(() => apiError(409, "CONFLICT", "1 zorunlu adım tamamlanmadı"));
+      const { result } = await setup(api);
+      const out = await approve(result.current);
+
+      expect(out).toEqual({ error: null, notice: `Onay kaydedildi; 07 ${p07.name} kapatılmadı: 1 zorunlu adım tamamlanmadı` });
+      expect(result.current.state.phases.find((p) => p.id === p07.id)?.status).toBe("in_progress");
+      expect(result.current.state.projects.find((p) => p.id === "p_garanti")?.goLiveApproval).toBeDefined();
+    });
+  });
+
   it("a project the API does not know stays local-only and is never synced", async () => {
     const api = fakeApi({ "GET /projects/p_ornek/phases": () => apiError(404, "NOT_FOUND", "Proje bulunamadı.") });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});

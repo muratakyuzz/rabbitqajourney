@@ -464,6 +464,7 @@ export function GoLiveTab({ project }: { project: Project }) {
   const [reason, setReason] = useState("");
   const [contactId, setContactId] = useState("");
   const [approvedAt, setApprovedAt] = useState(todayISO());
+  const [approving, setApproving] = useState(false);
   const steps = state.steps.filter((s) => s.projectId === project.id && ["gonogo", "commit_check", "customer_approval"].includes(s.key ?? ""));
   const commits = state.commitments.filter((c) => c.projectId === project.id);
   const openCommits = commits.filter((c) => c.status === "open");
@@ -546,12 +547,19 @@ export function GoLiveTab({ project }: { project: Project }) {
               <Label>Onay notu / gerekçe (zorunlu)</Label>
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Örn. Müşteri Go/No-Go toplantısında canlıya geçişi onayladı." />
             </div>
-            <Button disabled={!contactId} onClick={() => {
+            <Button disabled={!contactId || approving} onClick={async () => {
               if (!contactId) return toast.error("Onaylayan müşteri kişisini seçin");
               if (!reason.trim()) return toast.error("Onay notu zorunlu");
-              const err = approveGoLive(project.id, contactId, approvedAt, reason.trim());
-              if (err) toast.error(`Go-Live tamamlanamaz: ${err}`); else toast.success("Müşteri onayı kaydedildi");
-            }}>Müşteri onayını kaydet</Button>
+              setApproving(true);
+              try {
+                const { error, notice } = await approveGoLive(project.id, contactId, approvedAt, reason.trim());
+                if (error) toast.error(`Go-Live tamamlanamaz: ${error}`);
+                else if (notice) toast.warning(notice);
+                else toast.success("Müşteri onayı kaydedildi, Go-Live tamamlandı");
+              } finally {
+                setApproving(false);
+              }
+            }}>{approving ? "Kaydediliyor…" : "Müşteri onayını kaydet"}</Button>
           </CardContent>
         </Card>
       )}

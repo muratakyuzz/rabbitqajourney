@@ -126,6 +126,10 @@ export async function updateStep(db: Db, id: string, { reason, ...patch }: StepP
       if (lockErr) throw conflict(lockErr);
       const manualErr = manualStatusError(old, patch.status);
       if (manualErr) throw conflict(manualErr);
+      // the customer's Go-Live approval is recorded on the Go-Live screen (API_CONTRACT #5, S22); the bridge may still set it
+      if (old.key === "customer_approval" && patch.status === "done" && old.status !== "done") {
+        throw conflict("Müşteri onayı Go-Live ekranından kaydedilir");
+      }
       const statusChanged = patch.status !== undefined && patch.status !== old.status;
       const dueChanged = patch.due !== undefined && patch.due !== old.due;
       // marking a step done needs no reason (ADR-0004 K1); other manual status changes and due changes do

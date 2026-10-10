@@ -136,6 +136,24 @@ describe("PATCH /api/steps/:id", () => {
     expect((await stepOf("p_garanti", "st_garanti_19")).status).toBe("pending");
   });
 
+  it("customer_approval cannot be marked done by hand (409); the bridge still sets it (review D4)", async () => {
+    const { steps } = await phasesOf("p_garanti");
+    const approval = steps.find((s) => s.key === "customer_approval")!;
+    const open = { ...approval, status: "pending" as const };
+    expect((await request(app).post("/api/projects/p_garanti/steps/sync").send({ steps: [open] })).status).toBe(200);
+
+    const res = await request(app).patch(`/api/steps/${approval.id}`).send({ status: "done" });
+    expect(res.status).toBe(409);
+    expect(errorOf(res)).toMatchObject({ code: "CONFLICT", message: "Müşteri onayı Go-Live ekranından kaydedilir" });
+    expect((await stepOf("p_garanti", approval.id)).status).toBe("pending");
+    // other fields stay editable by hand
+    expect((await request(app).patch(`/api/steps/${approval.id}`).send({ ball: "csm" })).status).toBe(200);
+
+    const bridged = await request(app).post("/api/projects/p_garanti/steps/sync").send({ steps: [{ ...open, status: "done" }] });
+    expect(bridged.status).toBe(200);
+    expect((await stepOf("p_garanti", approval.id)).status).toBe("done");
+  });
+
   it("409 on a locked step", async () => {
     const res = await request(app).patch("/api/steps/st_garanti_19").send({ status: "pending", reason: "x" });
     expect(res.status).toBe(409);

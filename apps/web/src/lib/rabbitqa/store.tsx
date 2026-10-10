@@ -20,7 +20,7 @@ import { applyInstallType, applyLlmChoice, ensureReviewAction, installChoiceErro
 import type { RuleEffects, TemplateVersion } from "@rabbitqa/shared";
 import { fetchTemplate } from "@/lib/api/template";
 import { ApiError, apiErrorMessage } from "@/lib/api";
-import { getPhases, patchPhase, syncProject } from "@/lib/api/projects";
+import { completePhase, getPhases, patchPhase, syncProject } from "@/lib/api/projects";
 import { getActions } from "@/lib/api/actions";
 import { getMeetings } from "@/lib/api/meetings";
 import { diffProject, emptyView, mergeEffects, projectsIn, recordActions, recordSteps, replaceProjectData, type ServerView, canon } from "./server-sync";
@@ -30,6 +30,9 @@ export const BRIDGE_DEBOUNCE_MS = 300;
 
 /** Active template version from the API (not persisted); null while unknown or when the API is unreachable. */
 export type TemplateMeta = Omit<TemplateVersion, "phases">;
+
+/** Outcome of one bridge send for a project. */
+type FlushResult = "sent" | "nothing" | "failed" | "unbridged";
 
 function load(): RqState {
   try {
@@ -86,7 +89,11 @@ interface Ctx {
   addUser: (u: Omit<User, "id" | "active">) => string | null;
   updateUser: (id: string, patch: Partial<Pick<User, "role" | "active" | "name">>) => string | null;
   updateRisk: (id: string, patch: Partial<RiskDecision>, reason?: string) => string | null;
-  approveGoLive: (projectId: string, contactId: string, approvedAt: string, reason: string) => string | null;
+  /**
+   * Records the customer's Go-Live approval (store) and the customer_approval step, sends them through the bridge
+   * right away, then completes phase 07 through the API. `notice`: approval saved but 07 stayed open (and why).
+   */
+  approveGoLive: (projectId: string, contactId: string, approvedAt: string, reason: string) => Promise<{ error: string | null; notice: string | null }>;
   setConfig: <K extends "modules" | "questions" | "integrations" | "salespeople" | "alertThresholds" | "holidays" | "users">(key: K, value: RqState[K], label: string) => void;
   testConnection: (kind: "teams" | "email", override?: IntegrationConfig) => Promise<{ ok: boolean; message: string; channels?: ChatChannel[] }>;
   disconnect: (kind: "teams" | "email") => void;
@@ -158,7 +165,13 @@ export function RqProvider({ children }: { children: ReactNode }) {
   const views = useRef(new Map<string, ServerView>());
   const [localOnly, setLocalOnly] = useState<ReadonlySet<string>>(() => new Set());
   const stateRef = useRef(state);
-  useEffect(() => { stateRef.current = state; }, [state]);
+  // callers that must act on a committed store (e.g. send the bridge right away) wait here for the next commit
+  const commitWaiters = useRef<(() => void)[]>([]);
+  useEffect(() => {
+    stateRef.current = state;
+    for (const resolve of commitWaiters.current.splice(0)) resolve();
+  }, [state]);
+  const nextCommit = useCallback(() => new Promise<void>((resolve) => { commitWaiters.current.push(resolve); }), []);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const queues = useRef(new Map<string, Promise<void>>());
   const lastSent = useRef(new Map<string, string>());
@@ -213,16 +226,17 @@ export function RqProvider({ children }: { children: ReactNode }) {
     void hydrateAll(stateRef.current.projects.map((p) => p.id));
   }, [hydrateAll]);
 
-  const flush = useCallback((pid: string) => {
-    const run = async () => {
+  /** Sends the project's diff (queued per project). "unbridged": the project has no server view (offline, local-only). */
+  const flush = useCallback((pid: string): Promise<FlushResult> => {
+    const run = async (): Promise<FlushResult> => {
       const view = views.current.get(pid);
-      if (!view) return;
+      if (!view) return "unbridged";
       const diff = diffProject(stateRef.current, pid, view);
-      if (!diff.steps.length && !diff.actions.length) return;
+      if (!diff.steps.length && !diff.actions.length) return "nothing";
       const payload = canon(diff);
       if (lastSent.current.get(pid) === payload) {
         console.warn(`Köprü: ${pid} için aynı değişiklik tekrar oluştu, gönderilmedi (sunucu farklı tutuyor).`);
-        return;
+        return "nothing";
       }
       lastSent.current.set(pid, payload);
       // optimistic: what is in flight is not sent again while waiting
@@ -230,14 +244,24 @@ export function RqProvider({ children }: { children: ReactNode }) {
       recordActions(view, diff.actions);
       try {
         applyServerEffects(await syncProject(pid, diff));
+        return "sent";
       } catch (e) {
         toast.error(`Değişiklik sunucuya yazılamadı: ${apiErrorMessage(e)}`);
         await hydrate(pid);
+        return "failed";
       }
     };
     const next = (queues.current.get(pid) ?? Promise.resolve()).then(run, run);
-    queues.current.set(pid, next);
+    queues.current.set(pid, next.then(() => {}));
+    return next;
   }, [applyServerEffects, hydrate]);
+
+  /** Sends the project's pending diff now (no debounce) and waits for the answer. */
+  const flushNow = useCallback((pid: string) => {
+    clearTimeout(timers.current.get(pid));
+    timers.current.delete(pid);
+    return flush(pid);
+  }, [flush]);
 
   // Every store change: diff bridged projects against their server view; send after a short pause.
   useEffect(() => {
@@ -570,37 +594,40 @@ export function RqProvider({ children }: { children: ReactNode }) {
       patch<RiskDecision>("risks", id, p, reason);
       return null;
     },
-    approveGoLive: (projectId, contactId, approvedAt, reason) => {
+    approveGoLive: async (projectId, contactId, approvedAt, reason) => {
+      const fail = (error: string) => ({ error, notice: null });
       const contact = state.contacts.find((c) => c.id === contactId && c.projectId === projectId);
-      if (!contact) return "Onaylayan müşteri kişisini seçin";
-      if (!approvedAt) return "Onay tarihi zorunlu";
-      if (!reason.trim()) return "Onay notu zorunlu";
+      if (!contact) return fail("Onaylayan müşteri kişisini seçin");
+      if (!approvedAt) return fail("Onay tarihi zorunlu");
+      if (!reason.trim()) return fail("Onay notu zorunlu");
       const gonogo = state.steps.find((s) => s.projectId === projectId && s.key === "gonogo");
-      if (!gonogo || gonogo.status !== "done") return "Önce Go/No-Go toplantısını kaydedin";
+      if (!gonogo || gonogo.status !== "done") return fail("Önce Go/No-Go toplantısını kaydedin");
       const openCommits = state.commitments.filter((c) => c.projectId === projectId && c.status === "open");
-      if (openCommits.length) return `${openCommits.length} açık taahhüt var — önce kapatın veya karşılanamadı olarak işaretleyin`;
+      if (openCommits.length) return fail(`${openCommits.length} açık taahhüt var — önce kapatın veya karşılanamadı olarak işaretleyin`);
       const phase = state.phases.find((p) => p.projectId === projectId && p.code === "07");
+      // the approval and the customer_approval step stay in the store (mockup); phase 07 is closed by the API only
       setState((s) => {
-        let next = setStepByKey(s, projectId, "customer_approval", { status: "done" }, mkAudit, reason);
+        const next = setStepByKey(s, projectId, "customer_approval", { status: "done" }, mkAudit, reason);
         const approval = { contactId, approvedAt, recordedBy: userId, recordedAt: new Date().toISOString() };
-        next = {
+        return {
           ...next,
           projects: next.projects.map((p) => (p.id === projectId ? { ...p, goLiveApproval: approval } : p)),
           audit: [...next.audit, mkAudit({ projectId, kind: "update", entity: "project", entityId: projectId, label: `Go-Live müşteri onayı — ${contact.name}${contact.title ? ` (${contact.title})` : ""}, ${approvedAt.split("-").reverse().join(".")}`, field: "goLiveApproval", newValue: contact.name, reason })],
         };
-        if (phase) {
-          const open = next.steps.filter((x) => x.phaseId === phase.id && x.required && x.status !== "done" && x.status !== "out_of_scope");
-          if (!open.length) {
-            next = {
-              ...next,
-              phases: next.phases.map((p) => (p.id === phase.id ? { ...p, status: "done" as const, actualEnd: todayISO(), actualStart: p.actualStart ?? todayISO(), approvedBy: userId, approvedAt: new Date().toISOString() } : p)),
-              audit: [...next.audit, mkAudit({ projectId, kind: "update", entity: "phase", entityId: phase.id, label: phase.name, field: "status", oldValue: phase.status, newValue: "done", reason: "Müşteri onayı ile Go-Live tamamlandı" })],
-            };
-          }
-        }
-        return next;
       });
-      return null;
+      if (!phase) return { error: null, notice: null };
+      // the step must reach the server before the phase can be completed there: send the bridge now, then complete
+      await nextCommit();
+      const sent = await flushNow(projectId);
+      const notClosed = `${phase.code} ${phase.name} kapatılmadı`;
+      if (sent === "unbridged") return { error: null, notice: `Onay kaydedildi; proje sunucuya bağlı olmadığı için ${notClosed}.` };
+      if (sent === "failed") return { error: null, notice: `Onay kaydedildi ancak sunucuya yazılamadı; ${notClosed}.` };
+      try {
+        applyServerEffects(await completePhase(phase.id));
+        return { error: null, notice: null };
+      } catch (e) {
+        return { error: null, notice: `Onay kaydedildi; ${notClosed}: ${apiErrorMessage(e)}` };
+      }
     },
     createCustomerReport: (projectId, weekStart) => {
       if (!state.projects.some((p) => p.id === projectId)) return null;
@@ -841,7 +868,7 @@ export function RqProvider({ children }: { children: ReactNode }) {
     isLocalOnly: (pid) => localOnly.has(pid),
     };
     return api;
-  }, [state, userId, patch, add, mkAudit, templateVersion, applyTemplateVersion, applyServerEffects, hydrate, hydrateAll, localOnly]);
+  }, [state, userId, patch, add, mkAudit, templateVersion, applyTemplateVersion, applyServerEffects, hydrate, hydrateAll, localOnly, nextCommit, flushNow]);
 
   return <RqContext.Provider value={value}>{children}</RqContext.Provider>;
 }
