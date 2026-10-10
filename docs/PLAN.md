@@ -203,6 +203,8 @@ Diğer tüm ekranlar mockup kalır (store + localStorage) ve sonra **ekran ekran
 - [ ] Tek inceleme turu (M0–M4 aralığı) ve görsel kontrol (bu dört ekran)
 - [ ] `git tag faz1`
 - **Notlar:**
+  - e2e (`2d39cee`): `npm run e2e` gerçek API (`127.0.0.1:3001`) + Vite (`localhost:8080`) ile Chromium'da koşar; `npm run check`'e dahil değil. Şimdilik yalnız 1. adım (giriş → yeni proje → proje detayı) var. 2. adım bekliyor: 00 Satış Devri'nde elle tamamlanan adım yok (hepsi veri ya da toplantıyla tamamlanıyor); akışın hangi adımı "Tamamlandı" yapacağı Murat'ın kararı.
+  - İnceleme turu yapıldı (`docs/reviews/faz1-review.md`), bulgular düzeltildi (aynı dosyada "Düzeltmeler"). Görsel kontrol Murat'ta; kutu o zaman işaretlenir.
 
 ---
 
